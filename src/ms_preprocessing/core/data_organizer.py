@@ -258,21 +258,25 @@ class DataOrganizer(BaseProcessor):
         mz_col = df.columns[0]
         rt_col = df.columns[1]
 
-        # Create Mz/RT column
-        mz_rt_values = []
-        for idx in range(len(df)):
-            try:
-                mz_val = float(df.iloc[idx, 0])
-                rt_val = float(df.iloc[idx, 1])
+        # Vectorized merge for performance
+        mz_series = pd.to_numeric(df.iloc[:, 0], errors="coerce")
+        rt_series = pd.to_numeric(df.iloc[:, 1], errors="coerce")
+        valid_mask = mz_series.notna() & rt_series.notna()
 
-                # Format with specified decimal places
-                mz_rt = f"{mz_val:.{mz_decimals}f}/{rt_val:.{rt_decimals}f}"
-                mz_rt_values.append(mz_rt)
-                stats["mz_rt_merged"] += 1
-            except (ValueError, TypeError):
-                # Keep original value if conversion fails
-                mz_rt_values.append(f"{df.iloc[idx, 0]}/{df.iloc[idx, 1]}")
-                stats["invalid_values"] += 1
+        mz_np = mz_series.to_numpy()
+        rt_np = rt_series.to_numpy()
+        mz_str = np.char.mod(f"%.{mz_decimals}f", mz_np)
+        rt_str = np.char.mod(f"%.{rt_decimals}f", rt_np)
+        merged = np.char.add(np.char.add(mz_str, "/"), rt_str)
+
+        # Fallback to original strings for invalid rows
+        orig_mz = df.iloc[:, 0].astype(str).to_numpy()
+        orig_rt = df.iloc[:, 1].astype(str).to_numpy()
+        fallback = np.char.add(np.char.add(orig_mz, "/"), orig_rt)
+        mz_rt_values = np.where(valid_mask.to_numpy(), merged, fallback).tolist()
+
+        stats["mz_rt_merged"] = int(valid_mask.sum())
+        stats["invalid_values"] = int(len(df) - valid_mask.sum())
 
         # Create new DataFrame with Mz/RT as first column
         new_df = pd.DataFrame()

@@ -6,8 +6,9 @@ commonly used in mass spectrometry data processing.
 """
 
 from pathlib import Path
-from typing import Optional, Union, Tuple
+from typing import Optional, Union, Tuple, Any
 from datetime import datetime
+import json
 
 import pandas as pd
 import numpy as np
@@ -23,7 +24,7 @@ class FileHandler:
     preservation of formatting information where applicable.
     """
 
-    SUPPORTED_FORMATS = {".xlsx", ".xls", ".csv", ".tsv", ".txt"}
+    SUPPORTED_FORMATS = {".xlsx", ".xls", ".csv", ".tsv", ".txt", ".parquet"}
 
     def __init__(self):
         """Initialize the FileHandler."""
@@ -54,6 +55,11 @@ class FileHandler:
             Tuple of (DataFrame, metadata dict)
         """
         path = Path(file_path)
+        # Prefer parquet cache when loading Step2/Step3 outputs
+        if path.suffix.lower() == ".xlsx":
+            cached = self._resolve_parquet_cache(path)
+            if cached:
+                path = cached
         self._last_loaded_path = path
         self._red_font_rows = set()
         metadata = {"source_file": str(path), "load_time": datetime.now().isoformat()}
@@ -71,11 +77,17 @@ class FileHandler:
             metadata["format"] = "excel"
             metadata["sheet_name"] = sheet_name
         elif suffix == ".csv":
-            df = pd.read_csv(path, header=header_row)
+            df = self._load_delimited(path, header_row, sep=",")
             metadata["format"] = "csv"
         elif suffix in {".tsv", ".txt"}:
-            df = pd.read_csv(path, sep="\t", header=header_row)
+            df = self._load_delimited(path, header_row, sep="\t")
             metadata["format"] = "tsv"
+        elif suffix == ".parquet":
+            df = pd.read_parquet(path)
+            metadata["format"] = "parquet"
+            meta = self._load_parquet_meta(path)
+            if meta:
+                metadata.update(meta)
         else:
             raise ValueError(f"Unsupported file format: {suffix}")
 
@@ -93,7 +105,7 @@ class FileHandler:
     ) -> pd.DataFrame:
         """Load data from Excel file with formatting extraction."""
         # Load with pandas
-        df = pd.read_excel(file_path, sheet_name=sheet_name, header=header_row)
+        df = pd.read_excel(file_path, sheet_name=sheet_name, header=header_row, engine="openpyxl")
 
         # Extract red font information for protection logic
         self._red_font_rows = set()
@@ -140,6 +152,7 @@ class FileHandler:
         blue_font_cells: Optional[list] = None,
         red_font_rows: Optional[set] = None,
         extra_sheets: Optional[dict] = None,
+        save_parquet_cache: bool = False,
     ) -> Path:
         """
         Save data to a file.
@@ -169,10 +182,20 @@ class FileHandler:
                 red_font_rows,
                 extra_sheets=extra_sheets,
             )
+            if save_parquet_cache:
+                self._save_parquet_cache(
+                    df,
+                    path.with_suffix(".parquet"),
+                    highlight_rows=highlight_rows,
+                    blue_font_cells=blue_font_cells,
+                    red_font_rows=red_font_rows,
+                )
         elif suffix == ".csv":
             df.to_csv(path, index=index)
         elif suffix in {".tsv", ".txt"}:
             df.to_csv(path, sep="\t", index=index)
+        elif suffix == ".parquet":
+            df.to_parquet(path, index=index)
         else:
             # Default to Excel format
             path = path.with_suffix(".xlsx")
@@ -270,6 +293,73 @@ class FileHandler:
             output_path = input_path.parent / new_name
 
         return output_path
+
+    @staticmethod
+    def _parquet_meta_path(parquet_path: Path) -> Path:
+        return parquet_path.with_suffix(parquet_path.suffix + ".meta.json")
+
+    def _save_parquet_cache(
+        self,
+        df: pd.DataFrame,
+        parquet_path: Path,
+        highlight_rows: Optional[set] = None,
+        blue_font_cells: Optional[list] = None,
+        red_font_rows: Optional[set] = None,
+    ) -> None:
+        """Save a parquet cache with metadata sidecar for formatting."""
+        df.to_parquet(parquet_path, index=False)
+        meta = {
+            "red_font_rows": sorted(red_font_rows) if red_font_rows else [],
+            "blue_font_cells": blue_font_cells or [],
+            "highlight_rows": sorted(highlight_rows) if highlight_rows else [],
+        }
+        meta_path = self._parquet_meta_path(parquet_path)
+        try:
+            meta_path.write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+        except Exception:
+            pass
+
+    def _load_parquet_meta(self, parquet_path: Path) -> Optional[dict]:
+        """Load parquet metadata sidecar if it exists."""
+        meta_path = self._parquet_meta_path(parquet_path)
+        if not meta_path.exists():
+            return None
+        try:
+            data = json.loads(meta_path.read_text(encoding="utf-8"))
+            # Normalize
+            return {
+                "red_font_rows": data.get("red_font_rows", []),
+                "blue_font_cells": data.get("blue_font_cells", []),
+                "highlight_rows": data.get("highlight_rows", []),
+            }
+        except Exception:
+            return None
+
+    def _resolve_parquet_cache(self, excel_path: Path) -> Optional[Path]:
+        """Return parquet cache if it exists and is newer than Excel."""
+        parquet_path = excel_path.with_suffix(".parquet")
+        meta_path = self._parquet_meta_path(parquet_path)
+        if not parquet_path.exists() or not meta_path.exists():
+            return None
+        try:
+            if parquet_path.stat().st_mtime >= excel_path.stat().st_mtime:
+                return parquet_path
+        except Exception:
+            return None
+        return None
+
+    @staticmethod
+    def _load_delimited(path: Path, header_row: int, sep: str) -> pd.DataFrame:
+        """Load CSV/TSV using pyarrow engine if available."""
+        try:
+            import pyarrow  # type: ignore
+            engine = "pyarrow"
+        except Exception:
+            engine = None
+
+        if engine:
+            return pd.read_csv(path, header=header_row, sep=sep, engine=engine)
+        return pd.read_csv(path, header=header_row, sep=sep)
 
 
 def parse_mz_rt_string(value: str) -> Tuple[Optional[float], Optional[float]]:

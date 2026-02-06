@@ -17,6 +17,8 @@ class FeatureFilterWidget(BaseProcessingWidget):
     def __init__(
         self,
         parent: ctk.CTkFrame,
+        step_index: int,
+        on_load_file: Optional[Callable[[int], None]] = None,
         on_complete: Optional[Callable[[pd.DataFrame], None]] = None,
         on_log: Optional[Callable[[str], None]] = None,
     ):
@@ -24,6 +26,8 @@ class FeatureFilterWidget(BaseProcessingWidget):
             parent,
             title="Step 4: 篩選與填補 (Feature Filtering)",
             description="依據 ratio 門檻篩選有效特徵，並以組內最小值/2 填補缺失值",
+            step_index=step_index,
+            on_load_file=on_load_file,
             on_complete=on_complete,
             on_log=on_log,
         )

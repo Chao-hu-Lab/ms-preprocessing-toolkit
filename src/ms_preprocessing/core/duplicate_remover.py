@@ -282,49 +282,32 @@ class DuplicateRemover(BaseProcessor):
         """Parse m/z and RT values into separate columns."""
         stats = {"rows_parsed": 0, "parse_errors": 0}
 
-        mz_values = []
-        rt_values = []
-
         if col_info["combined_mz_rt"]:
             feature_col = col_info["feature_col"]
-            for idx in range(len(df)):
-                if idx < 1:
-                    mz_values.append(None)
-                    rt_values.append(None)
-                else:
-                    mz, rt = parse_mz_rt_string(str(df.iat[idx, 0]))
-                    mz_values.append(mz)
-                    rt_values.append(rt)
-                    if mz is not None:
-                        stats["rows_parsed"] += 1
-                    else:
-                        stats["parse_errors"] += 1
+            col = df[feature_col].astype(str)
+            parts = col.str.split("/", n=1, expand=True)
+            mz_series = pd.to_numeric(parts[0], errors="coerce")
+            rt_series = pd.to_numeric(parts[1], errors="coerce")
+            # Ensure sample type row (index 0) is NaN
+            if len(mz_series) > 0:
+                mz_series.iloc[0] = np.nan
+                rt_series.iloc[0] = np.nan
+
+            stats["rows_parsed"] = int(mz_series.notna().sum())
+            stats["parse_errors"] = int(len(df) - stats["rows_parsed"] - 1)
+            df["_mz"] = mz_series.to_numpy()
+            df["_rt"] = rt_series.to_numpy()
         else:
             # Use separate columns
-            for idx in range(len(df)):
-                if idx < 1:
-                    mz_values.append(None)
-                    rt_values.append(None)
-                else:
-                    mz = None
-                    rt = None
-                    if col_info["mz_col"]:
-                        try:
-                            mz = float(df.at[idx, col_info["mz_col"]])
-                        except (ValueError, TypeError):
-                            pass
-                    if col_info["rt_col"]:
-                        try:
-                            rt = float(df.at[idx, col_info["rt_col"]])
-                        except (ValueError, TypeError):
-                            pass
-                    mz_values.append(mz)
-                    rt_values.append(rt)
-                    if mz is not None:
-                        stats["rows_parsed"] += 1
-
-        df['_mz'] = mz_values
-        df['_rt'] = rt_values
+            mz_series = pd.to_numeric(df[col_info["mz_col"]], errors="coerce") if col_info["mz_col"] else pd.Series([np.nan] * len(df))
+            rt_series = pd.to_numeric(df[col_info["rt_col"]], errors="coerce") if col_info["rt_col"] else pd.Series([np.nan] * len(df))
+            if len(mz_series) > 0:
+                mz_series.iloc[0] = np.nan
+                rt_series.iloc[0] = np.nan
+            stats["rows_parsed"] = int(mz_series.notna().sum())
+            stats["parse_errors"] = int(len(df) - stats["rows_parsed"] - 1)
+            df["_mz"] = mz_series.to_numpy()
+            df["_rt"] = rt_series.to_numpy()
 
         return df, stats
 
@@ -334,31 +317,23 @@ class DuplicateRemover(BaseProcessor):
         col_info: Dict[str, Any],
     ) -> pd.DataFrame:
         """Calculate total intensity and occurrence count for each feature."""
-        total_intensity = []
-        occurrence = []
-
         intensity_cols = col_info["intensity_cols"]
+        if intensity_cols:
+            intensity_df = df[intensity_cols].apply(pd.to_numeric, errors="coerce")
+            mask = intensity_df > 0
+            total_intensity = intensity_df.where(mask).sum(axis=1, skipna=True)
+            occurrence = mask.sum(axis=1)
+        else:
+            total_intensity = pd.Series([0] * len(df), index=df.index)
+            occurrence = pd.Series([0] * len(df), index=df.index)
 
-        for idx in range(len(df)):
-            if idx < 1:
-                total_intensity.append(0)
-                occurrence.append(0)
-            else:
-                row_total = 0
-                row_count = 0
-                for col in intensity_cols:
-                    try:
-                        val = pd.to_numeric(df.at[idx, col], errors='coerce')
-                        if pd.notna(val) and val > 0:
-                            row_total += val
-                            row_count += 1
-                    except Exception:
-                        pass
-                total_intensity.append(row_total)
-                occurrence.append(row_count)
+        # Ensure sample type row is zero
+        if len(df) > 0:
+            total_intensity.iloc[0] = 0
+            occurrence.iloc[0] = 0
 
-        df['_total_intensity'] = total_intensity
-        df['_occurrence'] = occurrence
+        df["_total_intensity"] = total_intensity.to_numpy()
+        df["_occurrence"] = occurrence.to_numpy()
 
         return df
 
@@ -370,7 +345,7 @@ class DuplicateRemover(BaseProcessor):
         protected_rows: Set[int],
     ) -> Tuple[Set[int], Dict[str, Any]]:
         """
-        Find unique signals using RT binning and m/z tolerance.
+        Find unique signals using RT binning and m/z binning.
 
         Returns set of row indices to keep and statistics.
         """
@@ -383,73 +358,96 @@ class DuplicateRemover(BaseProcessor):
         if len(df) <= 1:
             return set(range(len(df))), stats
 
-        # Always keep Sample_Type row
-        keep_indices = {0}
+        keep_indices = {0}  # Always keep Sample_Type row
 
-        # Get data rows with valid m/z and RT
+        # Build valid rows list
         valid_rows = []
         for idx in range(1, len(df)):
-            mz = df.at[idx, '_mz']
-            rt = df.at[idx, '_rt']
+            mz = df.at[idx, "_mz"]
+            rt = df.at[idx, "_rt"]
             if mz is not None and rt is not None and mz > 0:
                 valid_rows.append({
-                    'idx': idx,
-                    'mz': mz,
-                    'rt': rt,
-                    'intensity': df.at[idx, '_total_intensity'],
-                    'occurrence': df.at[idx, '_occurrence'],
-                    'protected': idx in protected_rows,
+                    "idx": idx,
+                    "mz": mz,
+                    "rt": rt,
+                    "intensity": df.at[idx, "_total_intensity"],
+                    "occurrence": df.at[idx, "_occurrence"],
+                    "protected": idx in protected_rows,
                 })
 
         # Sort by RT for binning
-        valid_rows.sort(key=lambda x: x['rt'])
+        valid_rows.sort(key=lambda x: x["rt"])
 
         # Group by RT bins
-        rt_bins = {}
+        rt_bins: Dict[int, List[dict]] = {}
         for row in valid_rows:
-            bin_key = int(row['rt'] / rt_tolerance)
-            if bin_key not in rt_bins:
-                rt_bins[bin_key] = []
-            rt_bins[bin_key].append(row)
+            bin_key = int(row["rt"] / rt_tolerance) if rt_tolerance > 0 else 0
+            rt_bins.setdefault(bin_key, []).append(row)
 
-        # Process each RT bin
-        for bin_key, bin_rows in rt_bins.items():
-            # Sort by m/z within bin
-            bin_rows.sort(key=lambda x: x['mz'])
+        # Process each RT bin with m/z binning
+        for _, bin_rows in rt_bins.items():
+            if not bin_rows:
+                continue
 
-            # Find unique m/z groups
-            i = 0
-            while i < len(bin_rows):
-                current = bin_rows[i]
+            # Determine m/z bin size using median m/z
+            mz_values = [r["mz"] for r in bin_rows]
+            mz_values_sorted = sorted(mz_values)
+            median_mz = mz_values_sorted[len(mz_values_sorted) // 2]
+            mz_bin_size = max(median_mz * mz_tolerance_ppm / 1_000_000, 1e-6)
 
-                # Find all rows within m/z tolerance
-                group = [current]
-                j = i + 1
-                while j < len(bin_rows):
-                    other = bin_rows[j]
-                    # Calculate ppm difference
-                    ppm_diff = abs((current['mz'] - other['mz']) / current['mz'] * 1_000_000)
-                    if ppm_diff <= mz_tolerance_ppm:
-                        group.append(other)
-                        j += 1
+            # Group by m/z bins
+            mz_bins: Dict[int, List[dict]] = {}
+            for row in bin_rows:
+                mz_bin = int(row["mz"] / mz_bin_size) if mz_bin_size > 0 else 0
+                mz_bins.setdefault(mz_bin, []).append(row)
+
+            # Process each bin and its neighbor to avoid boundary misses
+            processed_ids: Set[int] = set()
+            for mz_bin_key in list(mz_bins.keys()):
+                # Collect rows from this bin and neighbor bins
+                neighbor_rows: List[dict] = []
+                for neighbor in (mz_bin_key - 1, mz_bin_key, mz_bin_key + 1):
+                    neighbor_rows.extend(mz_bins.get(neighbor, []))
+
+                # Sort by m/z within neighbor set
+                neighbor_rows.sort(key=lambda x: x["mz"])
+
+                i = 0
+                while i < len(neighbor_rows):
+                    current = neighbor_rows[i]
+                    if current["idx"] in processed_ids:
+                        i += 1
+                        continue
+
+                    group = [current]
+                    j = i + 1
+                    while j < len(neighbor_rows):
+                        other = neighbor_rows[j]
+                        if other["idx"] in processed_ids:
+                            j += 1
+                            continue
+                        ppm_diff = abs((current["mz"] - other["mz"]) / current["mz"] * 1_000_000)
+                        if ppm_diff <= mz_tolerance_ppm:
+                            group.append(other)
+                            j += 1
+                        else:
+                            break
+
+                    # Select representative
+                    protected_in_group = [r for r in group if r["protected"]]
+                    if protected_in_group:
+                        for r in protected_in_group:
+                            keep_indices.add(r["idx"])
+                            stats["protected_kept"] += 1
                     else:
-                        break
+                        best = max(group, key=lambda x: (x["occurrence"], x["intensity"]))
+                        keep_indices.add(best["idx"])
 
-                # Select representative from group
-                # Protected rows always kept, otherwise highest intensity
-                protected_in_group = [r for r in group if r['protected']]
-                if protected_in_group:
-                    for r in protected_in_group:
-                        keep_indices.add(r['idx'])
-                        stats["protected_kept"] += 1
-                else:
-                    # Keep highest intensity (by occurrence then total)
-                    best = max(group, key=lambda x: (x['occurrence'], x['intensity']))
-                    keep_indices.add(best['idx'])
+                    stats["duplicates_removed"] += len(group) - (len(protected_in_group) if protected_in_group else 1)
+                    for r in group:
+                        processed_ids.add(r["idx"])
 
-                stats["duplicates_removed"] += len(group) - (len(protected_in_group) if protected_in_group else 1)
-
-                i = j
+                    i = j
 
         return keep_indices, stats
 

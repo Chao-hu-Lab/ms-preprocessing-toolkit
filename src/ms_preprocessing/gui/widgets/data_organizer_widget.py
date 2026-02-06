@@ -18,6 +18,8 @@ class DataOrganizerWidget(BaseProcessingWidget):
     def __init__(
         self,
         parent: ctk.CTkFrame,
+        step_index: int,
+        on_load_file: Optional[Callable[[int], None]] = None,
         on_complete: Optional[Callable[[pd.DataFrame], None]] = None,
         on_log: Optional[Callable[[str], None]] = None,
     ):
@@ -25,6 +27,8 @@ class DataOrganizerWidget(BaseProcessingWidget):
             parent,
             title="Step 1: 資料整理 (Data Organization)",
             description="標準化資料結構、設定欄位名稱、建立 Sample Type 列",
+            step_index=step_index,
+            on_load_file=on_load_file,
             on_complete=on_complete,
             on_log=on_log,
         )

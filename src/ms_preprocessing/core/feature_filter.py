@@ -253,53 +253,50 @@ class FeatureFilter(BaseProcessor):
         ratio_cols = {}
         signal_threshold = self.config.signal_threshold
 
-        # Add ratio columns for each group
+        # Build numeric block once for all groups/QC
+        all_cols_set = set()
+        for cols in group_info["groups"].values():
+            all_cols_set.update(cols)
+        all_cols_set.update(group_info.get("qc_cols", []))
+        all_cols = sorted(all_cols_set)
+        col_pos = {col_idx: pos for pos, col_idx in enumerate(all_cols)}
+        if all_cols:
+            block_all = df.iloc[1:, all_cols].apply(pd.to_numeric, errors="coerce")
+            block_all_values = block_all.to_numpy()
+        else:
+            block_all_values = np.zeros((len(df) - 1, 0))
+
+        # Add ratio columns for each group (vectorized)
         for group_name, col_indices in group_info["groups"].items():
             ratio_col = f"{group_name}_ratio"
             ratio_cols[group_name] = ratio_col
 
-            ratios = ["na"]  # Sample_Type row value
+            if not col_indices:
+                df[ratio_col] = ["na"] + [0] * (len(df) - 1)
+                continue
 
-            for row_idx in range(1, len(df)):
-                signal_count = 0
-                total_count = len(col_indices)
+            pos = [col_pos[c] for c in col_indices]
+            block = block_all_values[:, pos]
+            signal_count = (block >= signal_threshold).sum(axis=1)
+            total_count = len(pos)
+            ratios = signal_count / total_count if total_count > 0 else 0
+            df[ratio_col] = ["na"] + ratios.tolist()
 
-                for col_idx in col_indices:
-                    try:
-                        val = pd.to_numeric(df.iat[row_idx, col_idx], errors='coerce')
-                        if pd.notna(val) and val >= signal_threshold:
-                            signal_count += 1
-                    except Exception:
-                        pass
-
-                ratio = signal_count / total_count if total_count > 0 else 0
-                ratios.append(ratio)
-
-            df[ratio_col] = ratios
-
-        # Add QC ratio if QC samples exist
+        # Add QC ratio if QC samples exist (vectorized)
         if group_info["has_qc"]:
             qc_ratio_col = "QC_ratio"
             ratio_cols["QC"] = qc_ratio_col
 
-            qc_ratios = ["na"]
-
-            for row_idx in range(1, len(df)):
-                signal_count = 0
-                total_count = len(group_info["qc_cols"])
-
-                for col_idx in group_info["qc_cols"]:
-                    try:
-                        val = pd.to_numeric(df.iat[row_idx, col_idx], errors='coerce')
-                        if pd.notna(val) and val >= signal_threshold:
-                            signal_count += 1
-                    except Exception:
-                        pass
-
-                ratio = signal_count / total_count if total_count > 0 else 0
-                qc_ratios.append(ratio)
-
-            df[qc_ratio_col] = qc_ratios
+            qc_cols = group_info["qc_cols"]
+            if qc_cols:
+                pos = [col_pos[c] for c in qc_cols]
+                block = block_all_values[:, pos]
+                signal_count = (block >= signal_threshold).sum(axis=1)
+                total_count = len(pos)
+                qc_ratios = signal_count / total_count if total_count > 0 else 0
+                df[qc_ratio_col] = ["na"] + qc_ratios.tolist()
+            else:
+                df[qc_ratio_col] = ["na"] + [0] * (len(df) - 1)
 
         return df, ratio_cols
 
@@ -335,70 +332,62 @@ class FeatureFilter(BaseProcessor):
         has_qc = group_info["has_qc"]
         qc_ratio_col = ratio_cols.get("QC")
 
-        for row_idx in range(1, len(df)):
-            # Check if protected (red font)
-            is_protected = row_idx in protected_rows
+        # Build ratio matrix (rows: features, cols: groups)
+        ratio_matrix = []
+        for group_name in group_names:
+            ratio_col = ratio_cols[group_name]
+            ratio_series = pd.to_numeric(df[ratio_col].iloc[1:], errors="coerce").fillna(0)
+            ratio_matrix.append(ratio_series.to_numpy())
 
-            # Get QC ratio
-            qc_ratio = 1.0  # Default if no QC
-            if has_qc and qc_ratio_col:
-                try:
-                    qc_ratio = float(df.at[row_idx, qc_ratio_col])
-                except (ValueError, TypeError):
-                    qc_ratio = 0
+        if ratio_matrix:
+            ratio_matrix = np.vstack(ratio_matrix).T  # shape: (n_rows, n_groups)
+        else:
+            ratio_matrix = np.zeros((len(df) - 1, 0))
 
-            # Rule 1: QC_ratio = 0 -> delete (unless protected)
-            if has_qc and qc_ratio == 0 and not is_protected:
-                deleted_features.append(df.iloc[row_idx].copy())
-                stats["deleted_count"] += 1
-                stats["qc_zero_deleted"] += 1
-                continue
+        # QC ratios
+        if has_qc and qc_ratio_col:
+            qc_ratio = pd.to_numeric(df[qc_ratio_col].iloc[1:], errors="coerce").fillna(0).to_numpy()
+        else:
+            qc_ratio = np.ones(len(df) - 1)
 
-            # Get group ratios
-            group_ratios = []
-            for group_name in group_names:
-                ratio_col = ratio_cols[group_name]
-                try:
-                    ratio = float(df.at[row_idx, ratio_col])
-                except (ValueError, TypeError):
-                    ratio = 0
-                group_ratios.append(ratio)
+        protected_mask = np.zeros(len(df) - 1, dtype=bool)
+        for idx in protected_rows:
+            if idx > 0 and idx < len(df):
+                protected_mask[idx - 1] = True
 
-            keep_feature = False
-            keep_reason = None
+        # Rule: QC ratio == 0
+        qc_zero = (qc_ratio == 0)
 
-            if is_protected:
-                keep_feature = True
-                keep_reason = "protected"
-                stats["protected_kept"] += 1
-            else:
-                # Condition 1: Skew - any group ratio >= skew_threshold
-                if any(r >= skew_threshold for r in group_ratios):
-                    keep_feature = True
-                    keep_reason = "skew"
-                    stats["skew_kept"] += 1
+        # Conditions
+        if ratio_matrix.shape[1] > 0:
+            skew_keep = (ratio_matrix >= skew_threshold).any(axis=1)
+            # Max diff across groups
+            max_diff = ratio_matrix.max(axis=1) - ratio_matrix.min(axis=1)
+            diff_keep = max_diff >= diff_threshold if ratio_matrix.shape[1] >= 2 else np.zeros(len(df) - 1, dtype=bool)
+            stable_keep = (ratio_matrix >= bg_threshold).sum(axis=1) >= 2
+        else:
+            skew_keep = np.zeros(len(df) - 1, dtype=bool)
+            diff_keep = np.zeros(len(df) - 1, dtype=bool)
+            stable_keep = np.zeros(len(df) - 1, dtype=bool)
 
-                # Condition 2: Diff - any two groups differ by >= diff_threshold
-                if not keep_feature and len(group_ratios) >= 2:
-                    max_diff = self._get_max_ratio_diff(group_ratios)
-                    if max_diff >= diff_threshold:
-                        keep_feature = True
-                        keep_reason = "diff"
-                        stats["diff_kept"] += 1
+        keep_mask = protected_mask | skew_keep | diff_keep | stable_keep
+        # If QC ratio is zero and not protected, force delete
+        keep_mask = np.where(qc_zero & ~protected_mask, False, keep_mask)
 
-                # Condition 3: Stable - >= 2 groups with ratio >= bg_threshold
-                if not keep_feature:
-                    groups_above = sum(1 for r in group_ratios if r >= bg_threshold)
-                    if groups_above >= 2:
-                        keep_feature = True
-                        keep_reason = "stable"
-                        stats["stable_kept"] += 1
+        # Update stats
+        stats["protected_kept"] = int(protected_mask.sum())
+        stats["skew_kept"] = int((skew_keep & ~protected_mask).sum())
+        stats["diff_kept"] = int((diff_keep & ~protected_mask).sum())
+        stats["stable_kept"] = int((stable_keep & ~protected_mask).sum())
+        stats["qc_zero_deleted"] = int((qc_zero & ~protected_mask).sum())
 
-            if keep_feature:
-                rows_to_keep.append(row_idx)
+        # Build keep rows
+        for i, keep in enumerate(keep_mask, start=1):
+            if keep:
+                rows_to_keep.append(i)
                 stats["kept_count"] += 1
             else:
-                deleted_features.append(df.iloc[row_idx].copy())
+                deleted_features.append(df.iloc[i].copy())
                 stats["deleted_count"] += 1
 
         # Build mapping for kept rows (for protected row updates)
@@ -414,13 +403,9 @@ class FeatureFilter(BaseProcessor):
 
     def _get_max_ratio_diff(self, ratios: List[float]) -> float:
         """Calculate maximum difference between any two ratios."""
-        max_diff = 0
-        for i in range(len(ratios)):
-            for j in range(i + 1, len(ratios)):
-                diff = abs(ratios[i] - ratios[j])
-                if diff > max_diff:
-                    max_diff = diff
-        return max_diff
+        if not ratios:
+            return 0.0
+        return float(max(ratios) - min(ratios))
 
     def _impute_missing_values(
         self,
@@ -443,98 +428,94 @@ class FeatureFilter(BaseProcessor):
 
         signal_threshold = self.config.signal_threshold
 
-        for row_idx in range(1, len(df)):
-            # Calculate group minimums for this row
-            group_mins = {}
+        # Precompute group ratios for special cases
+        group_ratios = {}
+        for group_name in group_info["groups"].keys():
+            ratio_col = ratio_cols.get(group_name)
+            if ratio_col:
+                group_ratios[group_name] = pd.to_numeric(df[ratio_col].iloc[1:], errors="coerce").fillna(0).to_numpy()
+            else:
+                group_ratios[group_name] = np.zeros(len(df) - 1)
 
-            # Get ratios for special case detection
-            group_ratios = {}
+        # Precompute special-case mask per group
+        special_case = {}
+        if len(group_info["groups"]) > 1:
             for group_name in group_info["groups"].keys():
-                ratio_col = ratio_cols.get(group_name)
-                if ratio_col:
-                    try:
-                        group_ratios[group_name] = float(df.at[row_idx, ratio_col])
-                    except (ValueError, TypeError):
-                        group_ratios[group_name] = 0
+                grp_ratio = group_ratios.get(group_name, np.zeros(len(df) - 1))
+                other_all_one = np.ones(len(df) - 1, dtype=bool)
+                for other_name in group_info["groups"].keys():
+                    if other_name == group_name:
+                        continue
+                    other_all_one &= (group_ratios.get(other_name, np.zeros(len(df) - 1)) == 1.0)
+                special_case[group_name] = (grp_ratio == 0) & other_all_one
+        else:
+            for group_name in group_info["groups"].keys():
+                special_case[group_name] = np.zeros(len(df) - 1, dtype=bool)
 
-            # Find min value for each group
-            for group_name, col_indices in group_info["groups"].items():
-                min_val = None
-                for col_idx in col_indices:
-                    try:
-                        val = pd.to_numeric(df.iat[row_idx, col_idx], errors='coerce')
-                        if pd.notna(val) and val > 0:
-                            if min_val is None or val < min_val:
-                                min_val = val
-                    except Exception:
-                        pass
-                group_mins[group_name] = min_val if min_val is not None else 0
+        # Build numeric block once for all group/QC columns
+        all_cols_set = set()
+        for cols in group_info["groups"].values():
+            all_cols_set.update(cols)
+        all_cols_set.update(group_info.get("qc_cols", []))
+        all_cols = sorted(all_cols_set)
+        col_pos = {col_idx: pos for pos, col_idx in enumerate(all_cols)}
+        if all_cols:
+            block_all = df.iloc[1:, all_cols].apply(pd.to_numeric, errors="coerce")
+            block_values = block_all.to_numpy()
+        else:
+            block_values = np.zeros((len(df) - 1, 0))
 
-            # QC minimum
-            qc_min = None
-            for col_idx in group_info.get("qc_cols", []):
-                try:
-                    val = pd.to_numeric(df.iat[row_idx, col_idx], errors='coerce')
-                    if pd.notna(val) and val > 0:
-                        if qc_min is None or val < qc_min:
-                            qc_min = val
-                except Exception:
-                    pass
-            qc_min = qc_min if qc_min is not None else 0
+        # Impute group columns in blocks
+        for group_name, col_indices in group_info["groups"].items():
+            if not col_indices:
+                continue
+            pos = [col_pos[c] for c in col_indices]
+            block = block_values[:, pos]
+            missing_mask = np.isnan(block)
+            if not missing_mask.any():
+                continue
 
-            # Impute missing values
-            for group_name, col_indices in group_info["groups"].items():
-                group_ratio = group_ratios.get(group_name, 0)
+            block_positive = np.where(block > 0, block, np.nan)
+            mins = np.nanmin(block_positive, axis=1)
+            mins = np.where(np.isnan(mins), 0, mins)
 
-                # Special case: this group has ratio=0 but others have ratio=1
-                is_special_case = False
-                if group_ratio == 0:
-                    other_all_one = all(
-                        group_ratios.get(g, 0) == 1.0
-                        for g in group_info["groups"].keys()
-                        if g != group_name
-                    )
-                    if other_all_one and len(group_info["groups"]) > 1:
-                        is_special_case = True
+            special = special_case[group_name]
+            fill_values = np.where(special, signal_threshold, mins / 2)
 
-                for col_idx in col_indices:
-                    val = df.iat[row_idx, col_idx]
-                    is_missing = pd.isna(val) or val == '' or val is None
+            filled = np.where(missing_mask, fill_values[:, None], block)
+            block_values[:, pos] = filled
 
-                    if not is_missing:
-                        try:
-                            numeric_val = pd.to_numeric(val, errors='coerce')
-                            is_missing = pd.isna(numeric_val)
-                        except Exception:
-                            is_missing = True
+            idx = np.argwhere(missing_mask)
+            if idx.size > 0:
+                rows = (idx[:, 0] + 1).astype(int).tolist()
+                cols = [col_indices[j] for j in idx[:, 1].tolist()]
+                imputed_cells.extend(list(zip(rows, cols)))
+                stats["cells_imputed"] += int(len(rows))
 
-                    if is_missing:
-                        if is_special_case:
-                            fill_value = signal_threshold
-                        else:
-                            fill_value = group_mins[group_name] / 2 if group_mins[group_name] > 0 else 0
+        # Impute QC columns in blocks
+        qc_cols = group_info.get("qc_cols", [])
+        if qc_cols:
+            pos = [col_pos[c] for c in qc_cols]
+            block = block_values[:, pos]
+            missing_mask = np.isnan(block)
+            if missing_mask.any():
+                block_positive = np.where(block > 0, block, np.nan)
+                qc_mins = np.nanmin(block_positive, axis=1)
+                qc_mins = np.where(np.isnan(qc_mins), 0, qc_mins)
+                fill_values = (qc_mins / 2)[:, None]
+                filled = np.where(missing_mask, fill_values, block)
+                block_values[:, pos] = filled
 
-                        df.iat[row_idx, col_idx] = fill_value
-                        imputed_cells.append((row_idx, col_idx))
-                        stats["cells_imputed"] += 1
+                idx = np.argwhere(missing_mask)
+                if idx.size > 0:
+                    rows = (idx[:, 0] + 1).astype(int).tolist()
+                    cols = [qc_cols[j] for j in idx[:, 1].tolist()]
+                    imputed_cells.extend(list(zip(rows, cols)))
+                    stats["cells_imputed"] += int(len(rows))
 
-            # Impute QC values
-            for col_idx in group_info.get("qc_cols", []):
-                val = df.iat[row_idx, col_idx]
-                is_missing = pd.isna(val) or val == '' or val is None
-
-                if not is_missing:
-                    try:
-                        numeric_val = pd.to_numeric(val, errors='coerce')
-                        is_missing = pd.isna(numeric_val)
-                    except Exception:
-                        is_missing = True
-
-                if is_missing:
-                    fill_value = qc_min / 2 if qc_min > 0 else 0
-                    df.iat[row_idx, col_idx] = fill_value
-                    imputed_cells.append((row_idx, col_idx))
-                    stats["cells_imputed"] += 1
+        # Write back to DataFrame
+        if all_cols:
+            df.iloc[1:, all_cols] = block_values
 
         stats["imputed_cells"] = imputed_cells
 

@@ -18,6 +18,8 @@ class ISTDMarkerWidget(BaseProcessingWidget):
     def __init__(
         self,
         parent: ctk.CTkFrame,
+        step_index: int,
+        on_load_file: Optional[Callable[[int], None]] = None,
         on_complete: Optional[Callable[[pd.DataFrame], None]] = None,
         on_log: Optional[Callable[[str], None]] = None,
     ):
@@ -29,6 +31,8 @@ class ISTDMarkerWidget(BaseProcessingWidget):
             parent,
             title="Step 2: ISTD 標記 (ISTD Marking)",
             description="標記內標(ISTD)、依 m/z 排序、偵測並標記重複訊號",
+            step_index=step_index,
+            on_load_file=on_load_file,
             on_complete=on_complete,
             on_log=on_log,
         )
@@ -62,11 +66,11 @@ class ISTDMarkerWidget(BaseProcessingWidget):
 
         self.rt_entry = ctk.CTkEntry(
             self.params_frame,
-            placeholder_text="0.5",
+            placeholder_text="1.0",
             width=100,
             font=FONTS["body"],
         )
-        self.rt_entry.insert(0, "0.5")
+        self.rt_entry.insert(0, "1.0")
         self.rt_entry.grid(row=1, column=1, padx=PADDING["small"], pady=PADDING["small"])
 
         # Known ISTD m/z values
@@ -173,7 +177,7 @@ class ISTDMarkerWidget(BaseProcessingWidget):
 
         # Update processor config
         self._processor.config.default_ppm_tolerance = params.get("ppm_tolerance", 20)
-        self._processor.config.default_rt_tolerance = params.get("rt_tolerance", 0.5)
+        self._processor.config.default_rt_tolerance = params.get("rt_tolerance", 1.0)
 
         result = self._processor.process(
             data,

@@ -164,10 +164,12 @@ def run_cli(args):
 
     # Import processing modules
     from ms_preprocessing.utils.file_handler import FileHandler
-    from ms_preprocessing.core.data_organizer import DataOrganizer
-    from ms_preprocessing.core.istd_marker import ISTDMarker
-    from ms_preprocessing.core.duplicate_remover import DuplicateRemover
-    from ms_preprocessing.core.feature_filter import FeatureFilter
+from ms_preprocessing.core.data_organizer import DataOrganizer
+from ms_preprocessing.core.istd_marker import ISTDMarker
+from ms_preprocessing.core.duplicate_remover import DuplicateRemover
+from ms_preprocessing.core.feature_filter import FeatureFilter
+from ms_preprocessing.utils.perf import take_snapshot, format_perf_delta
+from ms_preprocessing.config.settings import Settings
 
     try:
         # Load data
@@ -185,11 +187,14 @@ def run_cli(args):
 
         if step in ["organize", "all"]:
             print("Step 1: Data Organization...")
+            perf_start = take_snapshot()
             organizer = DataOrganizer()
             result = organizer.process(df, method_file=args.method_file)
             if result.success:
                 df = result.data
                 sample_info_df = result.metadata.get("sample_info")
+                perf_end = take_snapshot()
+                print(f"  Perf: {format_perf_delta(perf_start, perf_end)}")
                 print(f"  Done: {result.statistics}")
             else:
                 print(f"  Error: {result.message}")
@@ -197,6 +202,7 @@ def run_cli(args):
 
         if step in ["istd", "all"]:
             print("Step 2: ISTD Marking...")
+            perf_start = take_snapshot()
             marker = ISTDMarker()
             marker.config.default_ppm_tolerance = args.mz_tol
             marker.config.default_rt_tolerance = args.rt_tol
@@ -220,6 +226,8 @@ def run_cli(args):
                 protected_rows = set(
                     result.metadata.get("protected_rows") or result.metadata.get("istd_rows") or red_font_rows
                 )
+                perf_end = take_snapshot()
+                print(f"  Perf: {format_perf_delta(perf_start, perf_end)}")
                 if result.metadata.get("warning"):
                     print(f"  Warning: {result.metadata.get('warning')}")
                 print(f"  Done: {result.statistics}")
@@ -229,6 +237,7 @@ def run_cli(args):
 
         if step in ["duplicate-removal", "all"]:
             print("Step 3: Duplicate Removal...")
+            perf_start = take_snapshot()
             remover = DuplicateRemover()
             result = remover.process(
                 df,
@@ -240,6 +249,8 @@ def run_cli(args):
                 df = result.data
                 red_font_rows = set(result.metadata.get("red_font_rows", red_font_rows))
                 protected_rows = set(result.metadata.get("protected_rows") or red_font_rows)
+                perf_end = take_snapshot()
+                print(f"  Perf: {format_perf_delta(perf_start, perf_end)}")
                 print(f"  Done: {result.statistics}")
             else:
                 print(f"  Error: {result.message}")
@@ -247,6 +258,7 @@ def run_cli(args):
 
         if step in ["filter", "all"]:
             print("Step 4: Feature Filtering...")
+            perf_start = take_snapshot()
             filter_proc = FeatureFilter()
             result = filter_proc.process(
                 df,
@@ -260,6 +272,8 @@ def run_cli(args):
                 red_font_rows = set(result.metadata.get("red_font_rows", red_font_rows))
                 protected_rows = set(result.metadata.get("protected_rows") or red_font_rows)
                 blue_font_cells = result.metadata.get("blue_font_cells", blue_font_cells)
+                perf_end = take_snapshot()
+                print(f"  Perf: {format_perf_delta(perf_start, perf_end)}")
                 print(f"  Done: {result.statistics}")
             else:
                 print(f"  Error: {result.message}")
@@ -302,6 +316,7 @@ def run_cli(args):
             red_font_rows=red_font_rows,
             blue_font_cells=blue_font_cells,
             extra_sheets={"SampleInfo": sample_info_df} if sample_info_df is not None else None,
+            save_parquet_cache=Settings.SAVE_PARQUET_CACHE,
         )
         print("Done!")
 

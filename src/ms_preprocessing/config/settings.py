@@ -16,7 +16,7 @@ class ISTDConfig:
 
     # Default tolerances for duplicate detection
     default_ppm_tolerance: float = 20.0
-    default_rt_tolerance: float = 0.5
+    default_rt_tolerance: float = 1.0
 
     # Column names
     feature_id_col: str = "FeatureID"
@@ -103,7 +103,8 @@ class Settings:
     """
 
     # Supported file formats
-    SUPPORTED_FORMATS = [".xlsx", ".xls", ".csv", ".tsv", ".txt"]
+    SUPPORTED_FORMATS = [".xlsx", ".xls", ".csv", ".tsv", ".txt", ".parquet"]
+    SAVE_PARQUET_CACHE = True
 
     # GUI Settings
     WINDOW_TITLE = "MS Preprocessing Toolkit"

@@ -59,6 +59,7 @@ class MainWindow(ctk.CTk):
         self._current_step = 0
         self._last_completed_step: Optional[int] = None
         self._last_run_all: bool = False
+        self._step_output_paths: dict = {}
         self._context = {
             "red_font_rows": set(),
             "protected_rows": set(),
@@ -103,28 +104,6 @@ class MainWindow(ctk.CTk):
             font=FONTS["title"],
         )
         title_label.pack(pady=PADDING["medium"])
-
-        # File section
-        file_frame = ctk.CTkFrame(self.sidebar)
-        file_frame.pack(fill="x", padx=PADDING["small"], pady=PADDING["medium"])
-
-        self.load_btn = ctk.CTkButton(
-            file_frame,
-            text="載入檔案",
-            command=self._load_file,
-            width=180,
-            font=FONTS["body"],
-        )
-        self.load_btn.pack(pady=PADDING["small"])
-
-        self.file_label = ctk.CTkLabel(
-            file_frame,
-            text="未載入檔案",
-            font=FONTS["small"],
-            text_color=COLORS["text_secondary"],
-            wraplength=180,
-        )
-        self.file_label.pack(pady=PADDING["small"])
 
         # Workflow steps
         steps_label = ctk.CTkLabel(
@@ -200,6 +179,8 @@ class MainWindow(ctk.CTk):
         # Step 1: Data Organizer
         self.data_organizer_widget = DataOrganizerWidget(
             self.main_frame,
+            step_index=0,
+            on_load_file=self._load_file_for_step,
             on_complete=self._on_step_complete,
             on_log=self._log,
         )
@@ -208,6 +189,8 @@ class MainWindow(ctk.CTk):
         # Step 2: ISTD Marker
         self.istd_marker_widget = ISTDMarkerWidget(
             self.main_frame,
+            step_index=1,
+            on_load_file=self._load_file_for_step,
             on_complete=self._on_step_complete,
             on_log=self._log,
         )
@@ -216,6 +199,8 @@ class MainWindow(ctk.CTk):
         # Step 3: Duplicate Remover
         self.duplicate_remover_widget = DuplicateRemoverWidget(
             self.main_frame,
+            step_index=2,
+            on_load_file=self._load_file_for_step,
             on_complete=self._on_step_complete,
             on_log=self._log,
         )
@@ -224,6 +209,8 @@ class MainWindow(ctk.CTk):
         # Step 4: Feature Filter
         self.feature_filter_widget = FeatureFilterWidget(
             self.main_frame,
+            step_index=3,
+            on_load_file=self._load_file_for_step,
             on_complete=self._on_step_complete,
             on_log=self._log,
         )
@@ -294,26 +281,31 @@ class MainWindow(ctk.CTk):
 
     def _bind_shortcuts(self) -> None:
         """Bind keyboard shortcuts."""
-        self.bind("<Control-o>", lambda e: self._load_file())
+        self.bind("<Control-o>", lambda e: self._load_file_for_step(self._current_step))
         self.bind("<Control-s>", lambda e: self._export_results())
         self.bind("<Control-1>", lambda e: self._switch_step(0))
         self.bind("<Control-2>", lambda e: self._switch_step(1))
         self.bind("<Control-3>", lambda e: self._switch_step(2))
         self.bind("<Control-4>", lambda e: self._switch_step(3))
 
-    def _load_file(self) -> None:
-        """Open file dialog and load data."""
+    def _load_file_for_step(self, step_index: int, path: Optional[Path] = None) -> None:
+        """Open file dialog and load data for a specific step."""
         filetypes = [
             ("Excel files", "*.xlsx *.xls"),
+            ("Parquet files", "*.parquet"),
             ("CSV files", "*.csv"),
             ("TSV files", "*.tsv *.txt"),
             ("All files", "*.*"),
         ]
 
-        filepath = filedialog.askopenfilename(
-            title="選擇資料檔案",
-            filetypes=filetypes,
-        )
+        filepath = None
+        if path is None:
+            filepath = filedialog.askopenfilename(
+                title="選擇資料檔案",
+                filetypes=filetypes,
+            )
+        else:
+            filepath = str(path)
 
         if filepath:
             try:
@@ -331,15 +323,14 @@ class MainWindow(ctk.CTk):
                 self._context["highlight_rows"] = set()
                 self._context["sample_info"] = None
 
-                # Update file label
-                filename = Path(filepath).name
-                self.file_label.configure(text=f"{filename}\n({len(df)} rows, {len(df.columns)} cols)")
+                # Update input display for this step
+                if 0 <= step_index < len(self.step_widgets):
+                    self.step_widgets[step_index].set_input_file(filepath)
+                    self.step_widgets[step_index].set_data(df)
+                    self.step_widgets[step_index].set_context(self._context)
 
-                # Set data for first step
-                self.step_widgets[0].set_data(df)
-                self.step_widgets[0].set_context(self._context)
-
-                self._log(f"Loaded successfully: {len(df)} rows, {len(df.columns)} columns")
+                load_fmt = metadata.get("format", "unknown")
+                self._log(f"Loaded successfully: {len(df)} rows, {len(df.columns)} columns (format: {load_fmt})")
 
             except Exception as e:
                 self._log(f"Error loading file: {str(e)}")
@@ -361,6 +352,9 @@ class MainWindow(ctk.CTk):
         self._current_step = step_index
         self._show_step(step_index)
         self.step_widgets[step_index].set_context(self._context)
+        # If we have a saved output for this step, populate its input field
+        if hasattr(self, "_step_output_paths") and self._step_output_paths.get(step_index):
+            self.step_widgets[step_index].set_input_file(str(self._step_output_paths[step_index]))
 
         # Update sidebar button styles
         for i, btn in enumerate(self.step_buttons):
@@ -395,11 +389,20 @@ class MainWindow(ctk.CTk):
         self._last_completed_step = self._current_step
         self._last_run_all = False
 
+        # Auto-save output for this step
+        output_path = self._save_step_output(self._current_step, result_data)
+        if output_path:
+            self._step_output_paths[self._current_step] = output_path
+            self.step_widgets[self._current_step].set_input_file(str(output_path))
+
         # Automatically pass data to next step
         next_step = self._current_step + 1
         if next_step < len(self.step_widgets):
             self.step_widgets[next_step].set_data(result_data)
             self.step_widgets[next_step].set_context(self._context)
+            # Set default input for next step to this step's output file
+            if output_path:
+                self.step_widgets[next_step].set_input_file(str(output_path))
             self._log(f"Data passed to Step {next_step + 1}")
 
     def _run_all_steps(self) -> None:
@@ -424,6 +427,12 @@ class MainWindow(ctk.CTk):
 
                     self._current_data = data
                     self._last_completed_step = i
+                    output_path = self._save_step_output(i, data)
+                    if output_path:
+                        self._step_output_paths[i] = output_path
+                        widget.set_input_file(str(output_path))
+                        if i + 1 < len(self.step_widgets):
+                            self.step_widgets[i + 1].set_input_file(str(output_path))
                     self._log(f"Step {i + 1} completed")
 
                 self._last_run_all = True
@@ -453,7 +462,7 @@ class MainWindow(ctk.CTk):
         else:
             step_prefix = f"STEP{self._current_step + 1}"
 
-        stem = self._source_file.stem if self._source_file else "output"
+        stem = self._get_base_stem(self._source_file) if self._source_file else "output"
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         if step_prefix == "ALL":
@@ -467,18 +476,62 @@ class MainWindow(ctk.CTk):
             filepath = output_dir / filename
 
         try:
+                self._file_handler.save_data(
+                    self._current_data,
+                    filepath,
+                    sheet_name="RawIntensity",
+                    highlight_rows=self._context.get("highlight_rows"),
+                    blue_font_cells=self._context.get("blue_font_cells"),
+                    red_font_rows=self._context.get("red_font_rows"),
+                    extra_sheets={"SampleInfo": self._context.get("sample_info")},
+                    save_parquet_cache=Settings.SAVE_PARQUET_CACHE,
+                )
+            self._log(f"Exported to: {filepath}")
+        except Exception as e:
+            self._log(f"Export error: {str(e)}")
+
+    def _get_base_stem(self, path: Optional[Path]) -> str:
+        """Normalize base stem by stripping step prefixes and timestamps."""
+        if not path:
+            return "output"
+        stem = path.stem
+        for prefix in ["STEP1_", "STEP2_", "STEP3_", "STEP4_", "ALL_"]:
+            if stem.startswith(prefix):
+                stem = stem[len(prefix):]
+                break
+        # Remove trailing timestamp if present
+        if len(stem) > 16 and stem[-15:-14] == "_" and stem[-14:].isdigit():
+            stem = stem[:-15]
+        return stem
+
+    def _save_step_output(self, step_index: int, data: pd.DataFrame) -> Optional[Path]:
+        """Save step output to OUTPUT directory and return path."""
+        if data is None:
+            return None
+        output_dir = self._output_dir
+        output_dir.mkdir(parents=True, exist_ok=True)
+        step_prefix = f"STEP{step_index + 1}"
+        stem = self._get_base_stem(self._source_file) if self._source_file else "output"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{step_prefix}_{stem}_{timestamp}.xlsx"
+        filepath = output_dir / filename
+
+        try:
             self._file_handler.save_data(
-                self._current_data,
+                data,
                 filepath,
                 sheet_name="RawIntensity",
                 highlight_rows=self._context.get("highlight_rows"),
                 blue_font_cells=self._context.get("blue_font_cells"),
                 red_font_rows=self._context.get("red_font_rows"),
                 extra_sheets={"SampleInfo": self._context.get("sample_info")},
+                save_parquet_cache=Settings.SAVE_PARQUET_CACHE,
             )
-            self._log(f"Exported to: {filepath}")
+            self._log(f"Auto-saved: {filepath}")
+            return filepath
         except Exception as e:
-            self._log(f"Export error: {str(e)}")
+            self._log(f"Auto-save error: {str(e)}")
+            return None
 
     def _open_output_folder(self) -> None:
         """Open OUTPUT folder in file explorer."""

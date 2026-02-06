@@ -210,18 +210,12 @@ class ISTDMarker(BaseProcessor):
 
     def _standardize_headers(self, df: pd.DataFrame) -> pd.DataFrame:
         """Standardize the header structure."""
-        # Standardize column names
-        columns = list(df.columns)
-        if columns:
-            columns[0] = self.config.feature_id_col
-
         # Drop tolerance column if it exists (not needed after Step 2)
+        columns = list(df.columns)
         tolerance_cols = [c for c in columns if "tolerance" in str(c).lower()]
         if tolerance_cols:
             df = df.drop(columns=tolerance_cols)
             columns = list(df.columns)
-            if columns:
-                columns[0] = self.config.feature_id_col
 
         df.columns = columns
 
@@ -246,15 +240,10 @@ class ISTDMarker(BaseProcessor):
         header_rows = df.iloc[:1].copy()
         data_rows = df.iloc[1:].copy()
 
-        # Extract m/z values for sorting
-        first_col = df.columns[0]
-        mz_values = []
-
-        for idx, value in data_rows[first_col].items():
-            mz, _ = parse_mz_rt_string(str(value))
-            mz_values.append(mz if mz is not None else float('inf'))
-
-        data_rows['_sort_mz'] = mz_values
+        # Extract m/z values for sorting (vectorized)
+        mz_arr, _ = self._extract_mz_rt_arrays(data_rows)
+        mz_arr = np.where(np.isnan(mz_arr), np.inf, mz_arr)
+        data_rows["_sort_mz"] = mz_arr
 
         # Sort by m/z
         data_rows_sorted = data_rows.sort_values('_sort_mz', ascending=True)
@@ -296,13 +285,15 @@ class ISTDMarker(BaseProcessor):
                 tolerance_col = df.columns[1]
 
         # Get ISTD row indices and their m/z/RT values
+        mz_arr, rt_arr = self._extract_mz_rt_arrays(df)
         istd_data = {}  # feature_id -> (row_idx, mz, rt, ppm_tol, rt_tol)
 
         for row_idx in range(1, len(df)):
             feature_id = str(df.iat[row_idx, 0])
             if feature_id in istd_features:
-                mz, rt = parse_mz_rt_string(feature_id)
-                if mz is not None and rt is not None:
+                mz = mz_arr[row_idx]
+                rt = rt_arr[row_idx]
+                if not np.isnan(mz) and not np.isnan(rt):
                     # Get tolerance from column B or custom or default
                     ppm_tol = self.config.default_ppm_tolerance
                     rt_tol = self.config.default_rt_tolerance
@@ -330,8 +321,9 @@ class ISTDMarker(BaseProcessor):
             if feature_id in istd_features:
                 continue
 
-            mz, rt = parse_mz_rt_string(feature_id)
-            if mz is None or rt is None:
+            mz = mz_arr[row_idx]
+            rt = rt_arr[row_idx]
+            if np.isnan(mz) or np.isnan(rt):
                 continue
 
             # Check against each ISTD
@@ -417,13 +409,12 @@ class ISTDMarker(BaseProcessor):
         if len(df) <= 1:
             return potential_istd
 
-        first_col = df.columns[0]
-
+        mz_arr, _ = self._extract_mz_rt_arrays(df)
         for row_idx in range(1, len(df)):
             feature_id = str(df.iat[row_idx, 0])
-            mz, _ = parse_mz_rt_string(feature_id)
+            mz = mz_arr[row_idx]
 
-            if mz is None:
+            if np.isnan(mz):
                 continue
 
             for istd_mz in known_istd_mz:
@@ -471,33 +462,43 @@ class ISTDMarker(BaseProcessor):
             metadata["warning"] = "No ISTD RT targets found from record file"
             return set(), metadata
 
-        # Identify QC columns (prefer QC for occurrence count)
+        # Determine fixed columns (FeatureID + optional tolerance)
+        fixed_cols = 1
+        if len(df.columns) > 1 and "tolerance" in str(df.columns[1]).lower():
+            fixed_cols = 2
+
+        # Identify QC columns from Sample_Type row if present (for metadata only)
         qc_cols = []
-        if len(df) > 0:
-            for col_idx in range(2, len(df.columns)):
+        if len(df) > 0 and str(df.iat[0, 0]).lower().strip() == "sample_type":
+            for col_idx in range(fixed_cols, len(df.columns)):
                 st = str(df.iat[0, col_idx]).lower().strip()
                 if st == "qc":
                     qc_cols.append(col_idx)
+        metadata["qc_columns"] = qc_cols
 
-        if not qc_cols:
-            qc_cols = list(range(2, len(df.columns)))
+        # Use all sample columns for occurrence counting (requirement: all samples)
+        all_sample_cols = list(range(fixed_cols, len(df.columns)))
+        if not all_sample_cols:
+            return set(), {"warning": "No sample columns found for ISTD matching"}
 
         # Build candidates for each ISTD m/z
+        mz_arr, rt_arr = self._extract_mz_rt_arrays(df)
         candidates: Dict[float, List[Tuple[int, float, int, float]]] = {}
         for row_idx in range(1, len(df)):
             feature_id = str(df.iat[row_idx, 0])
-            mz, rt = parse_mz_rt_string(feature_id)
-            if mz is None or rt is None:
+            mz = mz_arr[row_idx]
+            rt = rt_arr[row_idx]
+            if np.isnan(mz) or np.isnan(rt):
                 continue
 
             for target_mz, target_rt in target_rt_by_mz.items():
                 ppm_diff = abs((mz - target_mz) / target_mz * 1_000_000) if target_mz else float("inf")
                 rt_diff = abs(rt - target_rt)
                 if ppm_diff <= self.config.default_ppm_tolerance and rt_diff <= self.config.default_rt_tolerance:
-                    # Occurrence count: intensity > 0
+                    # Occurrence count: intensity > 0 across all samples
                     count = 0
                     total_intensity = 0.0
-                    for col_idx in qc_cols:
+                    for col_idx in all_sample_cols:
                         val = pd.to_numeric(df.iat[row_idx, col_idx], errors="coerce")
                         if pd.notna(val) and val > 0:
                             count += 1
@@ -528,6 +529,14 @@ class ISTDMarker(BaseProcessor):
         metadata["istd_record_path"] = str(record_path)
 
         return istd_features, metadata
+
+    def _extract_mz_rt_arrays(self, df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
+        """Vectorized extraction of m/z and RT arrays from FeatureID column."""
+        col = df.iloc[:, 0].astype(str)
+        parts = col.str.split("/", n=1, expand=True)
+        mz = pd.to_numeric(parts[0], errors="coerce").to_numpy()
+        rt = pd.to_numeric(parts[1], errors="coerce").to_numpy()
+        return mz, rt
 
     def _load_istd_record_targets(
         self,

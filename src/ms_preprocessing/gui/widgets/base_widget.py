@@ -8,6 +8,7 @@ import customtkinter as ctk
 import pandas as pd
 
 from ms_preprocessing.gui.styles import COLORS, FONTS, PADDING
+from ms_preprocessing.utils.perf import take_snapshot, format_perf_delta
 
 
 class BaseProcessingWidget(ctk.CTkFrame, ABC):
@@ -23,6 +24,8 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         parent: ctk.CTkFrame,
         title: str,
         description: str,
+        step_index: int,
+        on_load_file: Optional[Callable[[int], None]] = None,
         on_complete: Optional[Callable[[pd.DataFrame], None]] = None,
         on_log: Optional[Callable[[str], None]] = None,
     ):
@@ -40,6 +43,8 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
 
         self.title = title
         self.description = description
+        self.step_index = step_index
+        self._on_load_file = on_load_file
         self.on_complete = on_complete
         self.on_log = on_log
         self._data: Optional[pd.DataFrame] = None
@@ -48,6 +53,7 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         self._last_metadata: dict = {}
         self.run_button = None
         self.reset_button = None
+        self.input_entry: Optional[ctk.CTkEntry] = None
 
         self._create_layout()
 
@@ -70,6 +76,34 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
             wraplength=520,
         )
         self.desc_label.pack(pady=(0, PADDING["small"]))
+
+        # Input file row
+        input_frame = ctk.CTkFrame(self, fg_color="transparent")
+        input_frame.pack(fill="x", padx=PADDING["small"], pady=(0, PADDING["small"]))
+        input_frame.grid_columnconfigure(1, weight=1)
+
+        input_label = ctk.CTkLabel(
+            input_frame,
+            text="輸入檔案：",
+            font=FONTS["body"],
+        )
+        input_label.grid(row=0, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+
+        self.input_entry = ctk.CTkEntry(
+            input_frame,
+            placeholder_text="選擇輸入檔案",
+            font=FONTS["body"],
+        )
+        self.input_entry.grid(row=0, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="ew")
+
+        load_btn = ctk.CTkButton(
+            input_frame,
+            text="選擇檔案",
+            command=self._on_load_clicked,
+            width=90,
+            font=FONTS["body"],
+        )
+        load_btn.grid(row=0, column=2, padx=PADDING["small"], pady=PADDING["small"])
 
         # Parameters frame (to be filled by subclasses)
         self.params_frame = ctk.CTkFrame(self)
@@ -111,6 +145,14 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         self._data = data
         self.log(f"Loaded data with {len(data)} rows and {len(data.columns)} columns")
 
+    def set_input_file(self, path: Optional[str]) -> None:
+        """Update input file display."""
+        if not self.input_entry:
+            return
+        self.input_entry.delete(0, "end")
+        if path:
+            self.input_entry.insert(0, path)
+
     def set_context(self, context: Optional[dict]) -> None:
         """Set shared processing context (e.g., protected rows)."""
         self._context = context or {}
@@ -135,12 +177,19 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
             self.status_label.configure(text=status)
         self.update_idletasks()
 
+    def _on_load_clicked(self) -> None:
+        """Handle input file selection."""
+        if self._on_load_file:
+            self._on_load_file(self.step_index)
+
     def _on_run_clicked(self) -> None:
         """Handle run button click."""
         if self._data is None:
             self.log("Error: No data loaded")
             self.status_label.configure(text="Error: No data loaded")
             return
+
+        perf_start = take_snapshot()
 
         try:
             if self.run_button is not None:
@@ -168,6 +217,8 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
             self.status_label.configure(text=f"Error: {str(e)}")
             self.log(f"Error: {str(e)}")
         finally:
+            perf_end = take_snapshot()
+            self.log(f"Performance: {format_perf_delta(perf_start, perf_end)}")
             if self.run_button is not None:
                 self.run_button.configure(state="normal")
 

@@ -17,6 +17,8 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
     def __init__(
         self,
         parent: ctk.CTkFrame,
+        step_index: int,
+        on_load_file: Optional[Callable[[int], None]] = None,
         on_complete: Optional[Callable[[pd.DataFrame], None]] = None,
         on_log: Optional[Callable[[str], None]] = None,
     ):
@@ -24,6 +26,8 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
             parent,
             title="Step 3: 重複訊號刪除 (Duplicate Removal)",
             description="基於 m/z 和 RT 容差智慧識別並移除重複訊號，保留最高強度",
+            step_index=step_index,
+            on_load_file=on_load_file,
             on_complete=on_complete,
             on_log=on_log,
         )
