@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ms-preprocessing-toolkit"
+version = "1.0.0"
+description = "Mass Spectrometry Data Preprocessing Toolkit - An integrated GUI tool for MS data preprocessing workflow"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+keywords = ["mass spectrometry", "preprocessing", "metabolomics", "data processing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Chemistry",
+]
+
+dependencies = [
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "openpyxl>=3.1.0",
+    "xlrd>=2.0.0",
+    "customtkinter>=5.2.0",
+    "pillow>=10.0.0",
+    "python-docx>=0.8.11",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+ms-preprocessing = "ms_preprocessing.main:main"
+
+[project.gui-scripts]
+ms-preprocessing-gui = "ms_preprocessing.main:main"
+
+[project.urls]
+Homepage = "https://github.com/yourusername/ms-preprocessing-toolkit"
+Documentation = "https://github.com/yourusername/ms-preprocessing-toolkit#readme"
+Repository = "https://github.com/yourusername/ms-preprocessing-toolkit"
+Issues = "https://github.com/yourusername/ms-preprocessing-toolkit/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311', 'py312']
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_ignores = true

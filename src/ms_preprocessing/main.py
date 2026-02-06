@@ -1,0 +1,316 @@
+"""
+Main entry point for MS Preprocessing Toolkit.
+
+This module provides the main entry point for running the application
+either as a GUI or from the command line.
+"""
+
+import sys
+import argparse
+from pathlib import Path
+from datetime import datetime
+
+
+def main():
+    """Main entry point."""
+    parser = argparse.ArgumentParser(
+        description="MS Preprocessing Toolkit - Mass Spectrometry Data Preprocessing",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Run GUI
+  ms-preprocessing
+
+  # Process file from command line
+  ms-preprocessing --input data.xlsx --output processed.xlsx
+
+  # Run specific step only
+  ms-preprocessing --input data.xlsx --step duplicate-removal --mz-tol 20 --rt-tol 1.0
+        """,
+    )
+
+    parser.add_argument(
+        "--input", "-i",
+        type=str,
+        help="Input file path (Excel, CSV, or TSV)",
+    )
+
+    parser.add_argument(
+        "--output", "-o",
+        type=str,
+        help="Output file path",
+    )
+
+    parser.add_argument(
+        "--method-file",
+        type=str,
+        help="Method/injection sequence file path (.docx)",
+    )
+
+    parser.add_argument(
+        "--step",
+        type=str,
+        choices=["organize", "istd", "duplicate-removal", "filter", "all"],
+        default="all",
+        help="Processing step to run (default: all)",
+    )
+
+    parser.add_argument(
+        "--mz-tol",
+        type=float,
+        default=20.0,
+        help="m/z tolerance in ppm (default: 20)",
+    )
+
+    parser.add_argument(
+        "--istd-mz",
+        type=str,
+        help="Comma-separated ISTD m/z list (e.g., 261.1273,245.1324)",
+    )
+
+    parser.add_argument(
+        "--istd-record-file",
+        type=str,
+        help="ISTD record Excel file path",
+    )
+
+    parser.add_argument(
+        "--istd-record-date",
+        type=str,
+        help="ISTD record target date (YYYYMMDD)",
+    )
+
+    parser.add_argument(
+        "--rt-tol",
+        type=float,
+        default=1.0,
+        help="RT tolerance in minutes (default: 1.0)",
+    )
+
+    parser.add_argument(
+        "--bg-threshold",
+        type=float,
+        default=0.33,
+        help="Background threshold for feature filtering (default: 0.33)",
+    )
+
+    parser.add_argument(
+        "--skew-threshold",
+        type=float,
+        default=0.66,
+        help="Skew threshold for feature filtering (default: 0.66)",
+    )
+
+    parser.add_argument(
+        "--diff-threshold",
+        type=float,
+        default=0.30,
+        help="Difference threshold for feature filtering (default: 0.30)",
+    )
+
+    parser.add_argument(
+        "--no-gui",
+        action="store_true",
+        help="Run in command-line mode without GUI",
+    )
+
+    parser.add_argument(
+        "--version", "-v",
+        action="store_true",
+        help="Show version information",
+    )
+
+    args = parser.parse_args()
+
+    # Show version
+    if args.version:
+        from ms_preprocessing import __version__
+        print(f"MS Preprocessing Toolkit v{__version__}")
+        return 0
+
+    # Command-line mode
+    if args.no_gui or args.input:
+        return run_cli(args)
+
+    # GUI mode
+    return run_gui()
+
+
+def run_gui():
+    """Run the GUI application."""
+    try:
+        from ms_preprocessing.gui.main_window import MainWindow
+
+        app = MainWindow()
+        app.mainloop()
+        return 0
+
+    except ImportError as e:
+        print(f"Error: Could not import GUI components: {e}")
+        print("Make sure customtkinter is installed: pip install customtkinter")
+        return 1
+
+
+def run_cli(args):
+    """Run in command-line mode."""
+    if not args.input:
+        print("Error: --input is required in command-line mode")
+        return 1
+
+    input_path = Path(args.input)
+    if not input_path.exists():
+        print(f"Error: Input file not found: {input_path}")
+        return 1
+
+    # Import processing modules
+    from ms_preprocessing.utils.file_handler import FileHandler
+    from ms_preprocessing.core.data_organizer import DataOrganizer
+    from ms_preprocessing.core.istd_marker import ISTDMarker
+    from ms_preprocessing.core.duplicate_remover import DuplicateRemover
+    from ms_preprocessing.core.feature_filter import FeatureFilter
+
+    try:
+        # Load data
+        print(f"Loading: {input_path}")
+        handler = FileHandler()
+        df, metadata = handler.load_data(input_path)
+        print(f"Loaded {len(df)} rows, {len(df.columns)} columns")
+        red_font_rows = set(metadata.get("red_font_rows", []))
+        protected_rows = set(metadata.get("protected_rows") or metadata.get("red_font_rows") or [])
+        blue_font_cells = []
+        sample_info_df = None
+
+        # Run requested steps
+        step = args.step
+
+        if step in ["organize", "all"]:
+            print("Step 1: Data Organization...")
+            organizer = DataOrganizer()
+            result = organizer.process(df, method_file=args.method_file)
+            if result.success:
+                df = result.data
+                sample_info_df = result.metadata.get("sample_info")
+                print(f"  Done: {result.statistics}")
+            else:
+                print(f"  Error: {result.message}")
+                return 1
+
+        if step in ["istd", "all"]:
+            print("Step 2: ISTD Marking...")
+            marker = ISTDMarker()
+            marker.config.default_ppm_tolerance = args.mz_tol
+            marker.config.default_rt_tolerance = args.rt_tol
+            istd_mz_list = None
+            if args.istd_mz:
+                try:
+                    istd_mz_list = [float(x.strip()) for x in args.istd_mz.split(",") if x.strip()]
+                except ValueError:
+                    print("  Error: Invalid --istd-mz format")
+                    return 1
+
+            result = marker.process(
+                df,
+                istd_mz_list=istd_mz_list,
+                istd_record_file=Path(args.istd_record_file) if args.istd_record_file else None,
+                istd_record_date=args.istd_record_date,
+            )
+            if result.success:
+                df = result.data
+                red_font_rows = set(result.metadata.get("red_font_rows", []))
+                protected_rows = set(
+                    result.metadata.get("protected_rows") or result.metadata.get("istd_rows") or red_font_rows
+                )
+                if result.metadata.get("warning"):
+                    print(f"  Warning: {result.metadata.get('warning')}")
+                print(f"  Done: {result.statistics}")
+            else:
+                print(f"  Error: {result.message}")
+                return 1
+
+        if step in ["duplicate-removal", "all"]:
+            print("Step 3: Duplicate Removal...")
+            remover = DuplicateRemover()
+            result = remover.process(
+                df,
+                mz_tolerance_ppm=args.mz_tol,
+                rt_tolerance=args.rt_tol,
+                protected_rows=protected_rows,
+            )
+            if result.success:
+                df = result.data
+                red_font_rows = set(result.metadata.get("red_font_rows", red_font_rows))
+                protected_rows = set(result.metadata.get("protected_rows") or red_font_rows)
+                print(f"  Done: {result.statistics}")
+            else:
+                print(f"  Error: {result.message}")
+                return 1
+
+        if step in ["filter", "all"]:
+            print("Step 4: Feature Filtering...")
+            filter_proc = FeatureFilter()
+            result = filter_proc.process(
+                df,
+                background_threshold=args.bg_threshold,
+                skew_threshold=args.skew_threshold,
+                diff_threshold=args.diff_threshold,
+                protected_rows=protected_rows,
+            )
+            if result.success:
+                df = result.data
+                red_font_rows = set(result.metadata.get("red_font_rows", red_font_rows))
+                protected_rows = set(result.metadata.get("protected_rows") or red_font_rows)
+                blue_font_cells = result.metadata.get("blue_font_cells", blue_font_cells)
+                print(f"  Done: {result.statistics}")
+            else:
+                print(f"  Error: {result.message}")
+                return 1
+
+        # Save output
+        if args.output:
+            output_path = Path(args.output)
+        else:
+            project_root = Path(__file__).resolve().parents[2]
+            output_dir = project_root / "OUTPUT"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            stem = input_path.stem
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+            step_prefix_map = {
+                "organize": "STEP1",
+                "istd": "STEP2",
+                "duplicate-removal": "STEP3",
+                "filter": "STEP4",
+                "all": "ALL",
+            }
+            step_prefix = step_prefix_map.get(step, "STEP1")
+
+            if step_prefix == "ALL":
+                filename = f"{step_prefix}_{stem}{input_path.suffix}"
+                output_path = output_dir / filename
+                if output_path.exists():
+                    filename = f"{step_prefix}_{stem}_{timestamp}{input_path.suffix}"
+                    output_path = output_dir / filename
+            else:
+                filename = f"{step_prefix}_{stem}_{timestamp}{input_path.suffix}"
+                output_path = output_dir / filename
+
+        print(f"Saving to: {output_path}")
+        handler.save_data(
+            df,
+            output_path,
+            sheet_name="RawIntensity",
+            red_font_rows=red_font_rows,
+            blue_font_cells=blue_font_cells,
+            extra_sheets={"SampleInfo": sample_info_df} if sample_info_df is not None else None,
+        )
+        print("Done!")
+
+        return 0
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
