@@ -345,7 +345,7 @@ class DuplicateRemover(BaseProcessor):
         protected_rows: Set[int],
     ) -> Tuple[Set[int], Dict[str, Any]]:
         """
-        Find unique signals using RT binning and m/z binning.
+        Find unique signals using RT-window grouping and m/z tolerance.
 
         Returns set of row indices to keep and statistics.
         """
@@ -375,79 +375,45 @@ class DuplicateRemover(BaseProcessor):
                     "protected": idx in protected_rows,
                 })
 
-        # Sort by RT for binning
-        valid_rows.sort(key=lambda x: x["rt"])
+        # Sort by RT first to allow a forward RT window scan.
+        valid_rows.sort(key=lambda x: (x["rt"], x["mz"]))
+        rt_window = rt_tolerance if rt_tolerance > 0 else float("inf")
+        processed_ids: Set[int] = set()
 
-        # Group by RT bins
-        rt_bins: Dict[int, List[dict]] = {}
-        for row in valid_rows:
-            bin_key = int(row["rt"] / rt_tolerance) if rt_tolerance > 0 else 0
-            rt_bins.setdefault(bin_key, []).append(row)
-
-        # Process each RT bin with m/z binning
-        for _, bin_rows in rt_bins.items():
-            if not bin_rows:
+        for i, current in enumerate(valid_rows):
+            if current["idx"] in processed_ids:
                 continue
 
-            # Determine m/z bin size using median m/z
-            mz_values = [r["mz"] for r in bin_rows]
-            mz_values_sorted = sorted(mz_values)
-            median_mz = mz_values_sorted[len(mz_values_sorted) // 2]
-            mz_bin_size = max(median_mz * mz_tolerance_ppm / 1_000_000, 1e-6)
+            group = [current]
 
-            # Group by m/z bins
-            mz_bins: Dict[int, List[dict]] = {}
-            for row in bin_rows:
-                mz_bin = int(row["mz"] / mz_bin_size) if mz_bin_size > 0 else 0
-                mz_bins.setdefault(mz_bin, []).append(row)
+            # Compare with following rows only while still inside RT window.
+            j = i + 1
+            while j < len(valid_rows):
+                other = valid_rows[j]
+                if (other["rt"] - current["rt"]) > rt_window:
+                    break
+                if other["idx"] in processed_ids:
+                    j += 1
+                    continue
+                ppm_diff = abs((current["mz"] - other["mz"]) / current["mz"] * 1_000_000)
+                if ppm_diff <= mz_tolerance_ppm:
+                    group.append(other)
+                j += 1
 
-            # Process each bin and its neighbor to avoid boundary misses
-            processed_ids: Set[int] = set()
-            for mz_bin_key in list(mz_bins.keys()):
-                # Collect rows from this bin and neighbor bins
-                neighbor_rows: List[dict] = []
-                for neighbor in (mz_bin_key - 1, mz_bin_key, mz_bin_key + 1):
-                    neighbor_rows.extend(mz_bins.get(neighbor, []))
+            # Select representative
+            protected_in_group = [r for r in group if r["protected"]]
+            if protected_in_group:
+                for r in protected_in_group:
+                    keep_indices.add(r["idx"])
+                    stats["protected_kept"] += 1
+            else:
+                best = max(group, key=lambda x: (x["occurrence"], x["intensity"]))
+                keep_indices.add(best["idx"])
 
-                # Sort by m/z within neighbor set
-                neighbor_rows.sort(key=lambda x: x["mz"])
-
-                i = 0
-                while i < len(neighbor_rows):
-                    current = neighbor_rows[i]
-                    if current["idx"] in processed_ids:
-                        i += 1
-                        continue
-
-                    group = [current]
-                    j = i + 1
-                    while j < len(neighbor_rows):
-                        other = neighbor_rows[j]
-                        if other["idx"] in processed_ids:
-                            j += 1
-                            continue
-                        ppm_diff = abs((current["mz"] - other["mz"]) / current["mz"] * 1_000_000)
-                        if ppm_diff <= mz_tolerance_ppm:
-                            group.append(other)
-                            j += 1
-                        else:
-                            break
-
-                    # Select representative
-                    protected_in_group = [r for r in group if r["protected"]]
-                    if protected_in_group:
-                        for r in protected_in_group:
-                            keep_indices.add(r["idx"])
-                            stats["protected_kept"] += 1
-                    else:
-                        best = max(group, key=lambda x: (x["occurrence"], x["intensity"]))
-                        keep_indices.add(best["idx"])
-
-                    stats["duplicates_removed"] += len(group) - (len(protected_in_group) if protected_in_group else 1)
-                    for r in group:
-                        processed_ids.add(r["idx"])
-
-                    i = j
+            kept_count = len(protected_in_group) if protected_in_group else 1
+            stats["duplicates_removed"] += len(group) - kept_count
+            for r in group:
+                processed_ids.add(r["idx"])
 
         return keep_indices, stats
 

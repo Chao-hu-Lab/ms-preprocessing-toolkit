@@ -76,3 +76,7 @@ ignore = ["E501"]
 python_version = "3.9"
 warn_return_any = true
 warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["OUTPUT", ".git", ".pytest_cache", "__pycache__"]

@@ -113,8 +113,11 @@ class DataValidator:
             self.errors.append(f"Column '{column}' not found")
             return False
 
+        # Skip the Sample_Type marker row if present.
+        start_idx = 1 if len(df) > 0 and str(df[column].iloc[0]).strip().lower() == "sample_type" else 0
+
         invalid_count = 0
-        for idx, value in df[column].items():
+        for _, value in df[column].iloc[start_idx:].items():
             if not self._is_valid_mz_rt(value):
                 invalid_count += 1
 
@@ -181,7 +184,7 @@ class DataValidator:
     def validate_sample_types(
         self,
         df: pd.DataFrame,
-        sample_type_row: int = 1,
+        sample_type_row: int = 0,
         expected_types: Optional[List[str]] = None,
     ) -> Tuple[bool, Dict[str, int]]:
         """

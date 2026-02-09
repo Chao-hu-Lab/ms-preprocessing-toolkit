@@ -91,6 +91,6 @@ class TestFeatureFilter:
         if result.data is not None:
             data_rows = result.data.iloc[1:]
             for col in result.data.columns[2:]:
-                if col not in ["_ratio" in col for col in result.data.columns]:
-                    # Non-ratio columns should have no NaN
-                    pass
+                if str(col).endswith("_ratio") or str(col) == "QC_ratio":
+                    continue
+                assert data_rows[col].isna().sum() == 0

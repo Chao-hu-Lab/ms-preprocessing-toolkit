@@ -7,7 +7,6 @@ import sys
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
-import threading
 
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
@@ -411,39 +410,35 @@ class MainWindow(ctk.CTk):
             self._log("Error: Please load a file first")
             return
 
-        def run_pipeline():
-            try:
-                data = self._original_data.copy()
+        try:
+            data = self._original_data.copy()
 
-                for i, widget in enumerate(self.step_widgets):
-                    self._log(f"Running Step {i + 1}...")
-                    widget.set_data(data)
-                    widget.set_context(self._context)
+            for i, widget in enumerate(self.step_widgets):
+                self._log(f"Running Step {i + 1}...")
+                widget.set_data(data)
+                widget.set_context(self._context)
 
-                    # Trigger processing (this is simplified - actual implementation would be more complex)
-                    params = widget._get_parameters()
-                    data = widget._run_processing(data, **params)
-                    self._update_context_from_metadata(widget.get_metadata())
+                # Trigger processing (this is simplified - actual implementation would be more complex)
+                params = widget._get_parameters()
+                data = widget._run_processing(data, **params)
+                self._update_context_from_metadata(widget.get_metadata())
 
-                    self._current_data = data
-                    self._last_completed_step = i
-                    output_path = self._save_step_output(i, data)
-                    if output_path:
-                        self._step_output_paths[i] = output_path
-                        widget.set_input_file(str(output_path))
-                        if i + 1 < len(self.step_widgets):
-                            self.step_widgets[i + 1].set_input_file(str(output_path))
-                    self._log(f"Step {i + 1} completed")
+                self._current_data = data
+                self._last_completed_step = i
+                output_path = self._save_step_output(i, data)
+                if output_path:
+                    self._step_output_paths[i] = output_path
+                    widget.set_input_file(str(output_path))
+                    if i + 1 < len(self.step_widgets):
+                        self.step_widgets[i + 1].set_input_file(str(output_path))
+                self._log(f"Step {i + 1} completed")
+                self.update_idletasks()
 
-                self._last_run_all = True
-                self._log("All steps completed successfully!")
+            self._last_run_all = True
+            self._log("All steps completed successfully!")
 
-            except Exception as e:
-                self._log(f"Pipeline error: {str(e)}")
-
-        # Run in thread to keep UI responsive
-        thread = threading.Thread(target=run_pipeline)
-        thread.start()
+        except Exception as e:
+            self._log(f"Pipeline error: {str(e)}")
 
     def _export_results(self) -> None:
         """Export the processed data."""
@@ -476,16 +471,16 @@ class MainWindow(ctk.CTk):
             filepath = output_dir / filename
 
         try:
-                self._file_handler.save_data(
-                    self._current_data,
-                    filepath,
-                    sheet_name="RawIntensity",
-                    highlight_rows=self._context.get("highlight_rows"),
-                    blue_font_cells=self._context.get("blue_font_cells"),
-                    red_font_rows=self._context.get("red_font_rows"),
-                    extra_sheets={"SampleInfo": self._context.get("sample_info")},
-                    save_parquet_cache=Settings.SAVE_PARQUET_CACHE,
-                )
+            self._file_handler.save_data(
+                self._current_data,
+                filepath,
+                sheet_name="RawIntensity",
+                highlight_rows=self._context.get("highlight_rows"),
+                blue_font_cells=self._context.get("blue_font_cells"),
+                red_font_rows=self._context.get("red_font_rows"),
+                extra_sheets={"SampleInfo": self._context.get("sample_info")},
+                save_parquet_cache=Settings.SAVE_PARQUET_CACHE,
+            )
             self._log(f"Exported to: {filepath}")
         except Exception as e:
             self._log(f"Export error: {str(e)}")

@@ -88,12 +88,16 @@ class FileHandler:
             meta = self._load_parquet_meta(path)
             if meta:
                 metadata.update(meta)
+                self._red_font_rows = set(meta.get("red_font_rows", []))
         else:
             raise ValueError(f"Unsupported file format: {suffix}")
 
         metadata["shape"] = df.shape
         metadata["columns"] = list(df.columns)
-        metadata["red_font_rows"] = sorted(self._red_font_rows)
+        if "red_font_rows" not in metadata:
+            metadata["red_font_rows"] = sorted(self._red_font_rows)
+        else:
+            metadata["red_font_rows"] = sorted(set(metadata.get("red_font_rows", [])))
 
         return df, metadata
 
@@ -183,13 +187,17 @@ class FileHandler:
                 extra_sheets=extra_sheets,
             )
             if save_parquet_cache:
-                self._save_parquet_cache(
-                    df,
-                    path.with_suffix(".parquet"),
-                    highlight_rows=highlight_rows,
-                    blue_font_cells=blue_font_cells,
-                    red_font_rows=red_font_rows,
-                )
+                try:
+                    self._save_parquet_cache(
+                        df,
+                        path.with_suffix(".parquet"),
+                        highlight_rows=highlight_rows,
+                        blue_font_cells=blue_font_cells,
+                        red_font_rows=red_font_rows,
+                    )
+                except Exception:
+                    # Parquet cache is an optimization; never fail the primary save path.
+                    pass
         elif suffix == ".csv":
             df.to_csv(path, index=index)
         elif suffix in {".tsv", ".txt"}:

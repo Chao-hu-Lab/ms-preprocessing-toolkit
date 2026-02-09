@@ -164,12 +164,12 @@ def run_cli(args):
 
     # Import processing modules
     from ms_preprocessing.utils.file_handler import FileHandler
-from ms_preprocessing.core.data_organizer import DataOrganizer
-from ms_preprocessing.core.istd_marker import ISTDMarker
-from ms_preprocessing.core.duplicate_remover import DuplicateRemover
-from ms_preprocessing.core.feature_filter import FeatureFilter
-from ms_preprocessing.utils.perf import take_snapshot, format_perf_delta
-from ms_preprocessing.config.settings import Settings
+    from ms_preprocessing.core.data_organizer import DataOrganizer
+    from ms_preprocessing.core.istd_marker import ISTDMarker
+    from ms_preprocessing.core.duplicate_remover import DuplicateRemover
+    from ms_preprocessing.core.feature_filter import FeatureFilter
+    from ms_preprocessing.utils.perf import take_snapshot, format_perf_delta
+    from ms_preprocessing.config.settings import Settings
 
     try:
         # Load data
