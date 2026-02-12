@@ -419,8 +419,8 @@ class MainWindow(ctk.CTk):
                 widget.set_context(self._context)
 
                 # Trigger processing (this is simplified - actual implementation would be more complex)
-                params = widget._get_parameters()
-                data = widget._run_processing(data, **params)
+                params = widget.get_parameters()
+                data = widget.run_processing(data, **params)
                 self._update_context_from_metadata(widget.get_metadata())
 
                 self._current_data = data
@@ -487,6 +487,8 @@ class MainWindow(ctk.CTk):
 
     def _get_base_stem(self, path: Optional[Path]) -> str:
         """Normalize base stem by stripping step prefixes and timestamps."""
+        import re
+
         if not path:
             return "output"
         stem = path.stem
@@ -494,9 +496,8 @@ class MainWindow(ctk.CTk):
             if stem.startswith(prefix):
                 stem = stem[len(prefix):]
                 break
-        # Remove trailing timestamp if present
-        if len(stem) > 16 and stem[-15:-14] == "_" and stem[-14:].isdigit():
-            stem = stem[:-15]
+        # Remove trailing timestamp (_YYYYMMDD_HHMMSS) if present
+        stem = re.sub(r"_\d{8}_\d{6}$", "", stem)
         return stem
 
     def _save_step_output(self, step_index: int, data: pd.DataFrame) -> Optional[Path]:
@@ -529,10 +530,19 @@ class MainWindow(ctk.CTk):
             return None
 
     def _open_output_folder(self) -> None:
-        """Open OUTPUT folder in file explorer."""
+        """Open OUTPUT folder in file explorer (cross-platform)."""
+        import platform
+        import subprocess
+
         try:
             self._output_dir.mkdir(parents=True, exist_ok=True)
-            os.startfile(self._output_dir)
+            system = platform.system()
+            if system == "Windows":
+                os.startfile(self._output_dir)
+            elif system == "Darwin":
+                subprocess.Popen(["open", str(self._output_dir)])
+            else:
+                subprocess.Popen(["xdg-open", str(self._output_dir)])
         except Exception as e:
             self._log(f"Open output folder error: {str(e)}")
 

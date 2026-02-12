@@ -7,7 +7,7 @@ for all processing modules in the toolkit.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, Callable
+from typing import Optional, Dict, Any, Callable, List
 from datetime import datetime
 
 import pandas as pd
@@ -32,8 +32,8 @@ class ProcessingResult:
     data: Optional[pd.DataFrame] = None
     message: str = ""
     statistics: Dict[str, Any] = field(default_factory=dict)
-    warnings: list = field(default_factory=list)
-    errors: list = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+    errors: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):

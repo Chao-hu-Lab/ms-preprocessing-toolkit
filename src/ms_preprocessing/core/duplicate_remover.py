@@ -17,6 +17,7 @@ import numpy as np
 from ms_preprocessing.core.base import BaseProcessor, ProcessingResult
 from ms_preprocessing.config.settings import DuplicateRemovalConfig
 from ms_preprocessing.utils.file_handler import parse_mz_rt_string
+from ms_preprocessing.utils.validators import detect_fixed_columns
 
 
 class DuplicateRemover(BaseProcessor):
@@ -245,14 +246,9 @@ class DuplicateRemover(BaseProcessor):
 
         # Identify intensity columns (typically data columns)
         # Skip fixed columns (FeatureID/Mz-RT and optional Tolerance)
-        fixed_cols = []
-        for col in df.columns:
-            col_lower = str(col).lower()
-            if col in ["Mz/RT", "FeatureID"] or "tolerance" in col_lower:
-                fixed_cols.append(col)
-            else:
-                break
-        start_idx = len(fixed_cols) if fixed_cols else 1
+        fixed_cols, start_idx = detect_fixed_columns(df)
+        if not fixed_cols:
+            start_idx = 1
 
         for col in df.columns[start_idx:]:
             if str(col).startswith("_"):

@@ -148,7 +148,7 @@ class ISTDMarker(BaseProcessor):
                 )
                 metadata["istd_mz_list"] = list(istd_mz_list)
 
-            duplicate_indices = self._detect_duplicates(
+            duplicate_indices = self._detect_istd_duplicates(
                 result_df,
                 istd_features_set,
                 custom_tolerances or {},
@@ -261,14 +261,18 @@ class ISTDMarker(BaseProcessor):
 
         return result_df, stats
 
-    def _detect_duplicates(
+    def _detect_istd_duplicates(
         self,
         df: pd.DataFrame,
         istd_features: Set[str],
         custom_tolerances: Dict[str, Tuple[float, float]],
     ) -> Set[int]:
         """
-        Detect duplicate features based on m/z and RT tolerance.
+        Detect non-ISTD features that fall within m/z (ppm) and RT tolerance
+        of a known ISTD feature.
+
+        Only compares non-ISTD rows against ISTD rows; does NOT perform
+        general-purpose deduplication (that is Step 3's responsibility).
 
         Returns set of row indices that are duplicates of ISTD features.
         """
@@ -535,7 +539,10 @@ class ISTDMarker(BaseProcessor):
         col = df.iloc[:, 0].astype(str)
         parts = col.str.split("/", n=1, expand=True)
         mz = pd.to_numeric(parts[0], errors="coerce").to_numpy()
-        rt = pd.to_numeric(parts[1], errors="coerce").to_numpy()
+        if parts.shape[1] >= 2:
+            rt = pd.to_numeric(parts[1], errors="coerce").to_numpy()
+        else:
+            rt = np.full(len(df), np.nan)
         return mz, rt
 
     def _load_istd_record_targets(

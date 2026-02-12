@@ -5,6 +5,7 @@ This module provides functions for reading and writing various file formats
 commonly used in mass spectrometry data processing.
 """
 
+import logging
 from pathlib import Path
 from typing import Optional, Union, Tuple, Any
 from datetime import datetime
@@ -15,6 +16,10 @@ import numpy as np
 from openpyxl import load_workbook
 from openpyxl.styles import Font, PatternFill, Color
 
+from ms_preprocessing.config.settings import Settings
+
+logger = logging.getLogger(__name__)
+
 
 class FileHandler:
     """
@@ -24,12 +29,11 @@ class FileHandler:
     preservation of formatting information where applicable.
     """
 
-    SUPPORTED_FORMATS = {".xlsx", ".xls", ".csv", ".tsv", ".txt", ".parquet"}
+    SUPPORTED_FORMATS = Settings.SUPPORTED_FORMATS
 
     def __init__(self):
         """Initialize the FileHandler."""
         self._last_loaded_path: Optional[Path] = None
-        self._red_font_rows: set = set()
 
     @staticmethod
     def is_supported_format(file_path: Union[str, Path]) -> bool:
@@ -61,7 +65,7 @@ class FileHandler:
             if cached:
                 path = cached
         self._last_loaded_path = path
-        self._red_font_rows = set()
+        red_font_rows: set = set()
         metadata = {"source_file": str(path), "load_time": datetime.now().isoformat()}
 
         if not path.exists():
@@ -73,7 +77,7 @@ class FileHandler:
         suffix = path.suffix.lower()
 
         if suffix in {".xlsx", ".xls"}:
-            df = self._load_excel(path, sheet_name, header_row)
+            df, red_font_rows = self._load_excel(path, sheet_name, header_row)
             metadata["format"] = "excel"
             metadata["sheet_name"] = sheet_name
         elif suffix == ".csv":
@@ -88,31 +92,35 @@ class FileHandler:
             meta = self._load_parquet_meta(path)
             if meta:
                 metadata.update(meta)
-                self._red_font_rows = set(meta.get("red_font_rows", []))
+                red_font_rows = set(meta.get("red_font_rows", []))
         else:
             raise ValueError(f"Unsupported file format: {suffix}")
 
         metadata["shape"] = df.shape
         metadata["columns"] = list(df.columns)
         if "red_font_rows" not in metadata:
-            metadata["red_font_rows"] = sorted(self._red_font_rows)
+            metadata["red_font_rows"] = sorted(red_font_rows)
         else:
             metadata["red_font_rows"] = sorted(set(metadata.get("red_font_rows", [])))
 
         return df, metadata
 
+    @staticmethod
     def _load_excel(
-        self,
         file_path: Path,
         sheet_name: Optional[Union[str, int]] = 0,
         header_row: int = 0,
-    ) -> pd.DataFrame:
-        """Load data from Excel file with formatting extraction."""
+    ) -> Tuple[pd.DataFrame, set]:
+        """Load data from Excel file with formatting extraction.
+
+        Returns:
+            Tuple of (DataFrame, set of red-font row indices).
+        """
         # Load with pandas
         df = pd.read_excel(file_path, sheet_name=sheet_name, header=header_row, engine="openpyxl")
 
         # Extract red font information for protection logic
-        self._red_font_rows = set()
+        red_font_rows: set = set()
         try:
             wb = load_workbook(file_path, data_only=False)
             if isinstance(sheet_name, int):
@@ -134,17 +142,12 @@ class FileHandler:
                             b = int(rgb[-2:], 16)
                             if r > 200 and g < 100 and b < 100:
                                 # Adjust for pandas DataFrame index (0-based, excluding header)
-                                self._red_font_rows.add(row_idx - header_row - 2)
+                                red_font_rows.add(row_idx - header_row - 2)
             wb.close()
-        except Exception:
-            # If formatting extraction fails, continue without it
-            pass
+        except Exception as exc:
+            logger.warning("Failed to extract red-font formatting: %s", exc)
 
-        return df
-
-    def get_red_font_rows(self) -> set:
-        """Get the set of row indices with red font."""
-        return self._red_font_rows
+        return df, red_font_rows
 
     def save_data(
         self,
@@ -195,9 +198,8 @@ class FileHandler:
                         blue_font_cells=blue_font_cells,
                         red_font_rows=red_font_rows,
                     )
-                except Exception:
-                    # Parquet cache is an optimization; never fail the primary save path.
-                    pass
+                except Exception as exc:
+                    logger.warning("Parquet cache save failed (non-fatal): %s", exc)
         elif suffix == ".csv":
             df.to_csv(path, index=index)
         elif suffix in {".tsv", ".txt"}:
@@ -324,8 +326,8 @@ class FileHandler:
         meta_path = self._parquet_meta_path(parquet_path)
         try:
             meta_path.write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Parquet meta write failed: %s", exc)
 
     def _load_parquet_meta(self, parquet_path: Path) -> Optional[dict]:
         """Load parquet metadata sidecar if it exists."""
@@ -340,7 +342,8 @@ class FileHandler:
                 "blue_font_cells": data.get("blue_font_cells", []),
                 "highlight_rows": data.get("highlight_rows", []),
             }
-        except Exception:
+        except Exception as exc:
+            logger.warning("Failed to load parquet meta: %s", exc)
             return None
 
     def _resolve_parquet_cache(self, excel_path: Path) -> Optional[Path]:
@@ -352,7 +355,8 @@ class FileHandler:
         try:
             if parquet_path.stat().st_mtime >= excel_path.stat().st_mtime:
                 return parquet_path
-        except Exception:
+        except Exception as exc:
+            logger.debug("Parquet cache resolution failed: %s", exc)
             return None
         return None
 

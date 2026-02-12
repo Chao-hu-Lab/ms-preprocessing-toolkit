@@ -158,7 +158,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
         """Update diff threshold label."""
         self.diff_value_label.configure(text=f"{int(value * 100)}%")
 
-    def _get_parameters(self) -> dict:
+    def get_parameters(self) -> dict:
         """Get current parameter values."""
         return {
             "signal_threshold": float(self.signal_entry.get() or "5000"),
@@ -167,7 +167,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
             "diff_threshold": self.diff_slider.get(),
         }
 
-    def _run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
+    def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
         """Run the feature filtering step."""
         self._processor.set_progress_callback(self.update_progress)
 

@@ -143,7 +143,7 @@ class ISTDMarkerWidget(BaseProcessingWidget):
             self.record_entry.delete(0, "end")
             self.record_entry.insert(0, filepath)
 
-    def _get_parameters(self) -> dict:
+    def get_parameters(self) -> dict:
         """Get current parameter values."""
         params = {
             "ppm_tolerance": float(self.ppm_entry.get() or "20"),
@@ -171,7 +171,7 @@ class ISTDMarkerWidget(BaseProcessingWidget):
         except ValueError:
             return []
 
-    def _run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
+    def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
         """Run the ISTD marking step."""
         self._processor.set_progress_callback(self.update_progress)
 

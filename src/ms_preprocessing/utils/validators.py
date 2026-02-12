@@ -113,8 +113,9 @@ class DataValidator:
             self.errors.append(f"Column '{column}' not found")
             return False
 
-        # Skip the Sample_Type marker row if present.
-        start_idx = 1 if len(df) > 0 and str(df[column].iloc[0]).strip().lower() == "sample_type" else 0
+        # Skip the Sample_Type marker row if present (case/whitespace insensitive).
+        first_val = str(df[column].iloc[0]).strip().lower().replace(" ", "").replace("_", "") if len(df) > 0 else ""
+        start_idx = 1 if first_val == "sampletype" else 0
 
         invalid_count = 0
         for _, value in df[column].iloc[start_idx:].items():
@@ -271,3 +272,30 @@ class DataValidator:
             lines.append("No issues found.")
 
         return "\n".join(lines)
+
+
+# Fixed column names that precede sample data columns.
+_FIXED_COLUMN_NAMES = {"Mz/RT", "FeatureID", "m/z Tolerance( ppm)/RT Tolerance"}
+
+
+def detect_fixed_columns(df: pd.DataFrame) -> Tuple[List[str], int]:
+    """
+    Detect leading fixed (non-sample) columns in a DataFrame.
+
+    Fixed columns are metadata columns such as FeatureID / Mz-RT / Tolerance
+    that appear before the sample intensity columns.  Detection stops at the
+    first column whose name is NOT in the known fixed-column set.
+
+    Args:
+        df: DataFrame to inspect.
+
+    Returns:
+        Tuple of (list of fixed column names, count of fixed columns).
+    """
+    fixed: List[str] = []
+    for col in df.columns:
+        if col in _FIXED_COLUMN_NAMES:
+            fixed.append(col)
+        else:
+            break
+    return fixed, len(fixed)

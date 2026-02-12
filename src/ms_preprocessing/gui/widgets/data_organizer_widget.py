@@ -88,7 +88,7 @@ class DataOrganizerWidget(BaseProcessingWidget):
             self.method_entry.delete(0, "end")
             self.method_entry.insert(0, filepath)
 
-    def _get_parameters(self) -> dict:
+    def get_parameters(self) -> dict:
         """Get current parameter values."""
         params = {
             "auto_detect": self.auto_detect_var.get(),
@@ -100,7 +100,7 @@ class DataOrganizerWidget(BaseProcessingWidget):
 
         return params
 
-    def _run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
+    def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
         """Run the data organization step."""
         self._processor.set_progress_callback(self.update_progress)
 

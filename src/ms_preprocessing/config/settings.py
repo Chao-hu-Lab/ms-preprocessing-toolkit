@@ -102,8 +102,8 @@ class Settings:
     for the MS Preprocessing Toolkit.
     """
 
-    # Supported file formats
-    SUPPORTED_FORMATS = [".xlsx", ".xls", ".csv", ".tsv", ".txt", ".parquet"]
+    # Supported file formats (canonical source — used by FileHandler too)
+    SUPPORTED_FORMATS = frozenset({".xlsx", ".xls", ".csv", ".tsv", ".txt", ".parquet"})
     SAVE_PARQUET_CACHE = True
 
     # GUI Settings

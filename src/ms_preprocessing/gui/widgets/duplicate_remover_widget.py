@@ -95,7 +95,7 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
         )
         preserve_cb.grid(row=3, column=0, columnspan=2, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
 
-    def _get_parameters(self) -> dict:
+    def get_parameters(self) -> dict:
         """Get current parameter values."""
         params = {
             "mz_tolerance_ppm": float(self.mz_entry.get() or "20"),
@@ -112,7 +112,7 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
 
         return params
 
-    def _run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
+    def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
         """Run the duplicate removal step."""
         self._processor.set_progress_callback(self.update_progress)
 

@@ -21,6 +21,7 @@ Output format (SampleInfo):
     Sample_Name | Sample_Type | Injection_Order | Injection_Volume
 """
 
+import logging
 import re
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple, Union
@@ -28,8 +29,11 @@ from dataclasses import dataclass
 import pandas as pd
 import numpy as np
 
+logger = logging.getLogger(__name__)
+
 from ms_preprocessing.core.base import BaseProcessor, ProcessingResult
 from ms_preprocessing.config.settings import DataOrganizerConfig
+from ms_preprocessing.utils.validators import detect_fixed_columns
 
 
 @dataclass
@@ -344,7 +348,8 @@ class DataOrganizer(BaseProcessor):
             # Handle both Windows and Unix paths
             path = Path(header)
             filename = path.stem  # Get filename without extension
-        except Exception:
+        except Exception as exc:
+            logger.debug("Path parse fallback for header '%s': %s", header, exc)
             filename = header
 
         # Try to extract the meaningful part
@@ -382,14 +387,7 @@ class DataOrganizer(BaseProcessor):
         stats = {"types_detected": {}}
 
         # Determine number of fixed columns (Mz/RT only, or Mz/RT + Tolerance)
-        fixed_cols = []
-        for col in df.columns:
-            if col in ["Mz/RT", "FeatureID", "m/z Tolerance( ppm)/RT Tolerance"]:
-                fixed_cols.append(col)
-            else:
-                break
-
-        num_fixed = len(fixed_cols)
+        fixed_cols, num_fixed = detect_fixed_columns(df)
 
         # Detect sample types
         sample_types = ["Sample_Type"] + ["na"] * (num_fixed - 1)  # Fixed columns
@@ -455,28 +453,16 @@ class DataOrganizer(BaseProcessor):
         Ensures proper data types and formatting.
         """
         # Determine number of fixed columns
-        fixed_cols = []
-        for col in df.columns:
-            if col in ["Mz/RT", "FeatureID", "m/z Tolerance( ppm)/RT Tolerance"]:
-                fixed_cols.append(col)
-            else:
-                break
-        num_fixed = len(fixed_cols)
+        fixed_cols, num_fixed = detect_fixed_columns(df)
 
-        # First row is now Sample_Type
-        # Data rows start from index 1
-
-        # Convert intensity values to numeric where possible (skip first row)
-        for col in df.columns[num_fixed:]:
-            # Convert data rows only (skip Sample_Type row)
-            for idx in range(1, len(df)):
-                val = df.iat[idx, df.columns.get_loc(col)]
-                if val == "na" or val == "" or pd.isna(val):
-                    continue
-                try:
-                    df.iat[idx, df.columns.get_loc(col)] = pd.to_numeric(val, errors="coerce")
-                except Exception:
-                    pass
+        # First row is now Sample_Type — data rows start from index 1.
+        # Vectorized numeric conversion for all sample columns at once.
+        if len(df) > 1 and num_fixed < len(df.columns):
+            sample_cols = df.columns[num_fixed:]
+            data_block = df.loc[df.index[1:], sample_cols]
+            df.loc[df.index[1:], sample_cols] = data_block.apply(
+                pd.to_numeric, errors="coerce"
+            )
 
         return df
 
@@ -574,9 +560,9 @@ class DataOrganizer(BaseProcessor):
                 ))
 
         except ImportError:
-            pass
-        except Exception:
-            pass
+            logger.warning("python-docx not installed; cannot parse injection sequence")
+        except Exception as exc:
+            logger.warning("Failed to parse injection sequence from %s: %s", file_path, exc)
 
         return injection_list
 
@@ -654,13 +640,7 @@ class DataOrganizer(BaseProcessor):
             - Injection_Volume: Volume from method file
         """
         # Determine number of fixed columns
-        fixed_cols = []
-        for col in df.columns:
-            if col in ["Mz/RT", "FeatureID", "m/z Tolerance( ppm)/RT Tolerance"]:
-                fixed_cols.append(col)
-            else:
-                break
-        num_fixed = len(fixed_cols)
+        fixed_cols, num_fixed = detect_fixed_columns(df)
 
         # Get sample columns (skip fixed columns)
         sample_cols = list(df.columns[num_fixed:])
@@ -802,13 +782,7 @@ class DataOrganizer(BaseProcessor):
             return df
 
         # Determine fixed columns
-        fixed_cols = []
-        for col in df.columns:
-            if col in ["Mz/RT", "FeatureID", "m/z Tolerance( ppm)/RT Tolerance"]:
-                fixed_cols.append(col)
-            else:
-                break
-        num_fixed = len(fixed_cols)
+        fixed_cols, num_fixed = detect_fixed_columns(df)
 
         # Get sample columns
         sample_cols = list(df.columns[num_fixed:])
@@ -940,11 +914,9 @@ class DataOrganizer(BaseProcessor):
                                 mapping[sample_id] = "standard"
 
         except ImportError:
-            # python-docx not installed
-            pass
-        except Exception:
-            # Failed to parse document
-            pass
+            logger.warning("python-docx not installed; cannot parse method file")
+        except Exception as exc:
+            logger.warning("Failed to parse method file %s: %s", file_path, exc)
 
         return mapping
 

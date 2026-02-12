@@ -16,6 +16,7 @@ import numpy as np
 
 from ms_preprocessing.core.base import BaseProcessor, ProcessingResult
 from ms_preprocessing.config.settings import FeatureFilterConfig
+from ms_preprocessing.utils.validators import detect_fixed_columns
 
 
 class FeatureFilter(BaseProcessor):
@@ -211,14 +212,9 @@ class FeatureFilter(BaseProcessor):
         # Row 0 contains sample types (Sample_Type row)
         sample_type_row = 0
 
-        fixed_cols = []
-        for col in df.columns:
-            col_lower = str(col).lower()
-            if col in ["Mz/RT", "FeatureID"] or "tolerance" in col_lower:
-                fixed_cols.append(col)
-            else:
-                break
-        start_idx = len(fixed_cols) if fixed_cols else 1
+        fixed_cols, start_idx = detect_fixed_columns(df)
+        if not fixed_cols:
+            start_idx = 1
 
         for col_idx in range(start_idx, len(df.columns)):
             col_name = df.columns[col_idx]
@@ -279,7 +275,7 @@ class FeatureFilter(BaseProcessor):
             block = block_all_values[:, pos]
             signal_count = (block >= signal_threshold).sum(axis=1)
             total_count = len(pos)
-            ratios = signal_count / total_count if total_count > 0 else 0
+            ratios = signal_count / total_count if total_count > 0 else np.zeros(len(signal_count))
             df[ratio_col] = ["na"] + ratios.tolist()
 
         # Add QC ratio if QC samples exist (vectorized)
@@ -293,7 +289,7 @@ class FeatureFilter(BaseProcessor):
                 block = block_all_values[:, pos]
                 signal_count = (block >= signal_threshold).sum(axis=1)
                 total_count = len(pos)
-                qc_ratios = signal_count / total_count if total_count > 0 else 0
+                qc_ratios = signal_count / total_count if total_count > 0 else np.zeros(len(signal_count))
                 df[qc_ratio_col] = ["na"] + qc_ratios.tolist()
             else:
                 df[qc_ratio_col] = ["na"] + [0] * (len(df) - 1)

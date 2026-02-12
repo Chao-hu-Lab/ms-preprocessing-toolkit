@@ -131,12 +131,12 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         pass
 
     @abstractmethod
-    def _get_parameters(self) -> dict:
+    def get_parameters(self) -> dict:
         """Get current parameter values. Must be implemented by subclasses."""
         pass
 
     @abstractmethod
-    def _run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
+    def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
         """Run the processing step. Must be implemented by subclasses."""
         pass
 
@@ -197,11 +197,11 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
             self.status_label.configure(text="Processing...")
             self.progress_bar.set(0)
 
-            params = self._get_parameters()
+            params = self.get_parameters()
             self.log(f"Starting with parameters: {params}")
 
             self._last_metadata = {}
-            self._result = self._run_processing(self._data, **params)
+            self._result = self.run_processing(self._data, **params)
 
             self.progress_bar.set(1)
             self.status_label.configure(text="Complete!")
