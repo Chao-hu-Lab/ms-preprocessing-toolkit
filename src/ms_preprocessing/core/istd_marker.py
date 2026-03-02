@@ -14,9 +14,9 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-from ms_preprocessing.core.base import BaseProcessor, ProcessingResult
-from ms_preprocessing.config.settings import ISTDConfig
-from ms_preprocessing.utils.file_handler import parse_mz_rt_string
+from ms_core.preprocessing.base import BaseProcessor, ProcessingResult
+from ms_core.preprocessing.settings import ISTDConfig
+from ms_core.utils.file_handler import parse_mz_rt_string
 
 
 class ISTDMarker(BaseProcessor):
@@ -466,7 +466,7 @@ class ISTDMarker(BaseProcessor):
             metadata["warning"] = "No ISTD RT targets found from record file"
             return set(), metadata
 
-        # Determine fixed columns (FeatureID + optional tolerance)
+        # Determine fixed columns (Mz/RT + optional tolerance)
         fixed_cols = 1
         if len(df.columns) > 1 and "tolerance" in str(df.columns[1]).lower():
             fixed_cols = 2
@@ -535,7 +535,7 @@ class ISTDMarker(BaseProcessor):
         return istd_features, metadata
 
     def _extract_mz_rt_arrays(self, df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
-        """Vectorized extraction of m/z and RT arrays from FeatureID column."""
+        """Vectorized extraction of m/z and RT arrays from Mz/RT column."""
         col = df.iloc[:, 0].astype(str)
         parts = col.str.split("/", n=1, expand=True)
         mz = pd.to_numeric(parts[0], errors="coerce").to_numpy()

@@ -9,7 +9,7 @@ import pandas as pd
 
 from ms_preprocessing.gui.widgets.base_widget import BaseProcessingWidget
 from ms_preprocessing.gui.styles import PADDING, FONTS
-from ms_preprocessing.core.istd_marker import ISTDMarker
+from ms_core.preprocessing.istd_marker import ISTDMarker
 
 
 class ISTDMarkerWidget(BaseProcessingWidget):

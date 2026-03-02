@@ -163,13 +163,22 @@ def run_cli(args):
         return 1
 
     # Import processing modules
-    from ms_preprocessing.utils.file_handler import FileHandler
-    from ms_preprocessing.core.data_organizer import DataOrganizer
-    from ms_preprocessing.core.istd_marker import ISTDMarker
-    from ms_preprocessing.core.duplicate_remover import DuplicateRemover
-    from ms_preprocessing.core.feature_filter import FeatureFilter
+    from ms_core.utils.file_handler import FileHandler
+    from ms_core.preprocessing.data_organizer import DataOrganizer
+    from ms_core.preprocessing.istd_marker import ISTDMarker
+    from ms_core.preprocessing.duplicate_remover import DuplicateRemover
+    from ms_core.preprocessing.ms_quality_filter import FeatureFilter
     from ms_preprocessing.utils.perf import take_snapshot, format_perf_delta
-    from ms_preprocessing.config.settings import Settings
+    from ms_core.preprocessing.settings import Settings
+
+    def _compact_stats(stats: dict) -> dict:
+        compact = {}
+        for key, value in (stats or {}).items():
+            if isinstance(value, list) and len(value) > 20:
+                compact[key] = f"[{len(value)} items]"
+            else:
+                compact[key] = value
+        return compact
 
     try:
         # Load data
@@ -181,6 +190,7 @@ def run_cli(args):
         protected_rows = set(metadata.get("protected_rows") or metadata.get("red_font_rows") or [])
         blue_font_cells = []
         sample_info_df = None
+        deleted_feature_df = None
 
         # Run requested steps
         step = args.step
@@ -195,7 +205,7 @@ def run_cli(args):
                 sample_info_df = result.metadata.get("sample_info")
                 perf_end = take_snapshot()
                 print(f"  Perf: {format_perf_delta(perf_start, perf_end)}")
-                print(f"  Done: {result.statistics}")
+                print(f"  Done: {_compact_stats(result.statistics)}")
             else:
                 print(f"  Error: {result.message}")
                 return 1
@@ -230,7 +240,7 @@ def run_cli(args):
                 print(f"  Perf: {format_perf_delta(perf_start, perf_end)}")
                 if result.metadata.get("warning"):
                     print(f"  Warning: {result.metadata.get('warning')}")
-                print(f"  Done: {result.statistics}")
+                print(f"  Done: {_compact_stats(result.statistics)}")
             else:
                 print(f"  Error: {result.message}")
                 return 1
@@ -251,7 +261,7 @@ def run_cli(args):
                 protected_rows = set(result.metadata.get("protected_rows") or red_font_rows)
                 perf_end = take_snapshot()
                 print(f"  Perf: {format_perf_delta(perf_start, perf_end)}")
-                print(f"  Done: {result.statistics}")
+                print(f"  Done: {_compact_stats(result.statistics)}")
             else:
                 print(f"  Error: {result.message}")
                 return 1
@@ -272,9 +282,19 @@ def run_cli(args):
                 red_font_rows = set(result.metadata.get("red_font_rows", red_font_rows))
                 protected_rows = set(result.metadata.get("protected_rows") or red_font_rows)
                 blue_font_cells = result.metadata.get("blue_font_cells", blue_font_cells)
+                deleted_features = result.metadata.get("deleted_features", [])
+                if deleted_features:
+                    try:
+                        import pandas as pd
+                        # Support duplicate column labels by building from row values.
+                        deleted_columns = list(deleted_features[0].index)
+                        deleted_values = [row.tolist() for row in deleted_features]
+                        deleted_feature_df = pd.DataFrame(deleted_values, columns=deleted_columns)
+                    except Exception:
+                        deleted_feature_df = None
                 perf_end = take_snapshot()
                 print(f"  Perf: {format_perf_delta(perf_start, perf_end)}")
-                print(f"  Done: {result.statistics}")
+                print(f"  Done: {_compact_stats(result.statistics)}")
             else:
                 print(f"  Error: {result.message}")
                 return 1
@@ -282,12 +302,15 @@ def run_cli(args):
         # Save output
         if args.output:
             output_path = Path(args.output)
+            if output_path.suffix == "":
+                output_path = output_path.with_suffix(".xlsx")
         else:
             project_root = Path(__file__).resolve().parents[2]
             output_dir = project_root / "OUTPUT"
             output_dir.mkdir(parents=True, exist_ok=True)
             stem = input_path.stem
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_suffix = ".xlsx"
 
             step_prefix_map = {
                 "organize": "STEP1",
@@ -299,14 +322,20 @@ def run_cli(args):
             step_prefix = step_prefix_map.get(step, "STEP1")
 
             if step_prefix == "ALL":
-                filename = f"{step_prefix}_{stem}{input_path.suffix}"
+                filename = f"{step_prefix}_{stem}{output_suffix}"
                 output_path = output_dir / filename
                 if output_path.exists():
-                    filename = f"{step_prefix}_{stem}_{timestamp}{input_path.suffix}"
+                    filename = f"{step_prefix}_{stem}_{timestamp}{output_suffix}"
                     output_path = output_dir / filename
             else:
-                filename = f"{step_prefix}_{stem}_{timestamp}{input_path.suffix}"
+                filename = f"{step_prefix}_{stem}_{timestamp}{output_suffix}"
                 output_path = output_dir / filename
+
+        extra_sheets = {}
+        if sample_info_df is not None:
+            extra_sheets["SampleInfo"] = sample_info_df
+        if deleted_feature_df is not None and not deleted_feature_df.empty:
+            extra_sheets["deleted_feature"] = deleted_feature_df
 
         print(f"Saving to: {output_path}")
         handler.save_data(
@@ -315,7 +344,7 @@ def run_cli(args):
             sheet_name="RawIntensity",
             red_font_rows=red_font_rows,
             blue_font_cells=blue_font_cells,
-            extra_sheets={"SampleInfo": sample_info_df} if sample_info_df is not None else None,
+            extra_sheets=extra_sheets or None,
             save_parquet_cache=Settings.SAVE_PARQUET_CACHE,
         )
         print("Done!")

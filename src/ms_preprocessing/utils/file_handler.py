@@ -16,7 +16,7 @@ import numpy as np
 from openpyxl import load_workbook
 from openpyxl.styles import Font, PatternFill, Color
 
-from ms_preprocessing.config.settings import Settings
+from ms_core.preprocessing.settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +59,8 @@ class FileHandler:
             Tuple of (DataFrame, metadata dict)
         """
         path = Path(file_path)
-        # Prefer parquet cache when loading Step2/Step3 outputs
-        if path.suffix.lower() == ".xlsx":
+        # Prefer parquet cache only when cache feature is enabled.
+        if Settings.SAVE_PARQUET_CACHE and path.suffix.lower() == ".xlsx":
             cached = self._resolve_parquet_cache(path)
             if cached:
                 path = cached
@@ -260,7 +260,7 @@ class FileHandler:
                     excel_col = col_idx + 1
                     ws.cell(row=excel_row, column=excel_col).font = blue_font
 
-            # Apply red font to specified rows (FeatureID column)
+            # Apply red font to specified rows (Mz/RT column)
             if red_font_rows:
                 for row_idx in red_font_rows:
                     excel_row = row_idx + 2
@@ -317,7 +317,19 @@ class FileHandler:
         red_font_rows: Optional[set] = None,
     ) -> None:
         """Save a parquet cache with metadata sidecar for formatting."""
-        df.to_parquet(parquet_path, index=False)
+        if df.columns.duplicated().any():
+            logger.debug("Skipping parquet cache because dataframe has duplicate column labels.")
+            return
+
+        try:
+            df.to_parquet(parquet_path, index=False)
+        except Exception as exc:
+            logger.debug(
+                "Parquet cache raw write failed; retrying with normalized object columns: %s",
+                exc,
+            )
+            normalized_df = self._normalize_for_parquet(df)
+            normalized_df.to_parquet(parquet_path, index=False)
         meta = {
             "red_font_rows": sorted(red_font_rows) if red_font_rows else [],
             "blue_font_cells": blue_font_cells or [],
@@ -361,6 +373,73 @@ class FileHandler:
         return None
 
     @staticmethod
+    def _normalize_for_parquet(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Normalize object columns to parquet-friendly scalar types.
+
+        This keeps numeric-like object columns numeric, preserves pure text
+        columns, decodes bytes, and stringifies mixed object columns.
+        """
+        normalized = df.copy()
+        object_positions = [
+            idx for idx, dtype in enumerate(normalized.dtypes)
+            if dtype == "object"
+        ]
+
+        for col_idx in object_positions:
+            # Use positional indexing to support duplicate column labels.
+            series = normalized.iloc[:, col_idx]
+            non_null = series[series.notna()]
+            if non_null.empty:
+                continue
+
+            if non_null.map(lambda v: isinstance(v, str)).all():
+                continue
+
+            if non_null.map(lambda v: isinstance(v, (bytes, bytearray))).all():
+                converted = series.map(FileHandler._decode_bytes_value)
+                normalized.iloc[:, col_idx] = converted.to_numpy()
+                continue
+
+            if non_null.map(lambda v: isinstance(v, (int, float, bool, np.number, np.bool_))).all():
+                converted = pd.to_numeric(series, errors="coerce")
+                normalized.iloc[:, col_idx] = converted.to_numpy()
+                continue
+
+            converted = series.map(FileHandler._stringify_mixed_value)
+            normalized.iloc[:, col_idx] = converted.to_numpy()
+
+        return normalized
+
+    @staticmethod
+    def _decode_bytes_value(value: Any) -> Any:
+        """Decode bytes-like values to UTF-8 strings while preserving nulls."""
+        if value is None:
+            return np.nan
+        try:
+            if pd.isna(value):
+                return np.nan
+        except Exception:
+            pass
+        if isinstance(value, (bytes, bytearray)):
+            return bytes(value).decode("utf-8", errors="replace")
+        return value
+
+    @staticmethod
+    def _stringify_mixed_value(value: Any) -> Any:
+        """Convert mixed-type object values to strings while preserving nulls."""
+        if value is None:
+            return np.nan
+        try:
+            if pd.isna(value):
+                return np.nan
+        except Exception:
+            pass
+        if isinstance(value, (bytes, bytearray)):
+            return bytes(value).decode("utf-8", errors="replace")
+        return str(value)
+
+    @staticmethod
     def _load_delimited(path: Path, header_row: int, sep: str) -> pd.DataFrame:
         """Load CSV/TSV using pyarrow engine if available."""
         try:
@@ -370,7 +449,14 @@ class FileHandler:
             engine = None
 
         if engine:
-            return pd.read_csv(path, header=header_row, sep=sep, engine=engine)
+            try:
+                return pd.read_csv(path, header=header_row, sep=sep, engine=engine)
+            except Exception as exc:
+                logger.debug(
+                    "pyarrow delimited parse failed for %s; falling back to default parser: %s",
+                    path,
+                    exc,
+                )
         return pd.read_csv(path, header=header_row, sep=sep)
 
 

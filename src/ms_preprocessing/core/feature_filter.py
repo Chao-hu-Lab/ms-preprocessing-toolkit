@@ -14,9 +14,9 @@ from typing import Optional, Dict, Any, List, Set, Tuple
 import pandas as pd
 import numpy as np
 
-from ms_preprocessing.core.base import BaseProcessor, ProcessingResult
-from ms_preprocessing.config.settings import FeatureFilterConfig
-from ms_preprocessing.utils.validators import detect_fixed_columns
+from ms_core.preprocessing.base import BaseProcessor, ProcessingResult
+from ms_core.preprocessing.settings import FeatureFilterConfig
+from ms_core.utils.validators import detect_fixed_columns
 
 
 class FeatureFilter(BaseProcessor):
@@ -472,8 +472,9 @@ class FeatureFilter(BaseProcessor):
                 continue
 
             block_positive = np.where(block > 0, block, np.nan)
-            mins = np.nanmin(block_positive, axis=1)
-            mins = np.where(np.isnan(mins), 0, mins)
+            # Avoid RuntimeWarning on all-NaN rows by using +inf sentinel.
+            mins = np.min(np.where(np.isnan(block_positive), np.inf, block_positive), axis=1)
+            mins = np.where(np.isinf(mins), 0, mins)
 
             special = special_case[group_name]
             fill_values = np.where(special, signal_threshold, mins / 2)
@@ -496,8 +497,8 @@ class FeatureFilter(BaseProcessor):
             missing_mask = np.isnan(block)
             if missing_mask.any():
                 block_positive = np.where(block > 0, block, np.nan)
-                qc_mins = np.nanmin(block_positive, axis=1)
-                qc_mins = np.where(np.isnan(qc_mins), 0, qc_mins)
+                qc_mins = np.min(np.where(np.isnan(block_positive), np.inf, block_positive), axis=1)
+                qc_mins = np.where(np.isinf(qc_mins), 0, qc_mins)
                 fill_values = (qc_mins / 2)[:, None]
                 filled = np.where(missing_mask, fill_values, block)
                 block_values[:, pos] = filled

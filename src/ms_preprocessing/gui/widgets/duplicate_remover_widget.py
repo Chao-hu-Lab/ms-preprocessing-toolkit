@@ -8,7 +8,7 @@ import pandas as pd
 
 from ms_preprocessing.gui.widgets.base_widget import BaseProcessingWidget
 from ms_preprocessing.gui.styles import PADDING, FONTS
-from ms_preprocessing.core.duplicate_remover import DuplicateRemover
+from ms_core.preprocessing.duplicate_remover import DuplicateRemover
 
 
 class DuplicateRemoverWidget(BaseProcessingWidget):

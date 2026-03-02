@@ -14,10 +14,10 @@ from typing import Optional, Dict, Any, List, Set, Tuple
 import pandas as pd
 import numpy as np
 
-from ms_preprocessing.core.base import BaseProcessor, ProcessingResult
-from ms_preprocessing.config.settings import DuplicateRemovalConfig
-from ms_preprocessing.utils.file_handler import parse_mz_rt_string
-from ms_preprocessing.utils.validators import detect_fixed_columns
+from ms_core.preprocessing.base import BaseProcessor, ProcessingResult
+from ms_core.preprocessing.settings import DuplicateRemovalConfig
+from ms_core.utils.file_handler import parse_mz_rt_string
+from ms_core.utils.validators import detect_fixed_columns
 
 
 class DuplicateRemover(BaseProcessor):
@@ -245,7 +245,7 @@ class DuplicateRemover(BaseProcessor):
                     col_info["mz_col"] = col
 
         # Identify intensity columns (typically data columns)
-        # Skip fixed columns (FeatureID/Mz-RT and optional Tolerance)
+        # Skip fixed columns (Mz/RT and optional Tolerance)
         fixed_cols, start_idx = detect_fixed_columns(df)
         if not fixed_cols:
             start_idx = 1

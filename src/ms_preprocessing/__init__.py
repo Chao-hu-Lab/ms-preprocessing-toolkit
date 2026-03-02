@@ -12,10 +12,10 @@ integrated GUI support for the complete workflow:
 __version__ = "1.0.0"
 __author__ = "Your Name"
 
-from ms_preprocessing.core.data_organizer import DataOrganizer
-from ms_preprocessing.core.istd_marker import ISTDMarker
-from ms_preprocessing.core.duplicate_remover import DuplicateRemover
-from ms_preprocessing.core.feature_filter import FeatureFilter
+from ms_core.preprocessing.data_organizer import DataOrganizer
+from ms_core.preprocessing.istd_marker import ISTDMarker
+from ms_core.preprocessing.duplicate_remover import DuplicateRemover
+from ms_core.preprocessing.ms_quality_filter import FeatureFilter
 
 __all__ = [
     "DataOrganizer",

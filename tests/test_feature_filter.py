@@ -4,7 +4,7 @@ import pytest
 import pandas as pd
 import numpy as np
 
-from ms_preprocessing.core.feature_filter import FeatureFilter
+from ms_core.preprocessing.ms_quality_filter import FeatureFilter
 
 
 class TestFeatureFilter:
@@ -19,7 +19,7 @@ class TestFeatureFilter:
     def sample_data(self):
         """Create sample test data with proper structure."""
         data = {
-            "FeatureID": ["Sample_Type", "100.123/1.5", "200.456/2.5", "300.789/3.5"],
+            "Mz/RT": ["Sample_Type", "100.123/1.5", "200.456/2.5", "300.789/3.5"],
             "Tolerance": ["na", "na", "na", "na"],
             "Case1": ["case", 10000, 8000, 100],  # Signal above threshold
             "Case2": ["case", 9000, 7500, 200],

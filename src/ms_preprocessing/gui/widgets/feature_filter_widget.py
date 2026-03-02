@@ -8,7 +8,7 @@ import pandas as pd
 
 from ms_preprocessing.gui.widgets.base_widget import BaseProcessingWidget
 from ms_preprocessing.gui.styles import PADDING, FONTS, COLORS
-from ms_preprocessing.core.feature_filter import FeatureFilter
+from ms_core.preprocessing.ms_quality_filter import FeatureFilter
 
 
 class FeatureFilterWidget(BaseProcessingWidget):

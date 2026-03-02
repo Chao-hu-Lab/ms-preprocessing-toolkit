@@ -4,7 +4,7 @@ import pytest
 import pandas as pd
 import numpy as np
 
-from ms_preprocessing.core.duplicate_remover import DuplicateRemover
+from ms_core.preprocessing.duplicate_remover import DuplicateRemover
 
 
 class TestDuplicateRemover:
@@ -19,7 +19,7 @@ class TestDuplicateRemover:
     def sample_data_with_duplicates(self):
         """Create sample data with duplicate signals."""
         data = {
-            "FeatureID": [
+            "Mz/RT": [
                 "Sample_Type",
                 "100.1234/1.50",  # Original
                 "100.1235/1.51",  # Duplicate (within tolerance)
@@ -48,7 +48,7 @@ class TestDuplicateRemover:
         col_info = remover._detect_columns(sample_data_with_duplicates)
 
         assert col_info["combined_mz_rt"] is True
-        assert col_info["feature_col"] == "FeatureID"
+        assert col_info["feature_col"] == "Mz/RT"
 
     def test_find_duplicate_groups(self, remover, sample_data_with_duplicates):
         """Test finding duplicate groups."""

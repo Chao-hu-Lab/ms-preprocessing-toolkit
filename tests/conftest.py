@@ -25,7 +25,7 @@ def temp_dir():
 def sample_excel_file(temp_dir):
     """Create a sample Excel file for testing."""
     data = {
-        "FeatureID": ["Sample_Type", "100.123/1.5", "200.456/2.5"],
+        "Mz/RT": ["Sample_Type", "100.123/1.5", "200.456/2.5"],
         "Tolerance": ["na", "20/0.5", "20/0.5"],
         "Sample1": ["case", 5000, 6000],
         "Sample2": ["case", 5500, 6500],
@@ -43,7 +43,7 @@ def sample_excel_file(temp_dir):
 def sample_csv_file(temp_dir):
     """Create a sample CSV file for testing."""
     data = {
-        "FeatureID": ["Sample_Type", "100.123/1.5", "200.456/2.5"],
+        "Mz/RT": ["Sample_Type", "100.123/1.5", "200.456/2.5"],
         "Tolerance": ["na", "20/0.5", "20/0.5"],
         "Sample1": ["case", 5000, 6000],
         "Sample2": ["case", 5500, 6500],

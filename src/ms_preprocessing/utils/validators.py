@@ -62,7 +62,7 @@ class DataValidator:
 
         Args:
             df: DataFrame to validate
-            require_feature_id: Whether to require a FeatureID column
+            require_feature_id: Whether to require a Mz/RT (or legacy FeatureID) column
             require_sample_type: Whether to require a Sample_Type row
             min_rows: Minimum number of data rows
             min_cols: Minimum number of columns
@@ -85,20 +85,20 @@ class DataValidator:
             self.errors.append(f"DataFrame has fewer than {min_cols} columns")
             return False
 
-        # Check for FeatureID column
+        # Check for Mz/RT (or legacy FeatureID) column
         if require_feature_id:
             feature_col = self._find_column(df, self.FEATURE_ID_PATTERNS)
             if feature_col is None:
                 self.warnings.append(
                     ValidationWarning(
-                        "No FeatureID column found",
+                        "No Mz/RT column found",
                         {"expected_patterns": self.FEATURE_ID_PATTERNS},
                     )
                 )
 
         return len(self.errors) == 0
 
-    def validate_mz_rt_format(self, df: pd.DataFrame, column: str = "FeatureID") -> bool:
+    def validate_mz_rt_format(self, df: pd.DataFrame, column: str = "Mz/RT") -> bool:
         """
         Validate that a column contains valid m/z/RT format strings.
 
@@ -282,7 +282,7 @@ def detect_fixed_columns(df: pd.DataFrame) -> Tuple[List[str], int]:
     """
     Detect leading fixed (non-sample) columns in a DataFrame.
 
-    Fixed columns are metadata columns such as FeatureID / Mz-RT / Tolerance
+    Fixed columns are metadata columns such as Mz/RT / Tolerance
     that appear before the sample intensity columns.  Detection stops at the
     first column whose name is NOT in the known fixed-column set.
 

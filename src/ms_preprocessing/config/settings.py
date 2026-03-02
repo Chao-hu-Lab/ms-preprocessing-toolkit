@@ -19,7 +19,7 @@ class ISTDConfig:
     default_rt_tolerance: float = 1.0
 
     # Column names
-    feature_id_col: str = "FeatureID"
+    feature_id_col: str = "Mz/RT"
     tolerance_col: str = "m/z Tolerance( ppm)/RT Tolerance"
     sample_type_col: str = "Sample_Type"
 
@@ -77,7 +77,7 @@ class DataOrganizerConfig:
     """Configuration for Data Organizer module."""
 
     # Expected column structure
-    required_columns: list = field(default_factory=lambda: ["FeatureID", "Sample_Type"])
+    required_columns: list = field(default_factory=lambda: ["Mz/RT", "Sample_Type"])
 
     # Data validation settings
     min_samples: int = 1
@@ -104,7 +104,8 @@ class Settings:
 
     # Supported file formats (canonical source — used by FileHandler too)
     SUPPORTED_FORMATS = frozenset({".xlsx", ".xls", ".csv", ".tsv", ".txt", ".parquet"})
-    SAVE_PARQUET_CACHE = True
+    # Keep output folder clean by default; only emit final Excel artifacts.
+    SAVE_PARQUET_CACHE = False
 
     # GUI Settings
     WINDOW_TITLE = "MS Preprocessing Toolkit"

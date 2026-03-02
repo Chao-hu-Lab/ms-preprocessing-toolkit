@@ -6,8 +6,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ms_preprocessing.core.istd_marker import ISTDMarker
-from ms_preprocessing.config.settings import ISTDConfig
+from ms_core.preprocessing.istd_marker import ISTDMarker
+from ms_core.preprocessing.settings import ISTDConfig
 
 
 # ---------------------------------------------------------------------------
@@ -16,7 +16,7 @@ from ms_preprocessing.config.settings import ISTDConfig
 
 def _make_df(feature_ids: list[str], sample_values: dict[str, list]) -> pd.DataFrame:
     """Build a DataFrame with Sample_Type header row."""
-    data = {"FeatureID": ["Sample_Type"] + feature_ids}
+    data = {"Mz/RT": ["Sample_Type"] + feature_ids}
     for col, vals in sample_values.items():
         data[col] = [col.split("_")[0]] + vals  # e.g. "case_S1" -> type "case"
     return pd.DataFrame(data)
@@ -157,9 +157,9 @@ class TestEdgeCases:
         assert result.success
 
     def test_no_slash_in_feature_id(self):
-        """FeatureID without '/' should not crash _extract_mz_rt_arrays."""
+        """Mz/RT value without '/' should not crash _extract_mz_rt_arrays."""
         df = pd.DataFrame({
-            "FeatureID": ["Sample_Type", "no_slash_here", "also_no_slash"],
+            "Mz/RT": ["Sample_Type", "no_slash_here", "also_no_slash"],
             "S1": ["case", 10, 20],
         })
         marker = ISTDMarker()
