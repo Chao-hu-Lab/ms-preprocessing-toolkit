@@ -109,6 +109,13 @@ Examples:
     )
 
     parser.add_argument(
+        "--qc-ratio-threshold",
+        type=float,
+        default=0.0,
+        help="Minimum QC_ratio to keep a feature (default: 0.0, legacy mode)",
+    )
+
+    parser.add_argument(
         "--no-gui",
         action="store_true",
         help="Run in command-line mode without GUI",
@@ -191,6 +198,37 @@ def run_cli(args):
         blue_font_cells = []
         sample_info_df = None
         deleted_feature_df = None
+        preserved_sheets = {}
+
+        # Preserve auxiliary sheets (e.g., SampleInfo) when running Step2+ on prior outputs.
+        if input_path.suffix.lower() in {".xlsx", ".xls"}:
+            try:
+                import pandas as pd
+
+                xls = pd.ExcelFile(input_path, engine="openpyxl")
+                sheet_names = list(xls.sheet_names)
+                raw_sheet_name = "RawIntensity" if "RawIntensity" in sheet_names else None
+                if raw_sheet_name is None:
+                    sheet_ref = metadata.get("sheet_name")
+                    if isinstance(sheet_ref, str) and sheet_ref in sheet_names:
+                        raw_sheet_name = sheet_ref
+                    elif isinstance(sheet_ref, int) and 0 <= sheet_ref < len(sheet_names):
+                        raw_sheet_name = sheet_names[sheet_ref]
+                    elif sheet_names:
+                        raw_sheet_name = sheet_names[0]
+
+                for sheet in sheet_names:
+                    if sheet == raw_sheet_name:
+                        continue
+                    preserved_sheets[sheet] = pd.read_excel(input_path, sheet_name=sheet, engine="openpyxl")
+
+                if "SampleInfo" in preserved_sheets:
+                    sample_info_df = preserved_sheets.pop("SampleInfo")
+                if "deleted_feature" in preserved_sheets:
+                    deleted_feature_df = preserved_sheets.pop("deleted_feature")
+            except Exception:
+                # Continue processing even if auxiliary-sheet preservation fails.
+                preserved_sheets = {}
 
         # Run requested steps
         step = args.step
@@ -275,6 +313,7 @@ def run_cli(args):
                 background_threshold=args.bg_threshold,
                 skew_threshold=args.skew_threshold,
                 diff_threshold=args.diff_threshold,
+                qc_ratio_threshold=args.qc_ratio_threshold,
                 protected_rows=protected_rows,
             )
             if result.success:
@@ -332,6 +371,8 @@ def run_cli(args):
                 output_path = output_dir / filename
 
         extra_sheets = {}
+        if preserved_sheets:
+            extra_sheets.update(preserved_sheets)
         if sample_info_df is not None:
             extra_sheets["SampleInfo"] = sample_info_df
         if deleted_feature_df is not None and not deleted_feature_df.empty:

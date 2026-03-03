@@ -94,3 +94,56 @@ class TestFeatureFilter:
                 if str(col).endswith("_ratio") or str(col) == "QC_ratio":
                     continue
                 assert data_rows[col].isna().sum() == 0
+
+    def test_qc_ratio_threshold_filters_low_qc_features(self, filter_proc):
+        """Features with non-zero but low QC_ratio should be removed when threshold is set."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0", "200.000/2.0"],
+                "Tolerance": ["na", "na", "na"],
+                "Case1": ["case", 8000, 8000],
+                "Control1": ["control", 8000, 8000],
+                "QC1": ["qc", 8000, 8000],
+                "QC2": ["qc", 100, 8000],
+            }
+        )
+
+        result = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            skew_threshold=0.66,
+            diff_threshold=0.30,
+            qc_ratio_threshold=0.60,
+        )
+
+        assert result.success
+        assert result.data is not None
+        assert "100.000/1.0" not in result.data["Mz/RT"].tolist()
+        assert "200.000/2.0" in result.data["Mz/RT"].tolist()
+        assert result.statistics.get("qc_low_deleted", 0) >= 1
+
+    def test_qc_ratio_threshold_zero_keeps_legacy_behavior(self, filter_proc):
+        """qc_ratio_threshold=0 should keep legacy behavior (only QC_ratio==0 forced delete)."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Control1": ["control", 8000],
+                "QC1": ["qc", 8000],
+                "QC2": ["qc", 100],
+            }
+        )
+
+        result = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            skew_threshold=0.66,
+            diff_threshold=0.30,
+            qc_ratio_threshold=0.0,
+        )
+
+        assert result.success
+        assert result.data is not None
+        assert "100.000/1.0" in result.data["Mz/RT"].tolist()
+        assert result.statistics.get("qc_low_deleted", 0) == 0

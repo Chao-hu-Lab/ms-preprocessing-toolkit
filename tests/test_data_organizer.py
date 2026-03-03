@@ -77,6 +77,34 @@ class TestDataOrganizer:
 
         assert result.success
 
+    def test_process_uses_input_sample_type_row_when_present(self, organizer):
+        """When input already has a Sample Type row, Step1 should preserve it."""
+        df = pd.DataFrame(
+            {
+                "Mz": ["Sample Type", 100.123, 200.456],
+                "RT": [None, 1.5, 2.5],
+                "Sample1": ["Exposure", 1000, 2000],
+                "Sample2": ["Control", 1100, 2100],
+                "QC1": ["QC", 1050, 2050],
+            }
+        )
+
+        result = organizer.process(df)
+
+        assert result.success
+        assert result.data.iloc[0, 0] == "Sample_Type"
+        assert result.data.iloc[1, 0] == "100.1230/1.50"
+        assert result.data.iloc[0]["Sample1"] == "Exposure"
+        assert result.data.iloc[0]["Sample2"] == "Control"
+        assert result.data.iloc[0]["QC_1"] == "QC"
+
+        sample_info = result.metadata.get("sample_info")
+        assert sample_info is not None
+        sample_type_by_name = dict(zip(sample_info["Sample_Name"], sample_info["Sample_Type"]))
+        assert sample_type_by_name["Sample1"] == "Exposure"
+        assert sample_type_by_name["Sample2"] == "Control"
+        assert sample_type_by_name["QC_1"] == "QC"
+
     def test_process_statistics_mode_keeps_mz_rt_and_sorts(self, organizer, normalized_data, monkeypatch):
         """Statistics mode keeps Mz/RT separate while preserving normalization behavior."""
         injection_sequence = [
