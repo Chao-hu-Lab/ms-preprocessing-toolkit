@@ -147,3 +147,44 @@ class TestFeatureFilter:
         assert result.data is not None
         assert "100.000/1.0" in result.data["Mz/RT"].tolist()
         assert result.statistics.get("qc_low_deleted", 0) == 0
+
+    def test_imputation_treats_zero_as_missing_for_group_columns(self, filter_proc):
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.0/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 0],
+                "Case2": ["case", 8000],
+                "Control1": ["control", 0],
+                "Control2": ["control", 9000],
+                "QC1": ["qc", 7000],
+            }
+        )
+
+        result = filter_proc.process(df, qc_ratio_threshold=0.0)
+
+        assert result.success
+        out = result.data
+        assert out is not None
+        assert float(out.loc[1, "Case1"]) > 0
+        assert float(out.loc[1, "Control1"]) > 0
+
+    def test_imputation_treats_zero_as_missing_for_qc_columns(self, filter_proc):
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.0/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Case2": ["case", 8500],
+                "Control1": ["control", 9000],
+                "QC1": ["qc", 0],
+                "QC2": ["qc", 6000],
+            }
+        )
+
+        result = filter_proc.process(df, qc_ratio_threshold=0.0)
+
+        assert result.success
+        out = result.data
+        assert out is not None
+        assert float(out.loc[1, "QC1"]) > 0
