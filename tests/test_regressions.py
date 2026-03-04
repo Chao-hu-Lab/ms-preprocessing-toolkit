@@ -62,6 +62,7 @@ def test_load_data_preserves_red_font_rows_from_cache_or_excel() -> None:
     fake_meta = {"red_font_rows": [1], "blue_font_cells": [], "highlight_rows": []}
 
     with (
+        patch("ms_core.utils.file_handler.Settings.SAVE_PARQUET_CACHE", True),
         patch.object(handler, "_resolve_parquet_cache", return_value=Path("cache.parquet")),
         patch("pathlib.Path.exists", return_value=True),
         patch("pandas.read_parquet", return_value=fake_df),
