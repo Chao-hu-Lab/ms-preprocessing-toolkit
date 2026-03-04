@@ -222,3 +222,10 @@ MIT License
 - ISTD 標記邏輯: FindSTDs_mzRT_Jia_Simplified.bas
 - 重複訊號刪除: [ms-data-processor](https://github.com/bosschen0429/ms-data-processor)
 - 特徵篩選與填補: Feature_barrier_V3.bas
+
+## Step 4 + Performance Notes (2026-03-04)
+
+- Step 4 imputation now treats both `NaN` and `0` as missing values in sample and QC columns.
+- Intermediate workflow outputs now prefer parquet for Step 1-3 auto-save paths.
+- Parquet cache is enabled by default (`SAVE_PARQUET_CACHE = True`) to speed repeated reloads.
+- Final user-facing deliverables remain `.xlsx` (including Step 4 export and final output).

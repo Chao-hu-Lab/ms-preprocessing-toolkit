@@ -1,7 +1,7 @@
 # Step4 Zero-Impute + Pipeline Performance Design
 
 Date: 2026-03-04
-Status: Approved by user
+Status: Implemented
 Scope:
 - Make Step 4 imputation treat `0` as missing by default (no toggle).
 - Accelerate end-to-end workflow (read, compute, write) with default-on parquet cache strategy.
@@ -93,7 +93,7 @@ Statistics:
 - If dataset has duplicate column labels and cache cannot be safely written:
   - Keep existing guard behavior and continue without cache.
 - If imputation encounters rows without positive values:
-  - Keep existing sentinel handling (min -> inf -> 0 fallback).
+  - Use positive fallback (`signal_threshold / 2`) instead of keeping `0`.
 
 ## 5. Testing and Verification Plan
 
@@ -152,3 +152,23 @@ Approved decisions:
 - Use mixed performance strategy (default-on parquet cache, keep Excel deliverables).
 - Step 4 treats `0` as missing for all relevant columns (including QC).
 - No opt-out toggle for legacy behavior.
+
+## 9. Implementation Results Appendix (2026-03-04)
+
+Implemented outcomes:
+- Step 4 imputation now uses missing mask: `isnan OR == 0` for group and QC blocks.
+- Imputation statistics now include:
+  - `cells_imputed_from_nan`
+  - `cells_imputed_from_zero`
+- For rows with no positive values in an imputation block, fallback fill is now positive (`signal_threshold / 2`) to avoid residual zero placeholders.
+- GUI step auto-save behavior now uses:
+  - Step 1-3: `.parquet`
+  - Step 4: `.xlsx`
+- Parquet cache default is enabled (`SAVE_PARQUET_CACHE = True`).
+
+User dataset verification (`STEP3_VERIFY_STEP1_drLiao_HNC_Urine_recheck_20260303_142706.xlsx`, thresholds `bg=0.5/skew=0.66/diff=0.5/qc=0.4`):
+- `cells_imputed_from_zero = 1267825`
+- `post_zero_count = 0`
+- `post_nan_count = 0`
+- Warm-cache load format: `parquet`
+- Warm-cache speedup (cold load vs warm load): `216.669497x` on benchmark run.
