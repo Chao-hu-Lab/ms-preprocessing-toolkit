@@ -83,3 +83,4 @@ logs/
 # Local temp folders
 .pip-tmp*/
 _tmp_docx_extract/
+.worktrees/
