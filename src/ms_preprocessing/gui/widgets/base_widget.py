@@ -51,6 +51,7 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         self._result: Optional[pd.DataFrame] = None
         self._context: dict = {}
         self._last_metadata: dict = {}
+        self._last_parameters: dict = {}
         self.run_button = None
         self.reset_button = None
         self.input_entry: Optional[ctk.CTkEntry] = None
@@ -165,6 +166,10 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         """Get the processing result."""
         return self._result
 
+    def get_last_parameters(self) -> dict:
+        """Get parameters used by the latest run."""
+        return dict(self._last_parameters)
+
     def log(self, message: str) -> None:
         """Log a message."""
         if self.on_log:
@@ -198,6 +203,7 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
             self.progress_bar.set(0)
 
             params = self.get_parameters()
+            self._last_parameters = dict(params)
             self.log(f"Starting with parameters: {params}")
 
             self._last_metadata = {}
