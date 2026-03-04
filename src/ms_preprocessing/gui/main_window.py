@@ -701,17 +701,20 @@ class MainWindow(ctk.CTk):
         step_prefix = f"STEP{step_index + 1}"
         stem = self._get_base_stem(self._source_file) if self._source_file else "output"
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{step_prefix}_{stem}_{timestamp}.xlsx"
+        extension = ".parquet" if step_index in (0, 1, 2) else ".xlsx"
+        filename = f"{step_prefix}_{stem}_{timestamp}{extension}"
         filepath = output_dir / filename
 
         try:
-            extra_sheets = {}
-            sample_info = self._context.get("sample_info")
-            if sample_info is not None:
-                extra_sheets["SampleInfo"] = sample_info
-            deleted_df = self._context.get("deleted_feature_df")
-            if isinstance(deleted_df, pd.DataFrame) and not deleted_df.empty:
-                extra_sheets["deleted_feature"] = deleted_df
+            extra_sheets = None
+            if extension == ".xlsx":
+                extra_sheets = {}
+                sample_info = self._context.get("sample_info")
+                if sample_info is not None:
+                    extra_sheets["SampleInfo"] = sample_info
+                deleted_df = self._context.get("deleted_feature_df")
+                if isinstance(deleted_df, pd.DataFrame) and not deleted_df.empty:
+                    extra_sheets["deleted_feature"] = deleted_df
 
             self._file_handler.save_data(
                 data,
@@ -720,7 +723,7 @@ class MainWindow(ctk.CTk):
                 highlight_rows=self._context.get("highlight_rows"),
                 blue_font_cells=self._context.get("blue_font_cells"),
                 red_font_rows=self._context.get("red_font_rows"),
-                extra_sheets=extra_sheets or None,
+                extra_sheets=extra_sheets,
                 save_parquet_cache=Settings.SAVE_PARQUET_CACHE,
             )
             self._log(f"Auto-saved: {filepath}")

@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pandas as pd
 
 from ms_core.preprocessing.duplicate_remover import DuplicateRemover
 from ms_core.utils.file_handler import FileHandler
+from ms_preprocessing.gui.main_window import MainWindow
 
 
 def test_duplicate_remover_handles_cross_rt_bin_duplicates() -> None:
@@ -72,3 +73,45 @@ def test_load_data_preserves_red_font_rows_from_cache_or_excel() -> None:
 
     assert metadata.get("format") == "parquet"
     assert metadata.get("red_font_rows") == [1]
+
+
+def test_intermediate_steps_autosave_as_parquet() -> None:
+    window = MainWindow.__new__(MainWindow)
+    window._output_dir = Path("OUTPUT") / "autosave-test"
+    window._source_file = Path("input.xlsx")
+    window._context = {
+        "sample_info": None,
+        "deleted_feature_df": None,
+        "highlight_rows": set(),
+        "blue_font_cells": [],
+        "red_font_rows": set(),
+    }
+    window._file_handler = Mock()
+    window._log = lambda _: None
+
+    data = pd.DataFrame({"Mz/RT": ["Sample_Type", "100.0/1.0"], "S1": ["case", 123]})
+    output_path = window._save_step_output(0, data)
+
+    assert output_path is not None
+    assert output_path.suffix == ".parquet"
+
+
+def test_step4_autosave_keeps_excel() -> None:
+    window = MainWindow.__new__(MainWindow)
+    window._output_dir = Path("OUTPUT") / "autosave-test"
+    window._source_file = Path("input.xlsx")
+    window._context = {
+        "sample_info": None,
+        "deleted_feature_df": None,
+        "highlight_rows": set(),
+        "blue_font_cells": [],
+        "red_font_rows": set(),
+    }
+    window._file_handler = Mock()
+    window._log = lambda _: None
+
+    data = pd.DataFrame({"Mz/RT": ["Sample_Type", "100.0/1.0"], "S1": ["case", 123]})
+    output_path = window._save_step_output(3, data)
+
+    assert output_path is not None
+    assert output_path.suffix == ".xlsx"
