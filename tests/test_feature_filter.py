@@ -212,3 +212,25 @@ class TestFeatureFilter:
         assert result.statistics["cells_imputed"] == (
             result.statistics["cells_imputed_from_nan"] + result.statistics["cells_imputed_from_zero"]
         )
+
+    def test_imputation_replaces_all_zero_group_with_positive_values(self, filter_proc):
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.0/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 0],
+                "Case2": ["case", 0],
+                "Control1": ["control", 9000],
+                "Control2": ["control", 100],
+                "QC1": ["qc", 6000],
+                "QC2": ["qc", 6000],
+            }
+        )
+
+        result = filter_proc.process(df, qc_ratio_threshold=0.0)
+
+        assert result.success
+        out = result.data
+        assert out is not None
+        assert float(out.loc[1, "Case1"]) > 0
+        assert float(out.loc[1, "Case2"]) > 0
