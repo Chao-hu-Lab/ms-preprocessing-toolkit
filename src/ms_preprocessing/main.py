@@ -232,6 +232,35 @@ def run_cli(args):
 
         # Run requested steps
         step = args.step
+        project_root = Path(__file__).resolve().parents[2]
+        intermediate_dir = project_root / "OUTPUT" / ".cli_intermediate"
+        if step == "all":
+            intermediate_dir.mkdir(parents=True, exist_ok=True)
+
+        def _persist_parquet_handoff(step_index: int) -> None:
+            """Persist current state to parquet and reload for next step handoff."""
+            nonlocal df, red_font_rows, protected_rows, blue_font_cells
+
+            if step != "all":
+                return
+
+            stem = input_path.stem
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            handoff_path = intermediate_dir / f"_CLI_STEP{step_index}_{stem}_{timestamp}.parquet"
+
+            handler.save_data(
+                df,
+                handoff_path,
+                red_font_rows=red_font_rows,
+                blue_font_cells=blue_font_cells,
+                save_parquet_cache=False,
+            )
+            df, handoff_meta = handler.load_data(handoff_path)
+            red_font_rows = set(handoff_meta.get("red_font_rows", red_font_rows))
+            protected_rows = set(
+                handoff_meta.get("protected_rows") or handoff_meta.get("red_font_rows") or protected_rows
+            )
+            blue_font_cells = handoff_meta.get("blue_font_cells", blue_font_cells)
 
         if step in ["organize", "all"]:
             print("Step 1: Data Organization...")
@@ -244,6 +273,7 @@ def run_cli(args):
                 perf_end = take_snapshot()
                 print(f"  Perf: {format_perf_delta(perf_start, perf_end)}")
                 print(f"  Done: {_compact_stats(result.statistics)}")
+                _persist_parquet_handoff(1)
             else:
                 print(f"  Error: {result.message}")
                 return 1
@@ -279,6 +309,7 @@ def run_cli(args):
                 if result.metadata.get("warning"):
                     print(f"  Warning: {result.metadata.get('warning')}")
                 print(f"  Done: {_compact_stats(result.statistics)}")
+                _persist_parquet_handoff(2)
             else:
                 print(f"  Error: {result.message}")
                 return 1
@@ -300,6 +331,7 @@ def run_cli(args):
                 perf_end = take_snapshot()
                 print(f"  Perf: {format_perf_delta(perf_start, perf_end)}")
                 print(f"  Done: {_compact_stats(result.statistics)}")
+                _persist_parquet_handoff(3)
             else:
                 print(f"  Error: {result.message}")
                 return 1
@@ -334,6 +366,7 @@ def run_cli(args):
                 perf_end = take_snapshot()
                 print(f"  Perf: {format_perf_delta(perf_start, perf_end)}")
                 print(f"  Done: {_compact_stats(result.statistics)}")
+                _persist_parquet_handoff(4)
             else:
                 print(f"  Error: {result.message}")
                 return 1
@@ -341,10 +374,12 @@ def run_cli(args):
         # Save output
         if args.output:
             output_path = Path(args.output)
-            if output_path.suffix == "":
+            suffix = output_path.suffix.lower()
+            if suffix == "":
+                output_path = output_path.with_suffix(".xlsx")
+            elif suffix not in {".xlsx", ".parquet"}:
                 output_path = output_path.with_suffix(".xlsx")
         else:
-            project_root = Path(__file__).resolve().parents[2]
             output_dir = project_root / "OUTPUT"
             output_dir.mkdir(parents=True, exist_ok=True)
             stem = input_path.stem
