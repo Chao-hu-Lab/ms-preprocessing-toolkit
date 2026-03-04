@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from ms_core.preprocessing.settings import Settings
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
@@ -31,3 +33,7 @@ def test_cli_version_smoke() -> None:
 
     assert result.returncode == 0, result.stderr or result.stdout
     assert "MS Preprocessing Toolkit v" in result.stdout
+
+
+def test_parquet_cache_default_enabled() -> None:
+    assert Settings.SAVE_PARQUET_CACHE is True
