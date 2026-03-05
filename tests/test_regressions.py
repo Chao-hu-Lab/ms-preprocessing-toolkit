@@ -10,6 +10,7 @@ import pandas as pd
 from ms_core.preprocessing.duplicate_remover import DuplicateRemover
 from ms_core.utils.file_handler import FileHandler
 from ms_preprocessing.gui.main_window import MainWindow
+from ms_preprocessing.gui.pipeline_session import PipelineSession
 
 
 def test_duplicate_remover_handles_cross_rt_bin_duplicates() -> None:
@@ -79,6 +80,11 @@ def test_intermediate_steps_autosave_as_parquet() -> None:
     window = MainWindow.__new__(MainWindow)
     window._output_dir = Path("OUTPUT") / "autosave-test"
     window._source_file = Path("input.xlsx")
+    window._pipeline_session = PipelineSession(
+        output_dir=window._output_dir,
+        source_file=window._source_file,
+    )
+    window._step_output_paths = window._pipeline_session.step_output_paths
     window._context = {
         "sample_info": None,
         "deleted_feature_df": None,
@@ -96,10 +102,15 @@ def test_intermediate_steps_autosave_as_parquet() -> None:
     assert output_path.suffix == ".parquet"
 
 
-def test_step4_autosave_keeps_excel() -> None:
+def test_step4_autosave_uses_parquet_intermediate() -> None:
     window = MainWindow.__new__(MainWindow)
     window._output_dir = Path("OUTPUT") / "autosave-test"
     window._source_file = Path("input.xlsx")
+    window._pipeline_session = PipelineSession(
+        output_dir=window._output_dir,
+        source_file=window._source_file,
+    )
+    window._step_output_paths = window._pipeline_session.step_output_paths
     window._context = {
         "sample_info": None,
         "deleted_feature_df": None,
@@ -114,4 +125,4 @@ def test_step4_autosave_keeps_excel() -> None:
     output_path = window._save_step_output(3, data)
 
     assert output_path is not None
-    assert output_path.suffix == ".xlsx"
+    assert output_path.suffix == ".parquet"
