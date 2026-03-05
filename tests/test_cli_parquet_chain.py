@@ -88,6 +88,7 @@ def _make_cli_args(input_path: Path, output_path: Path | None, step: str) -> Sim
         skew_threshold=0.66,
         diff_threshold=0.30,
         qc_ratio_threshold=0.0,
+        persist_intermediate=False,
         no_gui=True,
         version=False,
     )
@@ -107,7 +108,7 @@ def _patch_cli_dependencies(monkeypatch, fake_handler: _FakeFileHandler) -> None
     monkeypatch.setattr(filter_module, "FeatureFilter", _DummyFeatureFilter)
 
 
-def test_cli_step_all_uses_parquet_intermediates_and_final_xlsx(monkeypatch) -> None:
+def test_cli_step_all_default_does_not_write_step_parquet_intermediates(monkeypatch) -> None:
     with TemporaryDirectory(dir=Path.cwd()) as temp_dir:
         base = Path(temp_dir)
         df = pd.DataFrame(
@@ -132,9 +133,41 @@ def test_cli_step_all_uses_parquet_intermediates_and_final_xlsx(monkeypatch) -> 
         save_suffixes = [suffix for op, suffix, _ in fake_handler.calls if op == "save"]
         load_suffixes = [suffix for op, suffix, _ in fake_handler.calls if op == "load"]
 
-        assert ".parquet" in save_suffixes
-        assert ".parquet" in load_suffixes
+        assert ".parquet" not in save_suffixes
+        assert ".parquet" not in load_suffixes
         assert save_suffixes[-1] == ".xlsx"
+
+
+def test_cli_persist_intermediate_writes_parquet_to_internal_cache_not_output(monkeypatch) -> None:
+    with TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+        base = Path(temp_dir)
+        cache_root = base / "internal-cache"
+        monkeypatch.setenv("MSPTK_PARQUET_CACHE_ROOT", str(cache_root))
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.1/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 1000],
+                "Control1": ["control", 1200],
+                "QC1": ["qc", 1100],
+            }
+        )
+        input_path = base / "input.csv"
+        df.to_csv(input_path, index=False)
+        output_path = base / "final.xlsx"
+
+        fake_handler = _FakeFileHandler(input_df=df)
+        _patch_cli_dependencies(monkeypatch, fake_handler)
+
+        args = _make_cli_args(input_path=input_path, output_path=output_path, step="all")
+        args.persist_intermediate = True
+        rc = run_cli(args)
+        assert rc == 0
+
+        parquet_saves = [path for op, suffix, path in fake_handler.calls if op == "save" and suffix == ".parquet"]
+        assert parquet_saves
+        assert all(cache_root in path.parents for path in parquet_saves)
+        assert all("OUTPUT" not in str(path) for path in parquet_saves)
 
 
 def test_cli_single_step_filter_accepts_parquet_input(monkeypatch) -> None:
