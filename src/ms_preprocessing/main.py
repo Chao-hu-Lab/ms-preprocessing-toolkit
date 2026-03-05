@@ -122,6 +122,12 @@ Examples:
     )
 
     parser.add_argument(
+        "--persist-intermediate",
+        action="store_true",
+        help="Persist step snapshots to machine-local cache during --step all",
+    )
+
+    parser.add_argument(
         "--version", "-v",
         action="store_true",
         help="Show version information",
@@ -232,6 +238,32 @@ def run_cli(args):
 
         # Run requested steps
         step = args.step
+        project_root = Path(__file__).resolve().parents[2]
+        intermediate_dir: Path | None = None
+        last_parquet_handoff: Path | None = None
+        if step == "all" and args.persist_intermediate:
+            intermediate_dir = Settings.get_parquet_cache_root() / "cli-intermediate"
+            intermediate_dir.mkdir(parents=True, exist_ok=True)
+
+        def _persist_parquet_handoff(step_index: int) -> None:
+            """Persist current state to parquet for optional diagnostics."""
+            nonlocal df, red_font_rows, protected_rows, blue_font_cells, last_parquet_handoff
+
+            if step != "all" or not args.persist_intermediate or intermediate_dir is None:
+                return
+
+            stem = input_path.stem
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            handoff_path = intermediate_dir / f"_CLI_STEP{step_index}_{stem}_{timestamp}.parquet"
+
+            handler.save_data(
+                df,
+                handoff_path,
+                red_font_rows=red_font_rows,
+                blue_font_cells=blue_font_cells,
+                save_parquet_cache=False,
+            )
+            last_parquet_handoff = handoff_path
 
         if step in ["organize", "all"]:
             print("Step 1: Data Organization...")
@@ -244,6 +276,7 @@ def run_cli(args):
                 perf_end = take_snapshot()
                 print(f"  Perf: {format_perf_delta(perf_start, perf_end)}")
                 print(f"  Done: {_compact_stats(result.statistics)}")
+                _persist_parquet_handoff(1)
             else:
                 print(f"  Error: {result.message}")
                 return 1
@@ -279,6 +312,7 @@ def run_cli(args):
                 if result.metadata.get("warning"):
                     print(f"  Warning: {result.metadata.get('warning')}")
                 print(f"  Done: {_compact_stats(result.statistics)}")
+                _persist_parquet_handoff(2)
             else:
                 print(f"  Error: {result.message}")
                 return 1
@@ -300,6 +334,7 @@ def run_cli(args):
                 perf_end = take_snapshot()
                 print(f"  Perf: {format_perf_delta(perf_start, perf_end)}")
                 print(f"  Done: {_compact_stats(result.statistics)}")
+                _persist_parquet_handoff(3)
             else:
                 print(f"  Error: {result.message}")
                 return 1
@@ -334,6 +369,7 @@ def run_cli(args):
                 perf_end = take_snapshot()
                 print(f"  Perf: {format_perf_delta(perf_start, perf_end)}")
                 print(f"  Done: {_compact_stats(result.statistics)}")
+                _persist_parquet_handoff(4)
             else:
                 print(f"  Error: {result.message}")
                 return 1
@@ -341,10 +377,12 @@ def run_cli(args):
         # Save output
         if args.output:
             output_path = Path(args.output)
-            if output_path.suffix == "":
+            suffix = output_path.suffix.lower()
+            if suffix == "":
+                output_path = output_path.with_suffix(".xlsx")
+            elif suffix not in {".xlsx", ".parquet"}:
                 output_path = output_path.with_suffix(".xlsx")
         else:
-            project_root = Path(__file__).resolve().parents[2]
             output_dir = project_root / "OUTPUT"
             output_dir.mkdir(parents=True, exist_ok=True)
             stem = input_path.stem
@@ -386,7 +424,7 @@ def run_cli(args):
             red_font_rows=red_font_rows,
             blue_font_cells=blue_font_cells,
             extra_sheets=extra_sheets or None,
-            save_parquet_cache=Settings.SAVE_PARQUET_CACHE,
+            save_parquet_cache=False,
         )
         print("Done!")
 

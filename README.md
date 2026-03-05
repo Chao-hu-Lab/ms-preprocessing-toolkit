@@ -229,3 +229,10 @@ MIT License
 - Intermediate workflow outputs now prefer parquet for Step 1-3 auto-save paths.
 - Parquet cache is enabled by default (`SAVE_PARQUET_CACHE = True`) to speed repeated reloads.
 - Final user-facing deliverables remain `.xlsx` (including Step 4 export and final output).
+
+## Unified Parquet V2 (2026-03-05)
+
+- Step1-4 intermediate format = parquet
+- final export/DNP = xlsx
+- Step4 zero-as-missing default behavior
+- Unified Parquet V2 rollout checklist: `docs/plans/2026-03-05-unified-parquet-v2-rollout-checklist.md`

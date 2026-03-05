@@ -18,6 +18,7 @@ from ms_preprocessing.gui.widgets.data_organizer_widget import DataOrganizerWidg
 from ms_preprocessing.gui.widgets.istd_marker_widget import ISTDMarkerWidget
 from ms_preprocessing.gui.widgets.duplicate_remover_widget import DuplicateRemoverWidget
 from ms_preprocessing.gui.widgets.feature_filter_widget import FeatureFilterWidget
+from ms_preprocessing.gui.pipeline_session import PipelineSession
 from ms_core.utils.file_handler import FileHandler
 from ms_core.preprocessing.settings import Settings
 
@@ -59,15 +60,10 @@ class MainWindow(ctk.CTk):
         self._current_step = 0
         self._last_completed_step: Optional[int] = None
         self._last_run_all: bool = False
-        self._step_output_paths: dict = {}
-        self._context = {
-            "red_font_rows": set(),
-            "protected_rows": set(),
-            "blue_font_cells": [],
-            "highlight_rows": set(),
-            "sample_info": None,
-            "deleted_feature_df": None,
-        }
+        self._pipeline_session = PipelineSession(output_dir=self._output_dir, source_file=None)
+        self._step_output_paths = self._pipeline_session.step_output_paths
+        self._context = self._pipeline_session.context
+        self._last_materialized_export_path: Optional[Path] = None
 
         # Create layout
         self._create_layout()
@@ -383,6 +379,10 @@ class MainWindow(ctk.CTk):
                 self._current_data = df
                 self._original_data = df.copy()
                 self._source_file = loaded_path
+                self._pipeline_session = PipelineSession(output_dir=self._output_dir, source_file=loaded_path)
+                self._step_output_paths = self._pipeline_session.step_output_paths
+                self._context = self._pipeline_session.context
+                self._last_materialized_export_path = None
                 self._context["red_font_rows"] = set(metadata.get("red_font_rows", []))
                 self._context["protected_rows"] = set(
                     metadata.get("protected_rows") or metadata.get("red_font_rows") or []
@@ -391,6 +391,10 @@ class MainWindow(ctk.CTk):
                 self._context["highlight_rows"] = set()
                 self._context["sample_info"] = loaded_sample_info
                 self._context["deleted_feature_df"] = loaded_deleted_feature
+                self._context["metadata_refs"]["sample_info_ref"] = "SampleInfo" if loaded_sample_info is not None else None
+                self._context["metadata_refs"]["deleted_feature_ref"] = (
+                    "deleted_feature" if loaded_deleted_feature is not None else None
+                )
 
                 # Update input display for this step
                 if 0 <= step_index < len(self.step_widgets):
@@ -454,6 +458,11 @@ class MainWindow(ctk.CTk):
     def _on_step_complete(self, result_data: pd.DataFrame, metadata: Optional[dict] = None) -> None:
         """Handle completion of a processing step."""
         self._current_data = result_data
+        if 0 <= self._current_step < len(self.step_widgets):
+            self._pipeline_session.record_step_parameters(
+                self._current_step,
+                self.step_widgets[self._current_step].get_last_parameters(),
+            )
         self._update_context_from_metadata(metadata)
         self._last_completed_step = self._current_step
         self._last_run_all = False
@@ -491,6 +500,7 @@ class MainWindow(ctk.CTk):
 
                 # Trigger processing (this is simplified - actual implementation would be more complex)
                 params = widget.get_parameters()
+                self._pipeline_session.record_step_parameters(i, params)
                 data = widget.run_processing(data, **params)
                 self._update_context_from_metadata(widget.get_metadata())
 
@@ -512,35 +522,20 @@ class MainWindow(ctk.CTk):
         except Exception as e:
             self._log(f"Pipeline error: {str(e)}")
 
-    def _export_results(self) -> None:
-        """Export the processed data."""
+    def _export_results(self) -> Optional[Path]:
+        """Export the processed data and return the materialized xlsx path."""
         if self._current_data is None:
-            self._log("Error: No data to export")
-            return
+            materialized = self._materialize_final_xlsx_from_latest_step()
+            if materialized is None:
+                self._log("Error: No data to export")
+            return materialized
 
-        output_dir = self._output_dir
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        step_prefix = None
-        if self._last_run_all:
-            step_prefix = "ALL"
-        elif self._last_completed_step is not None:
-            step_prefix = f"STEP{self._last_completed_step + 1}"
-        else:
-            step_prefix = f"STEP{self._current_step + 1}"
-
-        stem = self._get_base_stem(self._source_file) if self._source_file else "output"
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-        if step_prefix == "ALL":
-            filename = f"{step_prefix}_{stem}.xlsx"
-            filepath = output_dir / filename
-            if filepath.exists():
-                filename = f"{step_prefix}_{stem}_{timestamp}.xlsx"
-                filepath = output_dir / filename
-        else:
-            filename = f"{step_prefix}_{stem}_{timestamp}.xlsx"
-            filepath = output_dir / filename
+        self._pipeline_session.set_source_file(self._source_file)
+        filepath = self._pipeline_session.build_final_export_path(
+            last_completed_step=self._last_completed_step,
+            last_run_all=self._last_run_all,
+            suffix=".xlsx",
+        )
 
         try:
             extra_sheets = {}
@@ -559,11 +554,14 @@ class MainWindow(ctk.CTk):
                 blue_font_cells=self._context.get("blue_font_cells"),
                 red_font_rows=self._context.get("red_font_rows"),
                 extra_sheets=extra_sheets or None,
-                save_parquet_cache=Settings.SAVE_PARQUET_CACHE,
+                save_parquet_cache=False,
             )
+            self._last_materialized_export_path = filepath
             self._log(f"Exported to: {filepath}")
+            return filepath
         except Exception as e:
             self._log(f"Export error: {str(e)}")
+            return None
 
     def _update_export_dnp_btn(self) -> None:
         """Enable/disable the DNP export button based on pipeline completion."""
@@ -591,16 +589,11 @@ class MainWindow(ctk.CTk):
             )
             return
 
-        # First export current results to get a fresh file
-        self._export_results()
-
-        # Find the most recent export file
-        last_step = self._last_completed_step
-        if last_step not in self._step_output_paths:
+        # First materialize a fresh xlsx source from latest state
+        source_path = self._export_results()
+        if source_path is None:
             messagebox.showerror("Error", "No output file found. Please export first.")
             return
-
-        source_path = self._step_output_paths[last_step]
 
         # Ask user for output location
         output_path = filedialog.asksaveasfilename(
@@ -657,6 +650,58 @@ class MainWindow(ctk.CTk):
             self.export_dnp_btn.configure(text=original_text, state="normal")
             self._update_export_dnp_btn()
 
+    def _materialize_final_xlsx_from_latest_step(self) -> Optional[Path]:
+        """Materialize final xlsx from the latest intermediate path."""
+        if self._last_completed_step is None:
+            return None
+        source_path = self._step_output_paths.get(self._last_completed_step)
+        if source_path is None:
+            return None
+
+        source_path = Path(source_path)
+        if source_path.suffix.lower() == ".xlsx":
+            self._last_materialized_export_path = source_path
+            return source_path
+
+        self._pipeline_session.set_source_file(self._source_file)
+        target_path = self._pipeline_session.build_final_export_path(
+            last_completed_step=self._last_completed_step,
+            last_run_all=self._last_run_all,
+            suffix=".xlsx",
+        )
+
+        try:
+            data, metadata = self._file_handler.load_data(source_path)
+            self._pipeline_session.update_context_from_metadata(metadata)
+            self._context = self._pipeline_session.context
+            self._current_data = data
+
+            extra_sheets = {}
+            sample_info = self._context.get("sample_info")
+            if sample_info is not None:
+                extra_sheets["SampleInfo"] = sample_info
+            deleted_df = self._context.get("deleted_feature_df")
+            if isinstance(deleted_df, pd.DataFrame) and not deleted_df.empty:
+                extra_sheets["deleted_feature"] = deleted_df
+
+            self._file_handler.save_data(
+                data,
+                target_path,
+                sheet_name="RawIntensity",
+                highlight_rows=self._context.get("highlight_rows"),
+                blue_font_cells=self._context.get("blue_font_cells"),
+                red_font_rows=self._context.get("red_font_rows"),
+                extra_sheets=extra_sheets or None,
+                save_parquet_cache=False,
+            )
+            self._step_output_paths[self._last_completed_step] = target_path
+            self._last_materialized_export_path = target_path
+            self._log(f"Materialized final xlsx from parquet: {target_path}")
+            return target_path
+        except Exception as exc:
+            self._log(f"Materialization error: {exc}")
+            return None
+
     def _launch_dnp(self) -> None:
         """Launch Data Normalization Project GUI as a separate process."""
         desktop = Path.home() / "Desktop"
@@ -696,35 +741,12 @@ class MainWindow(ctk.CTk):
         """Save step output to OUTPUT directory and return path."""
         if data is None:
             return None
-        output_dir = self._output_dir
-        output_dir.mkdir(parents=True, exist_ok=True)
-        step_prefix = f"STEP{step_index + 1}"
-        stem = self._get_base_stem(self._source_file) if self._source_file else "output"
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        extension = ".parquet" if step_index in (0, 1, 2) else ".xlsx"
-        filename = f"{step_prefix}_{stem}_{timestamp}{extension}"
-        filepath = output_dir / filename
-
         try:
-            extra_sheets = None
-            if extension == ".xlsx":
-                extra_sheets = {}
-                sample_info = self._context.get("sample_info")
-                if sample_info is not None:
-                    extra_sheets["SampleInfo"] = sample_info
-                deleted_df = self._context.get("deleted_feature_df")
-                if isinstance(deleted_df, pd.DataFrame) and not deleted_df.empty:
-                    extra_sheets["deleted_feature"] = deleted_df
-
-            self._file_handler.save_data(
-                data,
-                filepath,
-                sheet_name="RawIntensity",
-                highlight_rows=self._context.get("highlight_rows"),
-                blue_font_cells=self._context.get("blue_font_cells"),
-                red_font_rows=self._context.get("red_font_rows"),
-                extra_sheets=extra_sheets,
-                save_parquet_cache=Settings.SAVE_PARQUET_CACHE,
+            self._pipeline_session.set_source_file(self._source_file)
+            filepath = self._pipeline_session.save_step_output(
+                step_index=step_index,
+                data=data,
+                file_handler=self._file_handler,
             )
             self._log(f"Auto-saved: {filepath}")
             return filepath
@@ -763,33 +785,8 @@ class MainWindow(ctk.CTk):
 
     def _update_context_from_metadata(self, metadata: Optional[dict]) -> None:
         """Update shared context from processing metadata."""
-        if not metadata:
-            return
-        if "red_font_rows" in metadata:
-            self._context["red_font_rows"] = set(metadata.get("red_font_rows") or [])
-        if "protected_rows" in metadata:
-            self._context["protected_rows"] = set(metadata.get("protected_rows") or [])
-        elif "red_font_rows" in metadata:
-            self._context["protected_rows"] = set(metadata.get("red_font_rows") or [])
-        if "sample_info" in metadata:
-            self._context["sample_info"] = metadata.get("sample_info")
-        if "deleted_features" in metadata:
-            deleted_df = None
-            deleted_features = metadata.get("deleted_features") or []
-            if deleted_features:
-                try:
-                    deleted_columns = list(deleted_features[0].index)
-                    deleted_values = [row.tolist() for row in deleted_features]
-                    deleted_df = pd.DataFrame(deleted_values, columns=deleted_columns)
-                except Exception:
-                    deleted_df = None
-            self._context["deleted_feature_df"] = deleted_df
-        else:
-            self._context["deleted_feature_df"] = None
-        if "blue_font_cells" in metadata:
-            self._context["blue_font_cells"] = metadata.get("blue_font_cells") or []
-        if "highlight_rows" in metadata:
-            self._context["highlight_rows"] = set(metadata.get("highlight_rows") or [])
+        self._pipeline_session.update_context_from_metadata(metadata)
+        self._context = self._pipeline_session.context
 
 
 def run_app():

@@ -37,3 +37,44 @@ def test_cli_version_smoke() -> None:
 
 def test_parquet_cache_default_enabled() -> None:
     assert Settings.SAVE_PARQUET_CACHE is True
+
+
+def test_docs_reference_unified_parquet_pipeline_and_zero_missing_behavior() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8", errors="replace")
+    design = (
+        ROOT / "docs" / "plans" / "2026-03-04-step4-zero-impute-and-performance-design.md"
+    ).read_text(encoding="utf-8", errors="replace")
+    rollout = (
+        ROOT / "docs" / "plans" / "2026-03-05-unified-parquet-v2-rollout-checklist.md"
+    )
+
+    assert rollout.exists(), "Rollout checklist must exist"
+
+    assert "Unified Parquet V2" in readme
+    assert "Step1-4 intermediate format = parquet" in readme
+    assert "final export/DNP = xlsx" in readme
+    assert "Step4 zero-as-missing default behavior" in readme
+
+    assert "Unified Parquet V2 Addendum" in design
+    assert "rollback checklist" in design.lower()
+    assert "troubleshooting checklist" in design.lower()
+
+
+def test_docs_include_conservative_io_go_no_go_and_rollback_criteria() -> None:
+    rollout = (
+        ROOT / "docs" / "plans" / "2026-03-05-unified-parquet-v2-rollout-checklist.md"
+    ).read_text(encoding="utf-8", errors="replace")
+    notes_path = (
+        ROOT / "docs" / "plans" / "2026-03-05-conservative-io-write-optimization-notes.md"
+    )
+
+    assert notes_path.exists(), "Conservative optimization notes must exist"
+    notes = notes_path.read_text(encoding="utf-8", errors="replace")
+
+    assert "1497.067" in rollout
+    assert "go/no-go" in rollout.lower()
+    assert "rollback" in rollout.lower()
+
+    assert "Gate A" in notes
+    assert "Gate B" in notes
+    assert "keep previous behavior" in notes.lower()

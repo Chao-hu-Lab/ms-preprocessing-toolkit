@@ -234,5 +234,13 @@ class FeatureFilterWidget(BaseProcessingWidget):
             raise Exception(result.message)
 
         self.log(f"Statistics: {result.statistics}")
-        self._last_metadata = result.metadata
+        self._last_metadata = {
+            **(result.metadata or {}),
+            "step_parameters": dict(params),
+            "imputation_stats": {
+                "cells_imputed": result.statistics.get("cells_imputed", 0),
+                "cells_imputed_from_nan": result.statistics.get("cells_imputed_from_nan", 0),
+                "cells_imputed_from_zero": result.statistics.get("cells_imputed_from_zero", 0),
+            },
+        }
         return result.data
