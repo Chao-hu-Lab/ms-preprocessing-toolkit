@@ -8,14 +8,25 @@ from typing import Any
 import re
 
 import pandas as pd
+from ms_core.preprocessing.settings import Settings
 
 
 class PipelineSession:
     """Tracks per-step outputs, parameters, and shared metadata context."""
 
-    def __init__(self, output_dir: Path, source_file: Path | None = None) -> None:
+    def __init__(
+        self,
+        output_dir: Path,
+        source_file: Path | None = None,
+        intermediate_dir: Path | None = None,
+    ) -> None:
         self.output_dir = Path(output_dir)
         self.source_file = Path(source_file) if source_file else None
+        self.intermediate_dir = (
+            Path(intermediate_dir)
+            if intermediate_dir is not None
+            else Settings.get_parquet_cache_root() / "gui-intermediate"
+        )
         self.step_output_paths: dict[int, Path] = {}
         self.step_parameters: dict[int, dict[str, Any]] = {}
         self.context: dict[str, Any] = {
@@ -79,11 +90,11 @@ class PipelineSession:
 
     def save_step_output(self, step_index: int, data: pd.DataFrame, file_handler) -> Path:
         """Persist step output as parquet intermediate for GUI chaining."""
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.intermediate_dir.mkdir(parents=True, exist_ok=True)
         stem = self._get_base_stem(self.source_file) if self.source_file else "output"
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         step_prefix = f"STEP{step_index + 1}"
-        path = self.output_dir / f"{step_prefix}_{stem}_{timestamp}.parquet"
+        path = self.intermediate_dir / f"{step_prefix}_{stem}_{timestamp}.parquet"
 
         file_handler.save_data(
             data,

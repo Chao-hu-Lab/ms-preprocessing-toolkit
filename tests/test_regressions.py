@@ -76,53 +76,89 @@ def test_load_data_preserves_red_font_rows_from_cache_or_excel() -> None:
     assert metadata.get("red_font_rows") == [1]
 
 
-def test_intermediate_steps_autosave_as_parquet() -> None:
-    window = MainWindow.__new__(MainWindow)
-    window._output_dir = Path("OUTPUT") / "autosave-test"
-    window._source_file = Path("input.xlsx")
-    window._pipeline_session = PipelineSession(
-        output_dir=window._output_dir,
-        source_file=window._source_file,
-    )
-    window._step_output_paths = window._pipeline_session.step_output_paths
-    window._context = {
-        "sample_info": None,
-        "deleted_feature_df": None,
-        "highlight_rows": set(),
-        "blue_font_cells": [],
-        "red_font_rows": set(),
-    }
-    window._file_handler = Mock()
-    window._log = lambda _: None
+def test_intermediate_steps_autosave_as_parquet(monkeypatch) -> None:
+    with patch.dict("os.environ", {"MSPTK_PARQUET_CACHE_ROOT": str(Path.cwd() / "tmp-internal-cache")}):
+        window = MainWindow.__new__(MainWindow)
+        window._output_dir = Path("OUTPUT") / "autosave-test"
+        window._source_file = Path("input.xlsx")
+        window._pipeline_session = PipelineSession(
+            output_dir=window._output_dir,
+            source_file=window._source_file,
+        )
+        window._step_output_paths = window._pipeline_session.step_output_paths
+        window._context = {
+            "sample_info": None,
+            "deleted_feature_df": None,
+            "highlight_rows": set(),
+            "blue_font_cells": [],
+            "red_font_rows": set(),
+        }
+        window._file_handler = Mock()
+        window._log = lambda _: None
 
-    data = pd.DataFrame({"Mz/RT": ["Sample_Type", "100.0/1.0"], "S1": ["case", 123]})
-    output_path = window._save_step_output(0, data)
+        data = pd.DataFrame({"Mz/RT": ["Sample_Type", "100.0/1.0"], "S1": ["case", 123]})
+        output_path = window._save_step_output(0, data)
 
-    assert output_path is not None
-    assert output_path.suffix == ".parquet"
+        assert output_path is not None
+        assert output_path.suffix == ".parquet"
+        assert window._output_dir not in output_path.parents
 
 
-def test_step4_autosave_uses_parquet_intermediate() -> None:
-    window = MainWindow.__new__(MainWindow)
-    window._output_dir = Path("OUTPUT") / "autosave-test"
-    window._source_file = Path("input.xlsx")
-    window._pipeline_session = PipelineSession(
-        output_dir=window._output_dir,
-        source_file=window._source_file,
-    )
-    window._step_output_paths = window._pipeline_session.step_output_paths
-    window._context = {
-        "sample_info": None,
-        "deleted_feature_df": None,
-        "highlight_rows": set(),
-        "blue_font_cells": [],
-        "red_font_rows": set(),
-    }
-    window._file_handler = Mock()
-    window._log = lambda _: None
+def test_step4_autosave_uses_parquet_intermediate(monkeypatch) -> None:
+    with patch.dict("os.environ", {"MSPTK_PARQUET_CACHE_ROOT": str(Path.cwd() / "tmp-internal-cache")}):
+        window = MainWindow.__new__(MainWindow)
+        window._output_dir = Path("OUTPUT") / "autosave-test"
+        window._source_file = Path("input.xlsx")
+        window._pipeline_session = PipelineSession(
+            output_dir=window._output_dir,
+            source_file=window._source_file,
+        )
+        window._step_output_paths = window._pipeline_session.step_output_paths
+        window._context = {
+            "sample_info": None,
+            "deleted_feature_df": None,
+            "highlight_rows": set(),
+            "blue_font_cells": [],
+            "red_font_rows": set(),
+        }
+        window._file_handler = Mock()
+        window._log = lambda _: None
 
-    data = pd.DataFrame({"Mz/RT": ["Sample_Type", "100.0/1.0"], "S1": ["case", 123]})
-    output_path = window._save_step_output(3, data)
+        data = pd.DataFrame({"Mz/RT": ["Sample_Type", "100.0/1.0"], "S1": ["case", 123]})
+        output_path = window._save_step_output(3, data)
 
-    assert output_path is not None
-    assert output_path.suffix == ".parquet"
+        assert output_path is not None
+        assert output_path.suffix == ".parquet"
+        assert window._output_dir not in output_path.parents
+
+
+def test_output_directory_contains_only_user_deliverables_after_step_autosave(monkeypatch) -> None:
+    with patch.dict("os.environ", {"MSPTK_PARQUET_CACHE_ROOT": str(Path.cwd() / "tmp-internal-cache")}):
+        window = MainWindow.__new__(MainWindow)
+        window._output_dir = Path("OUTPUT") / "autosave-test"
+        window._source_file = Path("input.xlsx")
+        window._pipeline_session = PipelineSession(
+            output_dir=window._output_dir,
+            source_file=window._source_file,
+        )
+        window._step_output_paths = window._pipeline_session.step_output_paths
+        window._context = {
+            "sample_info": None,
+            "deleted_feature_df": None,
+            "highlight_rows": set(),
+            "blue_font_cells": [],
+            "red_font_rows": set(),
+        }
+        window._file_handler = Mock()
+        window._log = lambda _: None
+
+        data = pd.DataFrame({"Mz/RT": ["Sample_Type", "100.0/1.0"], "S1": ["case", 123]})
+        step_output = window._save_step_output(1, data)
+
+        assert step_output is not None
+        assert window._output_dir not in step_output.parents
+
+
+def _legacy_removed_tests_kept_for_context() -> None:
+    """No-op placeholder to preserve line mapping after regression updates."""
+    return
