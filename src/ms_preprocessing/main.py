@@ -424,7 +424,7 @@ def run_cli(args):
             red_font_rows=red_font_rows,
             blue_font_cells=blue_font_cells,
             extra_sheets=extra_sheets or None,
-            save_parquet_cache=Settings.SAVE_PARQUET_CACHE,
+            save_parquet_cache=False,
         )
         print("Done!")
 

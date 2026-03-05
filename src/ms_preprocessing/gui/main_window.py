@@ -554,7 +554,7 @@ class MainWindow(ctk.CTk):
                 blue_font_cells=self._context.get("blue_font_cells"),
                 red_font_rows=self._context.get("red_font_rows"),
                 extra_sheets=extra_sheets or None,
-                save_parquet_cache=Settings.SAVE_PARQUET_CACHE,
+                save_parquet_cache=False,
             )
             self._last_materialized_export_path = filepath
             self._log(f"Exported to: {filepath}")
@@ -692,7 +692,7 @@ class MainWindow(ctk.CTk):
                 blue_font_cells=self._context.get("blue_font_cells"),
                 red_font_rows=self._context.get("red_font_rows"),
                 extra_sheets=extra_sheets or None,
-                save_parquet_cache=Settings.SAVE_PARQUET_CACHE,
+                save_parquet_cache=False,
             )
             self._step_output_paths[self._last_completed_step] = target_path
             self._last_materialized_export_path = target_path

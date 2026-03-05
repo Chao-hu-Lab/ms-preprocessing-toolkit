@@ -130,10 +130,12 @@ def test_final_export_materializes_xlsx_from_parquet_intermediate() -> None:
         window._file_handler.load_data.return_value = (df_from_parquet, {"format": "parquet"})
 
         saved: dict[str, Path] = {}
+        saved_kwargs: dict = {}
 
         def _save_data(df, file_path, **kwargs):
-            _ = (df, kwargs)
+            _ = df
             saved["path"] = Path(file_path)
+            saved_kwargs.update(kwargs)
             return Path(file_path)
 
         window._file_handler.save_data.side_effect = _save_data
@@ -141,3 +143,4 @@ def test_final_export_materializes_xlsx_from_parquet_intermediate() -> None:
         window._export_results()
 
         assert saved["path"].suffix == ".xlsx"
+        assert saved_kwargs.get("save_parquet_cache") is False
