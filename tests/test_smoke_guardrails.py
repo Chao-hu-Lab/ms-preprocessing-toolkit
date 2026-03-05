@@ -58,3 +58,23 @@ def test_docs_reference_unified_parquet_pipeline_and_zero_missing_behavior() -> 
     assert "Unified Parquet V2 Addendum" in design
     assert "rollback checklist" in design.lower()
     assert "troubleshooting checklist" in design.lower()
+
+
+def test_docs_include_conservative_io_go_no_go_and_rollback_criteria() -> None:
+    rollout = (
+        ROOT / "docs" / "plans" / "2026-03-05-unified-parquet-v2-rollout-checklist.md"
+    ).read_text(encoding="utf-8", errors="replace")
+    notes_path = (
+        ROOT / "docs" / "plans" / "2026-03-05-conservative-io-write-optimization-notes.md"
+    )
+
+    assert notes_path.exists(), "Conservative optimization notes must exist"
+    notes = notes_path.read_text(encoding="utf-8", errors="replace")
+
+    assert "1497.067" in rollout
+    assert "go/no-go" in rollout.lower()
+    assert "rollback" in rollout.lower()
+
+    assert "Gate A" in notes
+    assert "Gate B" in notes
+    assert "keep previous behavior" in notes.lower()

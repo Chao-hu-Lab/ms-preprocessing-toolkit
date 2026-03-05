@@ -34,3 +34,10 @@ Status: Active rollout checklist
 - If metadata marks are missing after reload: inspect `.parquet.meta.json` sidecar presence and content.
 - If warm run is not faster: verify cache hit path and compare `load_s` between cold/warm runs.
 - If Step4 residual zero values appear: re-check imputation stats (`cells_imputed_from_zero`) and affected sample/QC columns.
+
+## 6. Conservative I/O Go/No-Go Gate
+
+- go/no-go baseline (legacy method total): `1497.067` seconds.
+- Gate A (must pass): optimized total `<= 1497.067` seconds.
+- Gate B (target): optimized total `<= 1420.0` seconds.
+- If Gate A fails, stop rollout and execute rollback checklist.
