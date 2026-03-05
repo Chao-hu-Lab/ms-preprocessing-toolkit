@@ -172,3 +172,20 @@ User dataset verification (`STEP3_VERIFY_STEP1_drLiao_HNC_Urine_recheck_20260303
 - `post_nan_count = 0`
 - Warm-cache load format: `parquet`
 - Warm-cache speedup (cold load vs warm load): `216.669497x` on benchmark run.
+
+## 10. Unified Parquet V2 Addendum (2026-03-05)
+
+Scope alignment for release:
+- Step1-4 intermediate format = parquet (with metadata sidecar).
+- Final deliverables remain `.xlsx`, and final export/DNP bridge consume xlsx only.
+- Step4 keeps zero-as-missing as default behavior (including QC columns).
+
+rollback checklist:
+- If production verification fails, switch consumers back to xlsx intermediate paths and disable parquet intermediate chaining in CLI/GUI path orchestration.
+- Keep `SAVE_PARQUET_CACHE` enabled for read acceleration only after xlsx path is confirmed healthy.
+- Re-run full dataset pipeline (`--step all`) and compare schema parity before re-enabling parquet chaining.
+
+troubleshooting checklist:
+- Missing metadata marks after reload: verify `<artifact>.parquet.meta.json` is present and version-compatible.
+- Unexpected DNP export input format: ensure final materialization step writes xlsx before DNP bridge invocation.
+- Performance regression on warm path: compare cold/warm benchmark sections separately (`load_s`, `step_times`, `save_s`, `total_s`) and validate cache hit conditions.
