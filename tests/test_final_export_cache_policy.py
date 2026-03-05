@@ -88,6 +88,7 @@ def _make_cli_args(input_path: Path, output_path: Path) -> SimpleNamespace:
         skew_threshold=0.66,
         diff_threshold=0.30,
         qc_ratio_threshold=0.0,
+        persist_intermediate=False,
         no_gui=True,
         version=False,
     )
