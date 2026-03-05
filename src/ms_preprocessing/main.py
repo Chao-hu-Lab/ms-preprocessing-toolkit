@@ -234,12 +234,13 @@ def run_cli(args):
         step = args.step
         project_root = Path(__file__).resolve().parents[2]
         intermediate_dir = project_root / "OUTPUT" / ".cli_intermediate"
+        last_parquet_handoff: Path | None = None
         if step == "all":
             intermediate_dir.mkdir(parents=True, exist_ok=True)
 
         def _persist_parquet_handoff(step_index: int) -> None:
             """Persist current state to parquet and reload for next step handoff."""
-            nonlocal df, red_font_rows, protected_rows, blue_font_cells
+            nonlocal df, red_font_rows, protected_rows, blue_font_cells, last_parquet_handoff
 
             if step != "all":
                 return
@@ -255,6 +256,7 @@ def run_cli(args):
                 blue_font_cells=blue_font_cells,
                 save_parquet_cache=False,
             )
+            last_parquet_handoff = handoff_path
             df, handoff_meta = handler.load_data(handoff_path)
             red_font_rows = set(handoff_meta.get("red_font_rows", red_font_rows))
             protected_rows = set(
@@ -404,6 +406,19 @@ def run_cli(args):
             else:
                 filename = f"{step_prefix}_{stem}_{timestamp}{output_suffix}"
                 output_path = output_dir / filename
+
+        # Explicitly materialize final xlsx from the latest parquet intermediate state.
+        if (
+            step == "all"
+            and output_path.suffix.lower() == ".xlsx"
+            and last_parquet_handoff is not None
+        ):
+            df, materialized_meta = handler.load_data(last_parquet_handoff)
+            red_font_rows = set(materialized_meta.get("red_font_rows", red_font_rows))
+            protected_rows = set(
+                materialized_meta.get("protected_rows") or materialized_meta.get("red_font_rows") or protected_rows
+            )
+            blue_font_cells = materialized_meta.get("blue_font_cells", blue_font_cells)
 
         extra_sheets = {}
         if preserved_sheets:
