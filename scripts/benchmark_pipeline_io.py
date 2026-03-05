@@ -18,6 +18,8 @@ METADATA_KEYS = (
     "sample_info_ref",
     "deleted_feature_ref",
 )
+GATE_A_SECONDS = 1497.067
+GATE_B_SECONDS = 1420.0
 
 
 def _empty_step_times() -> dict[str, float]:
@@ -69,6 +71,10 @@ def run_benchmark(
             "metadata_invariant_ok": True,
             "metadata_checked_keys": [],
             "metadata_mismatches": {},
+            "gate_a_seconds": GATE_A_SECONDS,
+            "gate_b_seconds": GATE_B_SECONDS,
+            "meets_gate_a": False,
+            "meets_gate_b": False,
             "total_s": 0.0,
             "dry_run": True,
         }
@@ -157,6 +163,10 @@ def run_benchmark(
         "metadata_invariant_ok": bool(metadata_invariant_ok),
         "metadata_checked_keys": metadata_checked_keys,
         "metadata_mismatches": metadata_mismatches,
+        "gate_a_seconds": float(GATE_A_SECONDS),
+        "gate_b_seconds": float(GATE_B_SECONDS),
+        "meets_gate_a": bool(total_s <= GATE_A_SECONDS),
+        "meets_gate_b": bool(total_s <= GATE_B_SECONDS),
         "total_s": float(total_s),
         "dry_run": False,
     }
