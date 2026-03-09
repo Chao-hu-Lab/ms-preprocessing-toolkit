@@ -27,6 +27,8 @@ wheels/
 # PyInstaller
 *.manifest
 *.spec
+# Allow the project's own spec file
+!ms-preprocessing.spec
 
 # Installer logs
 pip-log.txt
