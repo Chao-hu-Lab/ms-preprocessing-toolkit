@@ -135,40 +135,47 @@ class MainWindow(ctk.CTk):
             step_label.pack(side="left")
 
     def _create_sidebar(self) -> None:
-        """Create the left sidebar with workflow steps."""
+        """Create compact sidebar (180px) — navigation only."""
         self.sidebar = ctk.CTkFrame(self, width=DIMENSIONS["sidebar_width"])
-        self.sidebar.grid(row=1, column=0, rowspan=3, sticky="nsw", padx=0, pady=0)
+        self.sidebar.grid(row=1, column=0, rowspan=3, sticky="nsw")
         self.sidebar.grid_propagate(False)
 
-        # Logo/Title
-        title_label = ctk.CTkLabel(
+        # App title (compact, 2 lines)
+        ctk.CTkLabel(
             self.sidebar,
-            text="MS Preprocessing Toolkit",
-            font=FONTS["title"],
-        )
-        title_label.pack(pady=PADDING["medium"])
-
-        # Workflow steps
-        steps_label = ctk.CTkLabel(
-            self.sidebar,
-            text="工作流程 Workflow",
+            text="MS Preprocessing\nToolkit",
             font=FONTS["heading"],
-        )
-        steps_label.pack(pady=(PADDING["medium"], PADDING["small"]))
+            justify="left",
+            anchor="w",
+        ).pack(fill="x", padx=PADDING["medium"], pady=(PADDING["large"], PADDING["small"]))
 
+        # Separator
+        ctk.CTkFrame(self.sidebar, height=1, fg_color="#2a3f5a").pack(
+            fill="x", padx=PADDING["medium"], pady=(0, PADDING["small"])
+        )
+
+        # Workflow section label
+        ctk.CTkLabel(
+            self.sidebar,
+            text="工作流程",
+            font=FONTS["small"],
+            text_color=COLORS["text_secondary"],
+            anchor="w",
+        ).pack(fill="x", padx=PADDING["medium"], pady=(0, PADDING["small"]))
+
+        # Step buttons with status circle
         self.step_buttons = []
-        self._step_status_labels = []  # 存每個步驟的狀態 label
+        self._step_status_labels = []
 
         for i, (step_id, name_zh, name_en) in enumerate(Settings.WORKFLOW_STEPS):
             row_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-            row_frame.pack(fill="x", padx=PADDING["medium"], pady=2)
+            row_frame.pack(fill="x", padx=PADDING["small"], pady=2)
             row_frame.grid_columnconfigure(1, weight=1)
 
-            # 狀態圓圈 label
             status_lbl = ctk.CTkLabel(
                 row_frame,
                 text="○",
-                font=("Microsoft JhengHei UI", 13),
+                font=FONTS["body"],
                 text_color="#4a6fa5",
                 width=20,
             )
@@ -180,7 +187,8 @@ class MainWindow(ctk.CTk):
                 text=f"{i+1}. {name_zh}",
                 command=lambda idx=i: self._switch_step(idx),
                 anchor="w",
-                fg_color="transparent" if i != 0 else COLORS["primary"],
+                height=32,
+                fg_color=COLORS["primary"] if i == 0 else "transparent",
                 border_width=0,
                 font=FONTS["body"],
             )
@@ -188,89 +196,54 @@ class MainWindow(ctk.CTk):
             self.step_buttons.append(btn)
 
         # Spacer
-        spacer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        spacer.pack(fill="both", expand=True)
+        ctk.CTkFrame(self.sidebar, fg_color="transparent").pack(fill="both", expand=True)
 
-        # 分隔線
-        separator = ctk.CTkFrame(self.sidebar, height=1, fg_color="#2a3f5a")
-        separator.pack(fill="x", padx=PADDING["medium"], pady=PADDING["medium"])
+        # Actions separator
+        ctk.CTkFrame(self.sidebar, height=1, fg_color="#2a3f5a").pack(
+            fill="x", padx=PADDING["medium"], pady=(0, PADDING["small"])
+        )
 
-        actions_label = ctk.CTkLabel(
+        ctk.CTkLabel(
             self.sidebar,
-            text="動作 Actions",
+            text="動作",
             font=FONTS["small"],
             text_color=COLORS["text_secondary"],
-        )
-        actions_label.pack(pady=(0, PADDING["small"]))
+            anchor="w",
+        ).pack(fill="x", padx=PADDING["medium"], pady=(0, PADDING["small"]))
 
-        # Export section
-        export_frame = ctk.CTkFrame(self.sidebar)
-        export_frame.pack(fill="x", padx=PADDING["small"], pady=PADDING["medium"])
+        # Action buttons (compact, height=32)
+        action_buttons = [
+            ("↑ 匯出結果", self._export_results, COLORS["secondary"]),
+            ("📁 開啟資料夾", self._open_output_folder, "transparent"),
+            ("⚡ 執行全部", self._run_all_steps, COLORS["accent"]),
+        ]
+        for text, cmd, color in action_buttons:
+            ctk.CTkButton(
+                self.sidebar,
+                text=text,
+                command=cmd,
+                height=32,
+                fg_color=color,
+                font=FONTS["small"],
+                anchor="w",
+            ).pack(fill="x", padx=PADDING["medium"], pady=2)
 
-        self.export_btn = ctk.CTkButton(
-            export_frame,
-            text="匯出結果",
-            command=self._export_results,
-            width=180,
-            fg_color=COLORS["secondary"],
-            font=FONTS["body"],
-        )
-        self.export_btn.pack(pady=PADDING["small"])
-
-        self.open_output_btn = ctk.CTkButton(
-            export_frame,
-            text="開啟輸出資料夾",
-            command=self._open_output_folder,
-            width=180,
-            font=FONTS["body"],
-        )
-        self.open_output_btn.pack(pady=PADDING["small"])
-
-        # Run all button
-        self.run_all_btn = ctk.CTkButton(
-            export_frame,
-            text="執行全部流程",
-            command=self._run_all_steps,
-            width=180,
-            fg_color=COLORS["accent"],
-            font=FONTS["body"],
-        )
-        self.run_all_btn.pack(pady=PADDING["small"])
-
-        # Export to DNP button (disabled until Step 4 complete)
+        # DNP export button
         self.export_dnp_btn = ctk.CTkButton(
-            export_frame,
-            text="匯出至 DNP ⛔",
+            self.sidebar,
+            text="→ 匯出 DNP",
             command=self._export_to_dnp,
-            width=180,
+            height=32,
             fg_color="#6b7280",
-            font=FONTS["body"],
+            font=FONTS["small"],
+            anchor="w",
             state="disabled",
         )
-        self.export_dnp_btn.pack(pady=PADDING["small"])
-
-        # Run / Reset 按鈕
-        run_reset_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        run_reset_frame.pack(fill="x", padx=PADDING["medium"], pady=(0, PADDING["medium"]))
-
-        self.run_step_btn = ctk.CTkButton(
-            run_reset_frame,
-            text="▶ 執行",
-            command=self._run_current_step,
-            fg_color=COLORS["primary"],
-            font=FONTS["body"],
+        self.export_dnp_btn.pack(
+            fill="x",
+            padx=PADDING["medium"],
+            pady=(2, PADDING["large"]),
         )
-        self.run_step_btn.pack(fill="x", pady=2)
-
-        self.reset_step_btn = ctk.CTkButton(
-            run_reset_frame,
-            text="↺ 重置",
-            command=self._reset_current_step,
-            fg_color="transparent",
-            border_width=1,
-            font=FONTS["body"],
-        )
-        self.reset_step_btn.pack(fill="x", pady=2)
 
     def _create_main_area(self) -> None:
         """Create the main content area with step widgets."""
