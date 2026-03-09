@@ -46,7 +46,7 @@ class MainWindow(ctk.CTk):
         # Window setup
         self.title(Settings.WINDOW_TITLE)
         self.geometry(f"{Settings.WINDOW_SIZE[0]}x{Settings.WINDOW_SIZE[1]}")
-        self.minsize(900, 600)
+        self.minsize(1000, 650)
 
         # Project root/output
         self._project_root = Path(__file__).resolve().parents[3]
@@ -73,24 +73,29 @@ class MainWindow(ctk.CTk):
         self._bind_shortcuts()
 
     def _create_layout(self) -> None:
-        """Create the main window layout."""
-        # Configure grid: row 0 = pipeline nav, row 1 = main content, row 2 = log
+        """Create the main window layout (5 zones)."""
+        # column 0: sidebar (fixed), column 1: main content (expands)
+        self.grid_columnconfigure(0, weight=0)
         self.grid_columnconfigure(1, weight=1)
-        self.grid_rowconfigure(0, weight=0)   # nav bar 固定
-        self.grid_rowconfigure(1, weight=1)   # main content 可垂直擴展
-        self.grid_rowconfigure(2, weight=0)   # log 固定
 
-        # Pipeline navigation bar (spans full width)
-        self._create_pipeline_nav()
+        # row 0: pipeline nav (fixed)
+        # row 1: main content (expands)
+        # row 2: action bar (fixed)
+        # row 3: log (fixed)
+        self.grid_rowconfigure(0, weight=0)
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(2, weight=0)
+        self.grid_rowconfigure(3, weight=0)
 
-        # Sidebar
-        self._create_sidebar()
+        self._create_pipeline_nav()   # row 0, col 0-1
+        self._create_sidebar()        # row 1-3, col 0
+        self._create_main_area()      # row 1, col 1
+        self._create_action_bar()     # row 2, col 1
+        self._create_log_area()       # row 3, col 1
 
-        # Main content area
-        self._create_main_area()
-
-        # Bottom log area
-        self._create_log_area()
+    def _create_action_bar(self) -> None:
+        """Action bar placeholder — implemented in Task 5."""
+        pass
 
     def _create_pipeline_nav(self) -> None:
         """Create the pipeline navigation bar showing overall workflow position."""
@@ -132,7 +137,7 @@ class MainWindow(ctk.CTk):
     def _create_sidebar(self) -> None:
         """Create the left sidebar with workflow steps."""
         self.sidebar = ctk.CTkFrame(self, width=DIMENSIONS["sidebar_width"])
-        self.sidebar.grid(row=1, column=0, rowspan=2, sticky="nsw", padx=0, pady=0)
+        self.sidebar.grid(row=1, column=0, rowspan=3, sticky="nsw", padx=0, pady=0)
         self.sidebar.grid_propagate(False)
 
         # Logo/Title
@@ -324,7 +329,7 @@ class MainWindow(ctk.CTk):
     def _create_log_area(self) -> None:
         """Create the bottom log/status area."""
         self.log_frame = ctk.CTkFrame(self, height=DIMENSIONS["log_height"])
-        self.log_frame.grid(row=2, column=1, sticky="sew", padx=0, pady=0)
+        self.log_frame.grid(row=3, column=1, sticky="sew", padx=0, pady=0)
         self.log_frame.grid_propagate(False)
         self.log_frame.pack_propagate(False)
 
