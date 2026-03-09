@@ -1,0 +1,53 @@
+name: Build Windows Executable
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      upload_artifact:
+        description: "Upload as artifact (for testing without a tag)"
+        type: boolean
+        default: true
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -e . pyinstaller
+
+      - name: Build executable
+        run: pyinstaller ms-preprocessing.spec --clean --noconfirm
+        env:
+          PYTHONPATH: ms-core/src
+
+      - name: Verify executable
+        run: dist\ms-preprocessing.exe --version
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ms-preprocessing-windows
+          path: dist/ms-preprocessing.exe
+          retention-days: 7
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/ms-preprocessing.exe
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
