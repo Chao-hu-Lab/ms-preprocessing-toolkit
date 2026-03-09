@@ -37,6 +37,7 @@ jobs:
         run: dist\ms-preprocessing.exe --version
 
       - name: Upload artifact
+        if: startsWith(github.ref, 'refs/tags/') || inputs.upload_artifact
         uses: actions/upload-artifact@v4
         with:
           name: ms-preprocessing-windows
