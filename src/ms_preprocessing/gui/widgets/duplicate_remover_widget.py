@@ -48,7 +48,7 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
         self.mz_entry = ctk.CTkEntry(
             self.params_frame,
             placeholder_text="20",
-            width=100,
+            width=160,
             font=FONTS["body"],
         )
         self.mz_entry.insert(0, "20")
@@ -65,7 +65,7 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
         self.rt_entry = ctk.CTkEntry(
             self.params_frame,
             placeholder_text="1.0",
-            width=100,
+            width=160,
             font=FONTS["body"],
         )
         self.rt_entry.insert(0, "1.0")
@@ -82,7 +82,7 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
         self.topn_entry = ctk.CTkEntry(
             self.params_frame,
             placeholder_text="留空表示全部",
-            width=100,
+            width=160,
             font=FONTS["body"],
         )
         self.topn_entry.grid(row=2, column=1, padx=PADDING["small"], pady=PADDING["small"])

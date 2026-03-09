@@ -52,7 +52,7 @@ class ISTDMarkerWidget(BaseProcessingWidget):
         self.ppm_entry = ctk.CTkEntry(
             self.params_frame,
             placeholder_text="20",
-            width=100,
+            width=160,
             font=FONTS["body"],
         )
         self.ppm_entry.insert(0, "20")
@@ -69,7 +69,7 @@ class ISTDMarkerWidget(BaseProcessingWidget):
         self.rt_entry = ctk.CTkEntry(
             self.params_frame,
             placeholder_text="1.0",
-            width=100,
+            width=160,
             font=FONTS["body"],
         )
         self.rt_entry.insert(0, "1.0")
@@ -86,7 +86,7 @@ class ISTDMarkerWidget(BaseProcessingWidget):
         self.istd_entry = ctk.CTkEntry(
             self.params_frame,
             placeholder_text="例: 261.1273, 245.1324",
-            width=200,
+            width=160,
             font=FONTS["body"],
         )
         # Pre-fill default ISTD list
@@ -105,7 +105,7 @@ class ISTDMarkerWidget(BaseProcessingWidget):
         self.record_entry = ctk.CTkEntry(
             self.params_frame,
             placeholder_text="選擇 ISTD 記錄表 (.xlsx)",
-            width=200,
+            width=160,
             font=FONTS["body"],
         )
         self.record_entry.grid(row=3, column=1, padx=PADDING["small"], pady=PADDING["small"])
@@ -130,7 +130,7 @@ class ISTDMarkerWidget(BaseProcessingWidget):
         self.date_entry = ctk.CTkEntry(
             self.params_frame,
             placeholder_text="例: 20260106",
-            width=120,
+            width=160,
             font=FONTS["body"],
         )
         self.date_entry.grid(row=4, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="w")

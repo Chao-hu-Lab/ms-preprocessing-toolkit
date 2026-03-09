@@ -37,6 +37,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
 
     def _create_parameters(self) -> None:
         """Create parameter inputs."""
+        self.params_frame.grid_columnconfigure(3, weight=1)  # 說明欄位可延伸
         signal_label = ctk.CTkLabel(
             self.params_frame,
             text="訊號門檻值",
@@ -47,11 +48,19 @@ class FeatureFilterWidget(BaseProcessingWidget):
         self.signal_entry = ctk.CTkEntry(
             self.params_frame,
             placeholder_text="5000",
-            width=100,
+            width=160,
             font=FONTS["body"],
         )
         self.signal_entry.insert(0, "5000")
         self.signal_entry.grid(row=0, column=1, padx=PADDING["small"], pady=PADDING["small"])
+
+        ctk.CTkLabel(
+            self.params_frame,
+            text="低於此值視為噪音，直接從資料中排除",
+            font=FONTS["small"],
+            text_color=COLORS["text_secondary"],
+            anchor="w",
+        ).grid(row=0, column=3, padx=(PADDING["medium"], PADDING["small"]), sticky="w")
 
         bg_label = ctk.CTkLabel(
             self.params_frame,
@@ -62,6 +71,14 @@ class FeatureFilterWidget(BaseProcessingWidget):
         self.bg_slider = self._create_threshold_slider(row=1, default_value=0.33, on_change=self._update_bg)
         self.bg_entry = self._create_threshold_entry(row=1, default_value=0.33, on_apply=self._apply_bg)
 
+        ctk.CTkLabel(
+            self.params_frame,
+            text="「穩定型」保留規則：至少 2 組的 ratio ≥ 此值",
+            font=FONTS["small"],
+            text_color=COLORS["text_secondary"],
+            anchor="w",
+        ).grid(row=1, column=3, padx=(PADDING["medium"], PADDING["small"]), sticky="w")
+
         skew_label = ctk.CTkLabel(
             self.params_frame,
             text="偏斜比例門檻",
@@ -71,6 +88,14 @@ class FeatureFilterWidget(BaseProcessingWidget):
         self.skew_slider = self._create_threshold_slider(row=2, default_value=0.66, on_change=self._update_skew)
         self.skew_entry = self._create_threshold_entry(row=2, default_value=0.66, on_apply=self._apply_skew)
 
+        ctk.CTkLabel(
+            self.params_frame,
+            text="「偏斜型」保留規則：任一組 ratio ≥ 此值",
+            font=FONTS["small"],
+            text_color=COLORS["text_secondary"],
+            anchor="w",
+        ).grid(row=2, column=3, padx=(PADDING["medium"], PADDING["small"]), sticky="w")
+
         diff_label = ctk.CTkLabel(
             self.params_frame,
             text="組間差異門檻",
@@ -79,6 +104,14 @@ class FeatureFilterWidget(BaseProcessingWidget):
         diff_label.grid(row=3, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
         self.diff_slider = self._create_threshold_slider(row=3, default_value=0.30, on_change=self._update_diff)
         self.diff_entry = self._create_threshold_entry(row=3, default_value=0.30, on_apply=self._apply_diff)
+
+        ctk.CTkLabel(
+            self.params_frame,
+            text="「差異型」保留規則：最大 ratio − 最小 ratio ≥ 此值",
+            font=FONTS["small"],
+            text_color=COLORS["text_secondary"],
+            anchor="w",
+        ).grid(row=3, column=3, padx=(PADDING["medium"], PADDING["small"]), sticky="w")
 
         qc_ratio_label = ctk.CTkLabel(
             self.params_frame,
@@ -96,6 +129,14 @@ class FeatureFilterWidget(BaseProcessingWidget):
             default_value=0.00,
             on_apply=self._apply_qc_ratio,
         )
+
+        ctk.CTkLabel(
+            self.params_frame,
+            text="低於此值的特徵直接刪除（設 0 = 只刪 QC_ratio=0 的特徵）",
+            font=FONTS["small"],
+            text_color=COLORS["text_secondary"],
+            anchor="w",
+        ).grid(row=4, column=3, padx=(PADDING["medium"], PADDING["small"]), sticky="w")
 
         criteria_text = (
             "篩選規則：\n"

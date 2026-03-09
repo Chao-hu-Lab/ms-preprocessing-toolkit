@@ -92,7 +92,7 @@ class DataOrganizerWidget(BaseProcessingWidget):
         self.method_entry = ctk.CTkEntry(
             self.params_frame,
             placeholder_text="選擇分析方法文件 (.docx)",
-            width=220,
+            width=160,
             font=FONTS["body"],
         )
         self.method_entry.grid(row=2, column=1, padx=PADDING["small"], pady=PADDING["small"])

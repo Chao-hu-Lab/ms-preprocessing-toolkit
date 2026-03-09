@@ -69,7 +69,7 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         self.grid_rowconfigure(0, weight=0)  # params area — fixed, no vertical expansion
 
         self._content_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self._content_frame.grid(row=0, column=0, sticky="new")
+        self._content_frame.grid(row=0, column=0, sticky="new", padx=60)
         self._content_frame.grid_columnconfigure(0, weight=1)
 
         self._build_content_panel()
