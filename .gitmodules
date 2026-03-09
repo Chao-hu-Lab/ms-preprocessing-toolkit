@@ -1,0 +1,3 @@
+[submodule "ms-core"]
+	path = ms-core
+	url = https://github.com/bosschen0429/ms-core.git
