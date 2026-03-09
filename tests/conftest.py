@@ -18,7 +18,7 @@ if str(SRC) not in sys.path:
 
 def pytest_configure(config):
     """Redirect tmp_path base to project-local dir to avoid Windows Temp permission issues."""
-    if config.option.__dict__.get("basetemp") is None:
+    if getattr(config.option, "basetemp", None) is None:
         basetemp = ROOT / ".pytest-tmp"
         config.option.basetemp = str(basetemp)
 

@@ -4,6 +4,7 @@ from ms_preprocessing.bootstrap_paths import find_ms_core_src
 
 
 def test_find_ms_core_src_prefers_worktree_copy(tmp_path):
+    """Worktree copy with bridge marker should be preferred over main src."""
     toolkit_root = tmp_path / "Desktop" / "MS Data process package" / "ms-preprocessing-toolkit"
     toolkit_root.mkdir(parents=True, exist_ok=True)
 
@@ -25,7 +26,9 @@ def test_find_ms_core_src_prefers_worktree_copy(tmp_path):
         encoding="utf-8",
     )
 
-    assert find_ms_core_src(toolkit_root) == worktree_src
+    assert find_ms_core_src(toolkit_root) == worktree_src, (
+        f"Expected worktree src at {worktree_src}, got {find_ms_core_src(toolkit_root)}"
+    )
 
 
 def test_find_ms_core_src_finds_submodule_at_toolkit_root(tmp_path):
