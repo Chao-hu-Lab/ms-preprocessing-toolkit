@@ -26,10 +26,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
         super().__init__(
             parent,
             title="Step 4: 特徵篩選與缺失值填補",
-            description=(
-                "依各組別 ratio 進行特徵篩選，並補值缺失訊號。"
-                "另外可設定最小 QC_ratio，過低時直接刪除特徵。"
-            ),
+            description="",
             step_index=step_index,
             on_load_file=on_load_file,
             on_complete=on_complete,
