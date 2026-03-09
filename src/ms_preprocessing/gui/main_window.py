@@ -73,81 +73,15 @@ class MainWindow(ctk.CTk):
         self._bind_shortcuts()
 
     def _create_layout(self) -> None:
-        """Create the main window layout (5 zones)."""
-        # column 0: sidebar (fixed), column 1: main content (expands)
+        """Two-zone layout: nav bar + content area."""
         self.grid_columnconfigure(0, weight=0)
         self.grid_columnconfigure(1, weight=1)
-
-        # row 0: pipeline nav (fixed)
-        # row 1: main content (expands)
-        # row 2: action bar (fixed)
-        # row 3: log (fixed)
-        self.grid_rowconfigure(0, weight=0)
-        self.grid_rowconfigure(1, weight=1)
-        self.grid_rowconfigure(2, weight=0)
-        self.grid_rowconfigure(3, weight=0)
+        self.grid_rowconfigure(0, weight=0)   # nav
+        self.grid_rowconfigure(1, weight=1)   # content
 
         self._create_pipeline_nav()   # row 0, col 0-1
-        self._create_sidebar()        # row 1-3, col 0
-        self._create_main_area()      # row 1, col 1
-        self._create_action_bar()     # row 2, col 1
-        self._create_log_area()       # row 3, col 1
-
-    def _create_action_bar(self) -> None:
-        """Create fixed action bar with progress, run/reset, and status."""
-        self.action_bar = ctk.CTkFrame(
-            self,
-            height=DIMENSIONS["action_bar_height"],
-            fg_color="#0d1b2a",
-        )
-        self.action_bar.grid(row=2, column=1, sticky="ew")
-        self.action_bar.grid_propagate(False)
-        self.action_bar.grid_columnconfigure(0, weight=1)
-
-        # Progress bar row
-        self.progress_bar = ctk.CTkProgressBar(self.action_bar, height=6)
-        self.progress_bar.grid(
-            row=0, column=0, sticky="ew",
-            padx=PADDING["large"], pady=(PADDING["small"], 0),
-        )
-        self.progress_bar.set(0)
-
-        # Button + status row
-        btn_row = ctk.CTkFrame(self.action_bar, fg_color="transparent")
-        btn_row.grid(row=1, column=0, sticky="ew", padx=PADDING["large"], pady=(4, PADDING["small"]))
-        btn_row.grid_columnconfigure(2, weight=1)
-
-        self.run_step_btn = ctk.CTkButton(
-            btn_row,
-            text="▶  執行",
-            command=self._run_current_step,
-            width=110,
-            height=30,
-            font=FONTS["body"],
-            fg_color=COLORS["primary"],
-        )
-        self.run_step_btn.grid(row=0, column=0, padx=(0, PADDING["medium"]))
-
-        self.reset_step_btn = ctk.CTkButton(
-            btn_row,
-            text="↺  重置",
-            command=self._reset_current_step,
-            width=90,
-            height=30,
-            font=FONTS["body"],
-            fg_color="transparent",
-            border_width=1,
-        )
-        self.reset_step_btn.grid(row=0, column=1, padx=(0, PADDING["large"]))
-
-        self.status_label = ctk.CTkLabel(
-            btn_row,
-            text="Ready",
-            font=FONTS["small"],
-            text_color=COLORS["text_secondary"],
-            anchor="w",
-        )
-        self.status_label.grid(row=0, column=2, sticky="w")
+        self._create_sidebar()        # row 1, col 0
+        self._create_content_area()   # row 1, col 1
 
     def _update_action_bar_progress(self, value: float, status: str = "") -> None:
         """Update Action Bar progress bar and status label."""
@@ -195,7 +129,7 @@ class MainWindow(ctk.CTk):
     def _create_sidebar(self) -> None:
         """Create compact sidebar (180px) — navigation only."""
         self.sidebar = ctk.CTkFrame(self, width=DIMENSIONS["sidebar_width"])
-        self.sidebar.grid(row=1, column=0, rowspan=3, sticky="nsw")
+        self.sidebar.grid(row=1, column=0, rowspan=1, sticky="nsw")
         self.sidebar.grid_propagate(False)
 
         # App title (compact, 2 lines)
@@ -303,18 +237,23 @@ class MainWindow(ctk.CTk):
             pady=(2, PADDING["large"]),
         )
 
-    def _create_main_area(self) -> None:
-        """Create the main content area with step widgets."""
-        self.main_frame = ctk.CTkFrame(self)
-        self.main_frame.grid(row=1, column=1, sticky="nsew", padx=0, pady=0)
+    def _create_content_area(self) -> None:
+        """Create the full content area (step params + expanding bottom group)."""
+        # Outer content frame
+        self.content_frame = ctk.CTkFrame(self)
+        self.content_frame.grid(row=1, column=1, sticky="nsew")
+        self.content_frame.grid_columnconfigure(0, weight=1)
+        self.content_frame.grid_rowconfigure(0, weight=0)   # params — fixed
+        self.content_frame.grid_rowconfigure(1, weight=1)   # bottom — expands
+
+        # Step widget container (no vertical expansion)
+        self.main_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
+        self.main_frame.grid(row=0, column=0, sticky="ew")
         self.main_frame.grid_columnconfigure(0, weight=1)
-        self.main_frame.grid_rowconfigure(0, weight=0)
-        self.main_frame.grid_propagate(True)
 
         # Create step widgets
         self.step_widgets = []
 
-        # Step 1: Data Organizer
         self.data_organizer_widget = DataOrganizerWidget(
             self.main_frame,
             step_index=0,
@@ -325,7 +264,6 @@ class MainWindow(ctk.CTk):
         )
         self.step_widgets.append(self.data_organizer_widget)
 
-        # Step 2: ISTD Marker
         self.istd_marker_widget = ISTDMarkerWidget(
             self.main_frame,
             step_index=1,
@@ -336,7 +274,6 @@ class MainWindow(ctk.CTk):
         )
         self.step_widgets.append(self.istd_marker_widget)
 
-        # Step 3: Duplicate Remover
         self.duplicate_remover_widget = DuplicateRemoverWidget(
             self.main_frame,
             step_index=2,
@@ -347,7 +284,6 @@ class MainWindow(ctk.CTk):
         )
         self.step_widgets.append(self.duplicate_remover_widget)
 
-        # Step 4: Feature Filter
         self.feature_filter_widget = FeatureFilterWidget(
             self.main_frame,
             step_index=3,
@@ -358,19 +294,69 @@ class MainWindow(ctk.CTk):
         )
         self.step_widgets.append(self.feature_filter_widget)
 
-        # Show first step by default
         self._show_step(0)
 
-    def _create_log_area(self) -> None:
-        """Create log area — display only, no action buttons."""
-        self.log_frame = ctk.CTkFrame(self, height=DIMENSIONS["log_height"])
-        self.log_frame.grid(row=3, column=1, sticky="sew")
-        self.log_frame.grid_propagate(False)
-        self.log_frame.pack_propagate(False)
+        # Bottom group (expands to fill remaining space)
+        self._create_bottom_group()
 
-        # Header
-        log_header = ctk.CTkFrame(self.log_frame, fg_color="transparent")
-        log_header.pack(fill="x", padx=PADDING["medium"], pady=(PADDING["small"], 0))
+    def _create_bottom_group(self) -> None:
+        """Create bottom area: progress bar + run/reset buttons + log (log expands)."""
+        self.bottom_frame = ctk.CTkFrame(self.content_frame, fg_color="#0d1b2a")
+        self.bottom_frame.grid(row=1, column=0, sticky="nsew")
+        self.bottom_frame.grid_columnconfigure(0, weight=1)
+        self.bottom_frame.grid_rowconfigure(0, weight=0)   # progress bar
+        self.bottom_frame.grid_rowconfigure(1, weight=0)   # buttons
+        self.bottom_frame.grid_rowconfigure(2, weight=0)   # log header
+        self.bottom_frame.grid_rowconfigure(3, weight=1)   # log text — expands
+
+        # Row 0: Progress bar
+        self.progress_bar = ctk.CTkProgressBar(self.bottom_frame, height=6)
+        self.progress_bar.grid(
+            row=0, column=0, sticky="ew",
+            padx=PADDING["large"], pady=(PADDING["medium"], 4),
+        )
+        self.progress_bar.set(0)
+
+        # Row 1: Centered run/reset buttons + status label
+        btn_area = ctk.CTkFrame(self.bottom_frame, fg_color="transparent")
+        btn_area.grid(row=1, column=0, sticky="ew", padx=PADDING["large"], pady=(0, PADDING["small"]))
+        btn_area.grid_columnconfigure(0, weight=1)   # left spacer
+        btn_area.grid_columnconfigure(3, weight=1)   # right spacer
+
+        self.run_step_btn = ctk.CTkButton(
+            btn_area,
+            text="▶  執行",
+            command=self._run_current_step,
+            width=110,
+            height=34,
+            font=FONTS["body"],
+            fg_color=COLORS["primary"],
+        )
+        self.run_step_btn.grid(row=0, column=1, padx=(0, PADDING["medium"]))
+
+        self.reset_step_btn = ctk.CTkButton(
+            btn_area,
+            text="↺  重置",
+            command=self._reset_current_step,
+            width=90,
+            height=34,
+            font=FONTS["body"],
+            fg_color="transparent",
+            border_width=1,
+        )
+        self.reset_step_btn.grid(row=0, column=2, padx=(0, PADDING["medium"]))
+
+        self.status_label = ctk.CTkLabel(
+            btn_area,
+            text="Ready",
+            font=FONTS["small"],
+            text_color=COLORS["text_secondary"],
+        )
+        self.status_label.grid(row=0, column=3, padx=(0, PADDING["large"]), sticky="w")
+
+        # Row 2: Log header
+        log_header = ctk.CTkFrame(self.bottom_frame, fg_color="transparent")
+        log_header.grid(row=2, column=0, sticky="ew", padx=PADDING["medium"], pady=(PADDING["small"], 0))
 
         ctk.CTkLabel(
             log_header,
@@ -390,14 +376,12 @@ class MainWindow(ctk.CTk):
             border_width=1,
         ).pack(side="right")
 
-        self.log_text = ctk.CTkTextbox(
-            self.log_frame,
-            font=FONTS["mono"],
-        )
-        self.log_text.pack(
-            fill="both", expand=True,
+        # Row 3: Log text (expands)
+        self.log_text = ctk.CTkTextbox(self.bottom_frame, font=FONTS["mono"])
+        self.log_text.grid(
+            row=3, column=0, sticky="nsew",
             padx=PADDING["medium"],
-            pady=(4, PADDING["small"]),
+            pady=(4, PADDING["medium"]),
         )
 
     def _bind_shortcuts(self) -> None:
@@ -514,11 +498,10 @@ class MainWindow(ctk.CTk):
                 status_lbl.configure(text="○", text_color="#4a6fa5")
 
     def _show_step(self, step_index: int) -> None:
-        """Show the widget for a specific step."""
         for widget in self.step_widgets:
             widget.grid_forget()
         self.step_widgets[step_index].grid(
-            row=0, column=0, sticky="nsew",
+            row=0, column=0, sticky="ew",
             padx=0, pady=0,
         )
 
