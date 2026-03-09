@@ -16,6 +16,13 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 
+def pytest_configure(config):
+    """Redirect tmp_path base to project-local dir to avoid Windows Temp permission issues."""
+    if config.option.__dict__.get("basetemp") is None:
+        basetemp = ROOT / ".pytest-tmp"
+        config.option.basetemp = str(basetemp)
+
+
 @pytest.fixture
 def temp_dir():
     """Create a temporary directory for test files."""

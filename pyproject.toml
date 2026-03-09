@@ -80,3 +80,4 @@ warn_unused_ignores = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 norecursedirs = ["OUTPUT", ".git", ".pytest_cache", "__pycache__"]
+tmp_path_retention_policy = "failed"
