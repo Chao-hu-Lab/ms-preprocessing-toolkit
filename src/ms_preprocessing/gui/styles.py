@@ -18,11 +18,11 @@ COLORS = {
 
 # Font settings
 FONTS = {
-    "title": ("Microsoft JhengHei UI", 22, "bold"),
+    "title": ("Microsoft JhengHei UI", 20, "bold"),
     "heading": ("Microsoft JhengHei UI", 16, "bold"),
-    "body": ("Microsoft JhengHei UI", 13),
-    "small": ("Microsoft JhengHei UI", 11),
-    "mono": ("Consolas", 11),
+    "body": ("Microsoft JhengHei UI", 15),
+    "small": ("Microsoft JhengHei UI", 13),
+    "mono": ("Consolas", 13),
 }
 
 # Padding and spacing
@@ -36,6 +36,8 @@ PADDING = {
 DIMENSIONS = {
     "button_width": 120,
     "entry_width": 200,
-    "sidebar_width": 220,
-    "log_height": 160,
+    "sidebar_width": 180,     # 縮小（原 220）
+    "log_height": 150,        # 微調
+    "action_bar_height": 52,  # 新增
+    "left_panel_width": 420,  # 新增：雙欄左欄固定寬度
 }
