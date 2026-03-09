@@ -60,33 +60,25 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         self.run_button = None
         self.reset_button = None
         self.input_entry: Optional[ctk.CTkEntry] = None
-        self._stats_card: Optional[ctk.CTkFrame] = None
-        self._stats_label: Optional[ctk.CTkLabel] = None
 
         self._create_layout()
 
     def _create_layout(self) -> None:
-        """Create dual-column widget layout."""
-        self.grid_columnconfigure(0, weight=0, minsize=DIMENSIONS["left_panel_width"])
-        self.grid_columnconfigure(1, weight=1)
-        self.grid_rowconfigure(0, weight=1)
+        """Create single-column widget layout (no right panel)."""
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=0)  # params area — fixed, no vertical expansion
 
-        # Left frame — input + params
-        self._left_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self._left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+        self._content_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self._content_frame.grid(row=0, column=0, sticky="new")
+        self._content_frame.grid_columnconfigure(0, weight=1)
 
-        # Right frame — description + stats
-        self._right_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self._right_frame.grid(row=0, column=1, sticky="nsew")
+        self._build_content_panel()
 
-        self._build_left_panel()
-        self._build_right_panel()
-
-    def _build_left_panel(self) -> None:
-        """Build left param panel."""
+    def _build_content_panel(self) -> None:
+        """Build single-column content panel: title, subtitle desc, input, params."""
         # Step title
         self.title_label = ctk.CTkLabel(
-            self._left_frame,
+            self._content_frame,
             text=self.title,
             font=FONTS["heading"],
             anchor="w",
@@ -94,20 +86,38 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         self.title_label.pack(
             fill="x",
             padx=PADDING["large"],
-            pady=(PADDING["large"], PADDING["small"]),
+            pady=(PADDING["large"], 2),
         )
 
+        # Description as subtitle (hidden if empty)
+        if self.description:
+            self.desc_label = ctk.CTkLabel(
+                self._content_frame,
+                text=self.description,
+                font=FONTS["small"],
+                text_color=COLORS["text_secondary"],
+                anchor="w",
+                wraplength=700,
+                justify="left",
+            )
+            self.desc_label.pack(
+                fill="x",
+                padx=PADDING["large"],
+                pady=(0, PADDING["small"]),
+            )
+
         # Separator
-        sep = ctk.CTkFrame(self._left_frame, height=1, fg_color="#2a3f5a")
-        sep.pack(fill="x", padx=PADDING["large"], pady=(0, PADDING["medium"]))
+        ctk.CTkFrame(self._content_frame, height=1, fg_color="#2a3f5a").pack(
+            fill="x", padx=PADDING["large"], pady=(0, PADDING["medium"])
+        )
 
         # Input file row
-        input_frame = ctk.CTkFrame(self._left_frame, fg_color="transparent")
+        input_frame = ctk.CTkFrame(self._content_frame, fg_color="transparent")
         input_frame.pack(fill="x", padx=PADDING["large"], pady=(0, PADDING["medium"]))
         input_frame.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(input_frame, text="輸入檔案", font=FONTS["body"]).grid(
-            row=0, column=0, padx=(0, PADDING["small"]), sticky="w"
+            row=0, column=0, padx=(0, PADDING["small"]), sticky="e"
         )
 
         self.input_entry = ctk.CTkEntry(
@@ -128,99 +138,32 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
 
         # Params section label
         ctk.CTkLabel(
-            self._left_frame,
+            self._content_frame,
             text="參數設定",
             font=FONTS["small"],
             text_color=COLORS["text_secondary"],
             anchor="w",
         ).pack(fill="x", padx=PADDING["large"], pady=(0, PADDING["small"]))
 
-        # Params frame (subclasses fill this)
-        self.params_frame = ctk.CTkFrame(self._left_frame)
-        self.params_frame.pack(
-            fill="x",
-            padx=PADDING["large"],
-            pady=(0, PADDING["medium"]),
-        )
+        # Params outer container — max width 800px, centered
+        self._params_outer = ctk.CTkFrame(self._content_frame, fg_color="transparent")
+        self._params_outer.pack(fill="x", padx=PADDING["large"])
+
+        # Params frame (subclasses fill this via _create_parameters)
+        self.params_frame = ctk.CTkFrame(self._params_outer)
+        self.params_frame.pack(anchor="center", fill="x")
+
+        # Bind max width 800px
+        def _clamp_width(event):
+            w = min(event.width, 800)
+            self.params_frame.configure(width=w)
+        self._params_outer.bind("<Configure>", _clamp_width)
 
         self._create_parameters()
 
-    def _build_right_panel(self) -> None:
-        """Build right info/stats panel."""
-        # Description card
-        desc_card = ctk.CTkFrame(self._right_frame)
-        desc_card.pack(fill="x", padx=PADDING["large"], pady=PADDING["large"])
-
-        ctk.CTkLabel(
-            desc_card,
-            text="關於此步驟",
-            font=FONTS["body"],
-            anchor="w",
-        ).pack(fill="x", padx=PADDING["medium"], pady=(PADDING["medium"], PADDING["small"]))
-
-        self.desc_label = ctk.CTkLabel(
-            desc_card,
-            text=self.description,
-            font=FONTS["small"],
-            text_color=COLORS["text_secondary"],
-            wraplength=280,
-            justify="left",
-            anchor="w",
-        )
-        self.desc_label.pack(
-            fill="x",
-            padx=PADDING["medium"],
-            pady=(0, PADDING["medium"]),
-        )
-
-        # Stats card (hidden until step completes)
-        self._stats_card = ctk.CTkFrame(self._right_frame)
-        # Not packed until show_stats() is called
-
-        ctk.CTkLabel(
-            self._stats_card,
-            text="上次執行結果",
-            font=FONTS["body"],
-            anchor="w",
-        ).pack(fill="x", padx=PADDING["medium"], pady=(PADDING["medium"], PADDING["small"]))
-
-        self._stats_label = ctk.CTkLabel(
-            self._stats_card,
-            text="",
-            font=FONTS["small"],
-            text_color=COLORS["text_secondary"],
-            justify="left",
-            anchor="w",
-            wraplength=280,
-        )
-        self._stats_label.pack(
-            fill="x",
-            padx=PADDING["medium"],
-            pady=(0, PADDING["medium"]),
-        )
-
-        # Shortcut hint
-        step_num = self.step_index + 1
-        ctk.CTkLabel(
-            self._right_frame,
-            text=f"快捷鍵：Ctrl+{step_num}",
-            font=FONTS["small"],
-            text_color="#3a5a7a",
-            anchor="w",
-        ).pack(fill="x", padx=PADDING["large"], pady=(0, PADDING["medium"]))
-
     def show_stats(self, stats: dict) -> None:
-        """Display execution stats in the right panel."""
-        if not stats or self._stats_card is None or self._stats_label is None:
-            return
-        lines = [f"{k}：{v}" for k, v in list(stats.items())[:6]]
-        self._stats_label.configure(text="\n".join(lines))
-        if not self._stats_card.winfo_ismapped():
-            self._stats_card.pack(
-                fill="x",
-                padx=PADDING["large"],
-                pady=(0, PADDING["medium"]),
-            )
+        """No-op: stats panel removed from base widget."""
+        pass
 
     @abstractmethod
     def _create_parameters(self) -> None:
