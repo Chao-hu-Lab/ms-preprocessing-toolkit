@@ -9,6 +9,12 @@ integrated GUI support for the complete workflow:
 4. Feature Filtering and Missing Value Imputation
 """
 
+from pathlib import Path
+
+from .bootstrap_paths import ensure_ms_core_src_on_path
+
+ensure_ms_core_src_on_path(Path(__file__).resolve())
+
 __version__ = "1.0.0"
 __author__ = "Your Name"
 

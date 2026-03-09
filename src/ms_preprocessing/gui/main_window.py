@@ -20,7 +20,7 @@ from ms_preprocessing.gui.widgets.duplicate_remover_widget import DuplicateRemov
 from ms_preprocessing.gui.widgets.feature_filter_widget import FeatureFilterWidget
 from ms_preprocessing.gui.pipeline_session import PipelineSession
 from ms_core.utils.file_handler import FileHandler
-from ms_core.preprocessing.settings import Settings
+from ms_preprocessing.config.settings import Settings
 
 
 class MainWindow(ctk.CTk):
