@@ -27,9 +27,9 @@ FONTS = {
 
 # Padding and spacing
 PADDING = {
-    "small": 2,
-    "medium": 6,
-    "large": 10,
+    "small": 6,
+    "medium": 12,
+    "large": 20,
 }
 
 # Widget dimensions
@@ -37,5 +37,5 @@ DIMENSIONS = {
     "button_width": 120,
     "entry_width": 200,
     "sidebar_width": 220,
-    "log_height": 600,
+    "log_height": 160,
 }

@@ -60,6 +60,7 @@ class MainWindow(ctk.CTk):
         self._current_step = 0
         self._last_completed_step: Optional[int] = None
         self._last_run_all: bool = False
+        self._completed_steps: set = set()
         self._pipeline_session = PipelineSession(output_dir=self._output_dir, source_file=None)
         self._step_output_paths = self._pipeline_session.step_output_paths
         self._context = self._pipeline_session.context
@@ -75,9 +76,9 @@ class MainWindow(ctk.CTk):
         """Create the main window layout."""
         # Configure grid: row 0 = pipeline nav, row 1 = main content, row 2 = log
         self.grid_columnconfigure(1, weight=1)
-        self.grid_rowconfigure(0, weight=0)
-        self.grid_rowconfigure(1, weight=0)
-        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(0, weight=0)   # nav bar 固定
+        self.grid_rowconfigure(1, weight=1)   # main content 可垂直擴展
+        self.grid_rowconfigure(2, weight=0)   # log 固定
 
         # Pipeline navigation bar (spans full width)
         self._create_pipeline_nav()
@@ -151,22 +152,51 @@ class MainWindow(ctk.CTk):
         steps_label.pack(pady=(PADDING["medium"], PADDING["small"]))
 
         self.step_buttons = []
+        self._step_status_labels = []  # 存每個步驟的狀態 label
+
         for i, (step_id, name_zh, name_en) in enumerate(Settings.WORKFLOW_STEPS):
+            row_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+            row_frame.pack(fill="x", padx=PADDING["medium"], pady=2)
+            row_frame.grid_columnconfigure(1, weight=1)
+
+            # 狀態圓圈 label
+            status_lbl = ctk.CTkLabel(
+                row_frame,
+                text="○",
+                font=("Microsoft JhengHei UI", 13),
+                text_color="#4a6fa5",
+                width=20,
+            )
+            status_lbl.grid(row=0, column=0, padx=(4, 0))
+            self._step_status_labels.append(status_lbl)
+
             btn = ctk.CTkButton(
-                self.sidebar,
+                row_frame,
                 text=f"{i+1}. {name_zh}",
                 command=lambda idx=i: self._switch_step(idx),
-                width=180,
-                fg_color="transparent" if i != 0 else None,
-                border_width=1,
+                anchor="w",
+                fg_color="transparent" if i != 0 else COLORS["primary"],
+                border_width=0,
                 font=FONTS["body"],
             )
-            btn.pack(pady=PADDING["small"])
+            btn.grid(row=0, column=1, sticky="ew", padx=4)
             self.step_buttons.append(btn)
 
         # Spacer
         spacer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         spacer.pack(fill="both", expand=True)
+
+        # 分隔線
+        separator = ctk.CTkFrame(self.sidebar, height=1, fg_color="#2a3f5a")
+        separator.pack(fill="x", padx=PADDING["medium"], pady=PADDING["medium"])
+
+        actions_label = ctk.CTkLabel(
+            self.sidebar,
+            text="動作 Actions",
+            font=FONTS["small"],
+            text_color=COLORS["text_secondary"],
+        )
+        actions_label.pack(pady=(0, PADDING["small"]))
 
         # Export section
         export_frame = ctk.CTkFrame(self.sidebar)
@@ -213,6 +243,29 @@ class MainWindow(ctk.CTk):
             state="disabled",
         )
         self.export_dnp_btn.pack(pady=PADDING["small"])
+
+        # Run / Reset 按鈕
+        run_reset_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        run_reset_frame.pack(fill="x", padx=PADDING["medium"], pady=(0, PADDING["medium"]))
+
+        self.run_step_btn = ctk.CTkButton(
+            run_reset_frame,
+            text="▶ 執行",
+            command=self._run_current_step,
+            fg_color=COLORS["primary"],
+            font=FONTS["body"],
+        )
+        self.run_step_btn.pack(fill="x", pady=2)
+
+        self.reset_step_btn = ctk.CTkButton(
+            run_reset_frame,
+            text="↺ 重置",
+            command=self._reset_current_step,
+            fg_color="transparent",
+            border_width=1,
+            font=FONTS["body"],
+        )
+        self.reset_step_btn.pack(fill="x", pady=2)
 
     def _create_main_area(self) -> None:
         """Create the main content area with step widgets."""
@@ -273,60 +326,36 @@ class MainWindow(ctk.CTk):
         self.log_frame = ctk.CTkFrame(self, height=DIMENSIONS["log_height"])
         self.log_frame.grid(row=2, column=1, sticky="sew", padx=0, pady=0)
         self.log_frame.grid_propagate(False)
+        self.log_frame.pack_propagate(False)
 
-        # Control + Log header
         log_header = ctk.CTkFrame(self.log_frame, fg_color="transparent")
-        log_header.pack(fill="x", padx=PADDING["small"], pady=PADDING["small"])
-        log_header.grid_columnconfigure(0, weight=1)
-        log_header.grid_columnconfigure(1, weight=0)
-        log_header.grid_columnconfigure(2, weight=1)
+        log_header.pack(fill="x", padx=PADDING["medium"], pady=(PADDING["small"], 0))
 
         log_label = ctk.CTkLabel(
             log_header,
             text="處理紀錄 Log",
-            font=FONTS["body"],
+            font=FONTS["small"],
+            text_color=COLORS["text_secondary"],
         )
-        log_label.grid(row=0, column=0, sticky="w")
-
-        # Run/Reset buttons (centered above log)
-        control_frame = ctk.CTkFrame(log_header, fg_color="transparent")
-        control_frame.grid(row=0, column=1)
-        self.run_step_btn = ctk.CTkButton(
-            control_frame,
-            text="執行 Run",
-            command=self._run_current_step,
-            width=120,
-            font=FONTS["body"],
-        )
-        self.run_step_btn.pack(side="left", padx=(0, PADDING["small"]))
-
-        self.reset_step_btn = ctk.CTkButton(
-            control_frame,
-            text="重置 Reset",
-            command=self._reset_current_step,
-            width=120,
-            fg_color=COLORS["text_secondary"],
-            font=FONTS["body"],
-        )
-        self.reset_step_btn.pack(side="left")
+        log_label.pack(side="left")
 
         clear_btn = ctk.CTkButton(
             log_header,
             text="清除",
             command=self._clear_log,
-            width=60,
-            height=24,
+            width=50,
+            height=22,
             font=FONTS["small"],
+            fg_color="transparent",
+            border_width=1,
         )
-        clear_btn.grid(row=0, column=2, sticky="e")
+        clear_btn.pack(side="right")
 
-        # Log text area
         self.log_text = ctk.CTkTextbox(
             self.log_frame,
             font=FONTS["mono"],
-            height=100,
         )
-        self.log_text.pack(fill="both", expand=True, padx=PADDING["small"], pady=(0, PADDING["small"]))
+        self.log_text.pack(fill="both", expand=True, padx=PADDING["medium"], pady=(2, PADDING["small"]))
 
     def _bind_shortcuts(self) -> None:
         """Bind keyboard shortcuts."""
@@ -429,12 +458,17 @@ class MainWindow(ctk.CTk):
         if hasattr(self, "_step_output_paths") and self._step_output_paths.get(step_index):
             self.step_widgets[step_index].set_input_file(str(self._step_output_paths[step_index]))
 
-        # Update sidebar button styles
-        for i, btn in enumerate(self.step_buttons):
+        # 更新 sidebar 按鈕樣式 + 狀態圓圈
+        for i, (btn, status_lbl) in enumerate(zip(self.step_buttons, self._step_status_labels)):
             if i == step_index:
                 btn.configure(fg_color=COLORS["primary"])
+                status_lbl.configure(text="→", text_color="#52b788")
+            elif i in self._completed_steps:
+                btn.configure(fg_color="transparent")
+                status_lbl.configure(text="✓", text_color="#52b788")
             else:
                 btn.configure(fg_color="transparent")
+                status_lbl.configure(text="○", text_color="#4a6fa5")
 
     def _show_step(self, step_index: int) -> None:
         """Show the widget for a specific step."""
@@ -443,7 +477,7 @@ class MainWindow(ctk.CTk):
             widget.pack_forget()
 
         # Show selected widget
-        self.step_widgets[step_index].pack(fill="x", expand=False, padx=0, pady=0)
+        self.step_widgets[step_index].pack(fill="both", expand=True, padx=0, pady=0)
 
     def _run_current_step(self) -> None:
         """Run the currently selected step."""
@@ -464,6 +498,7 @@ class MainWindow(ctk.CTk):
                 self.step_widgets[self._current_step].get_last_parameters(),
             )
         self._update_context_from_metadata(metadata)
+        self._completed_steps.add(self._current_step)  # 追蹤已完成步驟
         self._last_completed_step = self._current_step
         self._last_run_all = False
         self._update_export_dnp_btn()
