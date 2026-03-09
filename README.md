@@ -35,15 +35,23 @@
 
 ## 安裝
 
-### 環境需求
+### 一般使用者（直接執行）
+
+從 [Releases](https://github.com/bosschen0429/ms-preprocessing-toolkit/releases) 下載最新的 `ms-preprocessing.exe`，直接執行即可，無需安裝 Python 環境。
+
+### 開發者（原始碼安裝）
+
+> **注意：** 本專案包含 git submodule（ms-core），clone 時必須加上 `--recurse-submodules`。
+
+#### 環境需求
 - Python 3.9+
 - Windows / macOS / Linux
 
-### 安裝步驟
+#### 安裝步驟
 
 ```bash
-# 1. 克隆或下載專案
-git clone https://github.com/yourusername/ms-preprocessing-toolkit.git
+# 1. 克隆專案（包含 submodule）
+git clone --recurse-submodules https://github.com/bosschen0429/ms-preprocessing-toolkit.git
 cd ms-preprocessing-toolkit
 
 # 2. 創建虛擬環境 (建議)
@@ -53,11 +61,16 @@ venv\Scripts\activate
 # macOS/Linux:
 source venv/bin/activate
 
-# 3. 安裝依賴
-pip install -r requirements.txt
-
-# 或使用 pip install
+# 3. 安裝套件
 pip install -e .
+```
+
+#### 如果忘記加 `--recurse-submodules`
+
+若已 clone 但 submodule 目錄為空，執行以下指令補救：
+
+```bash
+git submodule update --init --recursive
 ```
 
 ## 使用方式
