@@ -362,24 +362,24 @@ class MainWindow(ctk.CTk):
         self._show_step(0)
 
     def _create_log_area(self) -> None:
-        """Create the bottom log/status area."""
+        """Create log area — display only, no action buttons."""
         self.log_frame = ctk.CTkFrame(self, height=DIMENSIONS["log_height"])
-        self.log_frame.grid(row=3, column=1, sticky="sew", padx=0, pady=0)
+        self.log_frame.grid(row=3, column=1, sticky="sew")
         self.log_frame.grid_propagate(False)
         self.log_frame.pack_propagate(False)
 
+        # Header
         log_header = ctk.CTkFrame(self.log_frame, fg_color="transparent")
         log_header.pack(fill="x", padx=PADDING["medium"], pady=(PADDING["small"], 0))
 
-        log_label = ctk.CTkLabel(
+        ctk.CTkLabel(
             log_header,
-            text="處理紀錄 Log",
+            text="處理紀錄",
             font=FONTS["small"],
             text_color=COLORS["text_secondary"],
-        )
-        log_label.pack(side="left")
+        ).pack(side="left")
 
-        clear_btn = ctk.CTkButton(
+        ctk.CTkButton(
             log_header,
             text="清除",
             command=self._clear_log,
@@ -388,14 +388,17 @@ class MainWindow(ctk.CTk):
             font=FONTS["small"],
             fg_color="transparent",
             border_width=1,
-        )
-        clear_btn.pack(side="right")
+        ).pack(side="right")
 
         self.log_text = ctk.CTkTextbox(
             self.log_frame,
             font=FONTS["mono"],
         )
-        self.log_text.pack(fill="both", expand=True, padx=PADDING["medium"], pady=(2, PADDING["small"]))
+        self.log_text.pack(
+            fill="both", expand=True,
+            padx=PADDING["medium"],
+            pady=(4, PADDING["small"]),
+        )
 
     def _bind_shortcuts(self) -> None:
         """Bind keyboard shortcuts."""
@@ -512,12 +515,12 @@ class MainWindow(ctk.CTk):
 
     def _show_step(self, step_index: int) -> None:
         """Show the widget for a specific step."""
-        # Hide all widgets
         for widget in self.step_widgets:
-            widget.pack_forget()
-
-        # Show selected widget
-        self.step_widgets[step_index].pack(fill="both", expand=True, padx=0, pady=0)
+            widget.grid_forget()
+        self.step_widgets[step_index].grid(
+            row=0, column=0, sticky="nsew",
+            padx=0, pady=0,
+        )
 
     def _run_current_step(self) -> None:
         """Run the currently selected step."""
@@ -539,6 +542,13 @@ class MainWindow(ctk.CTk):
             )
         self._update_context_from_metadata(metadata)
         self._completed_steps.add(self._current_step)  # 追蹤已完成步驟
+
+        # Show stats in right panel
+        stats = {}
+        if hasattr(self.step_widgets[self._current_step], '_last_metadata') and self.step_widgets[self._current_step]._last_metadata:
+            stats = self.step_widgets[self._current_step]._last_metadata.get("statistics") or {}
+        self.step_widgets[self._current_step].show_stats(stats)
+
         self._last_completed_step = self._current_step
         self._last_run_all = False
         self._update_export_dnp_btn()
