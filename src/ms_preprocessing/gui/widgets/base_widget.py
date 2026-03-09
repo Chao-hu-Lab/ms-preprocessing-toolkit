@@ -7,7 +7,7 @@ from typing import Optional, Callable, Any
 import customtkinter as ctk
 import pandas as pd
 
-from ms_preprocessing.gui.styles import COLORS, FONTS, PADDING
+from ms_preprocessing.gui.styles import COLORS, FONTS, PADDING, DIMENSIONS
 from ms_preprocessing.utils.perf import take_snapshot, format_perf_delta
 
 
@@ -28,6 +28,7 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         on_load_file: Optional[Callable[[int], None]] = None,
         on_complete: Optional[Callable[[pd.DataFrame], None]] = None,
         on_log: Optional[Callable[[str], None]] = None,
+        on_progress: Optional[Callable[[float, str], None]] = None,
     ):
         """
         Initialize the base widget.
@@ -36,8 +37,11 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
             parent: Parent widget
             title: Title of this processing step
             description: Description of what this step does
+            step_index: Zero-based index of this step in the pipeline
+            on_load_file: Callback when user requests file load
             on_complete: Callback when processing completes
             on_log: Callback for logging messages
+            on_progress: Callback for progress updates (value, status)
         """
         super().__init__(parent)
 
@@ -47,6 +51,7 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         self._on_load_file = on_load_file
         self.on_complete = on_complete
         self.on_log = on_log
+        self._on_progress = on_progress
         self._data: Optional[pd.DataFrame] = None
         self._result: Optional[pd.DataFrame] = None
         self._context: dict = {}
@@ -55,76 +60,167 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         self.run_button = None
         self.reset_button = None
         self.input_entry: Optional[ctk.CTkEntry] = None
+        self._stats_card: Optional[ctk.CTkFrame] = None
+        self._stats_label: Optional[ctk.CTkLabel] = None
 
         self._create_layout()
 
     def _create_layout(self) -> None:
-        """Create the widget layout."""
-        # Title
+        """Create dual-column widget layout."""
+        self.grid_columnconfigure(0, weight=0, minsize=DIMENSIONS["left_panel_width"])
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+
+        # Left frame — input + params
+        self._left_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self._left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+
+        # Right frame — description + stats
+        self._right_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self._right_frame.grid(row=0, column=1, sticky="nsew")
+
+        self._build_left_panel()
+        self._build_right_panel()
+
+    def _build_left_panel(self) -> None:
+        """Build left param panel."""
+        # Step title
         self.title_label = ctk.CTkLabel(
-            self,
+            self._left_frame,
             text=self.title,
             font=FONTS["heading"],
+            anchor="w",
         )
-        self.title_label.pack(pady=(PADDING["small"], PADDING["small"]))
+        self.title_label.pack(
+            fill="x",
+            padx=PADDING["large"],
+            pady=(PADDING["large"], PADDING["small"]),
+        )
 
-        # Description
-        self.desc_label = ctk.CTkLabel(
-            self,
-            text=self.description,
-            font=FONTS["small"],
-            text_color=COLORS["text_secondary"],
-            wraplength=520,
-        )
-        self.desc_label.pack(pady=(0, PADDING["small"]))
+        # Separator
+        sep = ctk.CTkFrame(self._left_frame, height=1, fg_color="#2a3f5a")
+        sep.pack(fill="x", padx=PADDING["large"], pady=(0, PADDING["medium"]))
 
         # Input file row
-        input_frame = ctk.CTkFrame(self, fg_color="transparent")
-        input_frame.pack(fill="x", padx=PADDING["small"], pady=(0, PADDING["small"]))
+        input_frame = ctk.CTkFrame(self._left_frame, fg_color="transparent")
+        input_frame.pack(fill="x", padx=PADDING["large"], pady=(0, PADDING["medium"]))
         input_frame.grid_columnconfigure(1, weight=1)
 
-        input_label = ctk.CTkLabel(
-            input_frame,
-            text="輸入檔案：",
-            font=FONTS["body"],
+        ctk.CTkLabel(input_frame, text="輸入檔案", font=FONTS["body"]).grid(
+            row=0, column=0, padx=(0, PADDING["small"]), sticky="w"
         )
-        input_label.grid(row=0, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
 
         self.input_entry = ctk.CTkEntry(
             input_frame,
             placeholder_text="選擇輸入檔案",
             font=FONTS["body"],
         )
-        self.input_entry.grid(row=0, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="ew")
+        self.input_entry.grid(row=0, column=1, sticky="ew", padx=(0, PADDING["small"]))
 
-        load_btn = ctk.CTkButton(
+        ctk.CTkButton(
             input_frame,
-            text="選擇檔案",
+            text="選擇",
             command=self._on_load_clicked,
-            width=90,
+            width=60,
+            height=32,
             font=FONTS["body"],
+        ).grid(row=0, column=2)
+
+        # Params section label
+        ctk.CTkLabel(
+            self._left_frame,
+            text="參數設定",
+            font=FONTS["small"],
+            text_color=COLORS["text_secondary"],
+            anchor="w",
+        ).pack(fill="x", padx=PADDING["large"], pady=(0, PADDING["small"]))
+
+        # Params frame (subclasses fill this)
+        self.params_frame = ctk.CTkFrame(self._left_frame)
+        self.params_frame.pack(
+            fill="x",
+            padx=PADDING["large"],
+            pady=(0, PADDING["medium"]),
         )
-        load_btn.grid(row=0, column=2, padx=PADDING["small"], pady=PADDING["small"])
 
-        # Parameters frame (to be filled by subclasses)
-        self.params_frame = ctk.CTkFrame(self)
-        self.params_frame.pack(fill="x", padx=0, pady=PADDING["small"])
-
-        # Create subclass-specific parameters
         self._create_parameters()
 
-        # Progress bar
-        self.progress_bar = ctk.CTkProgressBar(self)
-        self.progress_bar.pack(fill="x", padx=PADDING["small"], pady=PADDING["small"])
-        self.progress_bar.set(0)
+    def _build_right_panel(self) -> None:
+        """Build right info/stats panel."""
+        # Description card
+        desc_card = ctk.CTkFrame(self._right_frame)
+        desc_card.pack(fill="x", padx=PADDING["large"], pady=PADDING["large"])
 
-        # Status label
-        self.status_label = ctk.CTkLabel(
-            self,
-            text="Ready",
+        ctk.CTkLabel(
+            desc_card,
+            text="關於此步驟",
+            font=FONTS["body"],
+            anchor="w",
+        ).pack(fill="x", padx=PADDING["medium"], pady=(PADDING["medium"], PADDING["small"]))
+
+        self.desc_label = ctk.CTkLabel(
+            desc_card,
+            text=self.description,
             font=FONTS["small"],
+            text_color=COLORS["text_secondary"],
+            wraplength=280,
+            justify="left",
+            anchor="w",
         )
-        self.status_label.pack(pady=PADDING["small"])
+        self.desc_label.pack(
+            fill="x",
+            padx=PADDING["medium"],
+            pady=(0, PADDING["medium"]),
+        )
+
+        # Stats card (hidden until step completes)
+        self._stats_card = ctk.CTkFrame(self._right_frame)
+        # Not packed until show_stats() is called
+
+        ctk.CTkLabel(
+            self._stats_card,
+            text="上次執行結果",
+            font=FONTS["body"],
+            anchor="w",
+        ).pack(fill="x", padx=PADDING["medium"], pady=(PADDING["medium"], PADDING["small"]))
+
+        self._stats_label = ctk.CTkLabel(
+            self._stats_card,
+            text="",
+            font=FONTS["small"],
+            text_color=COLORS["text_secondary"],
+            justify="left",
+            anchor="w",
+            wraplength=280,
+        )
+        self._stats_label.pack(
+            fill="x",
+            padx=PADDING["medium"],
+            pady=(0, PADDING["medium"]),
+        )
+
+        # Shortcut hint
+        step_num = self.step_index + 1
+        ctk.CTkLabel(
+            self._right_frame,
+            text=f"快捷鍵：Ctrl+{step_num}",
+            font=FONTS["small"],
+            text_color="#3a5a7a",
+            anchor="w",
+        ).pack(fill="x", padx=PADDING["large"], pady=(0, PADDING["medium"]))
+
+    def show_stats(self, stats: dict) -> None:
+        """Display execution stats in the right panel."""
+        if not stats or self._stats_card is None or self._stats_label is None:
+            return
+        lines = [f"{k}：{v}" for k, v in list(stats.items())[:6]]
+        self._stats_label.configure(text="\n".join(lines))
+        if not self._stats_card.winfo_ismapped():
+            self._stats_card.pack(
+                fill="x",
+                padx=PADDING["large"],
+                pady=(0, PADDING["medium"]),
+            )
 
     @abstractmethod
     def _create_parameters(self) -> None:
@@ -176,10 +272,9 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
             self.on_log(f"[{self.title}] {message}")
 
     def update_progress(self, value: float, status: str = "") -> None:
-        """Update the progress bar and status."""
-        self.progress_bar.set(value / 100)
-        if status:
-            self.status_label.configure(text=status)
+        """Delegate progress update to injected callback (Action Bar)."""
+        if self._on_progress:
+            self._on_progress(value, status)
         self.update_idletasks()
 
     def _on_load_clicked(self) -> None:
@@ -191,7 +286,7 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         """Handle run button click."""
         if self._data is None:
             self.log("Error: No data loaded")
-            self.status_label.configure(text="Error: No data loaded")
+            self.update_progress(0, "Error: No data loaded")
             return
 
         perf_start = take_snapshot()
@@ -199,8 +294,7 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         try:
             if self.run_button is not None:
                 self.run_button.configure(state="disabled")
-            self.status_label.configure(text="Processing...")
-            self.progress_bar.set(0)
+            self.update_progress(0, "Processing...")
 
             params = self.get_parameters()
             self._last_parameters = dict(params)
@@ -209,8 +303,7 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
             self._last_metadata = {}
             self._result = self.run_processing(self._data, **params)
 
-            self.progress_bar.set(1)
-            self.status_label.configure(text="Complete!")
+            self.update_progress(100, "Complete!")
             self.log("Processing completed successfully")
 
             if self.on_complete and self._result is not None:
@@ -220,7 +313,7 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
                     self.on_complete(self._result)
 
         except Exception as e:
-            self.status_label.configure(text=f"Error: {str(e)}")
+            self.update_progress(0, f"Error: {str(e)}")
             self.log(f"Error: {str(e)}")
         finally:
             perf_end = take_snapshot()
@@ -232,6 +325,5 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         """Handle reset button click."""
         self._result = None
         self._last_metadata = {}
-        self.progress_bar.set(0)
-        self.status_label.configure(text="Ready")
+        self.update_progress(0, "Ready")
         self.log("Reset")
