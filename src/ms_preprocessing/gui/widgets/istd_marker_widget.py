@@ -22,6 +22,7 @@ class ISTDMarkerWidget(BaseProcessingWidget):
         on_load_file: Optional[Callable[[int], None]] = None,
         on_complete: Optional[Callable[[pd.DataFrame], None]] = None,
         on_log: Optional[Callable[[str], None]] = None,
+        on_progress: Optional[Callable[[float, str], None]] = None,
     ):
         # Initialize processor before BaseProcessingWidget builds UI
         # (BaseProcessingWidget.__init__ calls _create_parameters)
@@ -35,6 +36,7 @@ class ISTDMarkerWidget(BaseProcessingWidget):
             on_load_file=on_load_file,
             on_complete=on_complete,
             on_log=on_log,
+            on_progress=on_progress,
         )
 
     def _create_parameters(self) -> None:

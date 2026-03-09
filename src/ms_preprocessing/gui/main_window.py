@@ -94,8 +94,66 @@ class MainWindow(ctk.CTk):
         self._create_log_area()       # row 3, col 1
 
     def _create_action_bar(self) -> None:
-        """Action bar placeholder — implemented in Task 5."""
-        pass
+        """Create fixed action bar with progress, run/reset, and status."""
+        self.action_bar = ctk.CTkFrame(
+            self,
+            height=DIMENSIONS["action_bar_height"],
+            fg_color="#0d1b2a",
+        )
+        self.action_bar.grid(row=2, column=1, sticky="ew")
+        self.action_bar.grid_propagate(False)
+        self.action_bar.grid_columnconfigure(0, weight=1)
+
+        # Progress bar row
+        self.progress_bar = ctk.CTkProgressBar(self.action_bar, height=6)
+        self.progress_bar.grid(
+            row=0, column=0, sticky="ew",
+            padx=PADDING["large"], pady=(PADDING["small"], 0),
+        )
+        self.progress_bar.set(0)
+
+        # Button + status row
+        btn_row = ctk.CTkFrame(self.action_bar, fg_color="transparent")
+        btn_row.grid(row=1, column=0, sticky="ew", padx=PADDING["large"], pady=(4, PADDING["small"]))
+        btn_row.grid_columnconfigure(2, weight=1)
+
+        self.run_step_btn = ctk.CTkButton(
+            btn_row,
+            text="▶  執行",
+            command=self._run_current_step,
+            width=110,
+            height=30,
+            font=FONTS["body"],
+            fg_color=COLORS["primary"],
+        )
+        self.run_step_btn.grid(row=0, column=0, padx=(0, PADDING["medium"]))
+
+        self.reset_step_btn = ctk.CTkButton(
+            btn_row,
+            text="↺  重置",
+            command=self._reset_current_step,
+            width=90,
+            height=30,
+            font=FONTS["body"],
+            fg_color="transparent",
+            border_width=1,
+        )
+        self.reset_step_btn.grid(row=0, column=1, padx=(0, PADDING["large"]))
+
+        self.status_label = ctk.CTkLabel(
+            btn_row,
+            text="Ready",
+            font=FONTS["small"],
+            text_color=COLORS["text_secondary"],
+            anchor="w",
+        )
+        self.status_label.grid(row=0, column=2, sticky="w")
+
+    def _update_action_bar_progress(self, value: float, status: str = "") -> None:
+        """Update Action Bar progress bar and status label."""
+        self.progress_bar.set(value / 100)
+        if status:
+            self.status_label.configure(text=status)
 
     def _create_pipeline_nav(self) -> None:
         """Create the pipeline navigation bar showing overall workflow position."""
@@ -263,6 +321,7 @@ class MainWindow(ctk.CTk):
             on_load_file=self._load_file_for_step,
             on_complete=self._on_step_complete,
             on_log=self._log,
+            on_progress=self._update_action_bar_progress,
         )
         self.step_widgets.append(self.data_organizer_widget)
 
@@ -273,6 +332,7 @@ class MainWindow(ctk.CTk):
             on_load_file=self._load_file_for_step,
             on_complete=self._on_step_complete,
             on_log=self._log,
+            on_progress=self._update_action_bar_progress,
         )
         self.step_widgets.append(self.istd_marker_widget)
 
@@ -283,6 +343,7 @@ class MainWindow(ctk.CTk):
             on_load_file=self._load_file_for_step,
             on_complete=self._on_step_complete,
             on_log=self._log,
+            on_progress=self._update_action_bar_progress,
         )
         self.step_widgets.append(self.duplicate_remover_widget)
 
@@ -293,6 +354,7 @@ class MainWindow(ctk.CTk):
             on_load_file=self._load_file_for_step,
             on_complete=self._on_step_complete,
             on_log=self._log,
+            on_progress=self._update_action_bar_progress,
         )
         self.step_widgets.append(self.feature_filter_widget)
 
