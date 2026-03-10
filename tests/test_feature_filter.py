@@ -148,6 +148,176 @@ class TestFeatureFilter:
         assert "100.000/1.0" in result.data["Mz/RT"].tolist()
         assert result.statistics.get("qc_low_deleted", 0) == 0
 
+    def test_disabling_background_rule_removes_feature_kept_only_by_stable_ratio(self, filter_proc):
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Case2": ["case", 100],
+                "Control1": ["control", 8000],
+                "Control2": ["control", 100],
+                "QC1": ["qc", 8000],
+            }
+        )
+
+        enabled = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            skew_threshold=0.66,
+            diff_threshold=0.30,
+            qc_ratio_threshold=0.0,
+        )
+        disabled = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            skew_threshold=0.66,
+            diff_threshold=0.30,
+            qc_ratio_threshold=0.0,
+            enable_background_threshold=False,
+        )
+
+        assert enabled.success
+        assert disabled.success
+        assert "100.000/1.0" in enabled.data["Mz/RT"].tolist()
+        assert "100.000/1.0" not in disabled.data["Mz/RT"].tolist()
+
+    def test_disabling_skew_rule_removes_feature_kept_only_by_skew_ratio(self, filter_proc):
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Case2": ["case", 9000],
+                "QC1": ["qc", 8000],
+            }
+        )
+
+        enabled = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            skew_threshold=0.66,
+            diff_threshold=0.30,
+            qc_ratio_threshold=0.0,
+        )
+        disabled = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            skew_threshold=0.66,
+            diff_threshold=0.30,
+            qc_ratio_threshold=0.0,
+            enable_skew_threshold=False,
+        )
+
+        assert enabled.success
+        assert disabled.success
+        assert "100.000/1.0" in enabled.data["Mz/RT"].tolist()
+        assert "100.000/1.0" not in disabled.data["Mz/RT"].tolist()
+
+    def test_disabling_diff_rule_removes_feature_kept_only_by_diff_ratio(self, filter_proc):
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Case2": ["case", 100],
+                "Control1": ["control", 100],
+                "Control2": ["control", 100],
+                "QC1": ["qc", 8000],
+            }
+        )
+
+        enabled = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            skew_threshold=0.66,
+            diff_threshold=0.30,
+            qc_ratio_threshold=0.0,
+        )
+        disabled = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            skew_threshold=0.66,
+            diff_threshold=0.30,
+            qc_ratio_threshold=0.0,
+            enable_diff_threshold=False,
+        )
+
+        assert enabled.success
+        assert disabled.success
+        assert "100.000/1.0" in enabled.data["Mz/RT"].tolist()
+        assert "100.000/1.0" not in disabled.data["Mz/RT"].tolist()
+
+    def test_disabling_qc_rule_keeps_feature_even_when_qc_ratio_is_zero(self, filter_proc):
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Case2": ["case", 9000],
+                "Control1": ["control", 8100],
+                "Control2": ["control", 9200],
+                "QC1": ["qc", 100],
+            }
+        )
+
+        enabled = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            skew_threshold=0.66,
+            diff_threshold=0.30,
+            qc_ratio_threshold=0.0,
+        )
+        disabled = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            skew_threshold=0.66,
+            diff_threshold=0.30,
+            qc_ratio_threshold=0.0,
+            enable_qc_ratio_threshold=False,
+        )
+
+        assert enabled.success
+        assert disabled.success
+        assert "100.000/1.0" not in enabled.data["Mz/RT"].tolist()
+        assert "100.000/1.0" in disabled.data["Mz/RT"].tolist()
+        assert disabled.metadata["enabled_thresholds"]["qc_ratio"] is False
+
+    def test_disabling_qc_rule_ignores_nonzero_qc_threshold_cutoff(self, filter_proc):
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Case2": ["case", 9000],
+                "Control1": ["control", 8100],
+                "Control2": ["control", 9200],
+                "QC1": ["qc", 8000],
+                "QC2": ["qc", 100],
+            }
+        )
+
+        enabled = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            skew_threshold=0.66,
+            diff_threshold=0.30,
+            qc_ratio_threshold=0.75,
+        )
+        disabled = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            skew_threshold=0.66,
+            diff_threshold=0.30,
+            qc_ratio_threshold=0.75,
+            enable_qc_ratio_threshold=False,
+        )
+
+        assert enabled.success
+        assert disabled.success
+        assert "100.000/1.0" not in enabled.data["Mz/RT"].tolist()
+        assert "100.000/1.0" in disabled.data["Mz/RT"].tolist()
+
     def test_imputation_treats_zero_as_missing_for_group_columns(self, filter_proc):
         df = pd.DataFrame(
             {

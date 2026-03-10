@@ -1,18 +1,20 @@
-"""
-Feature Filter Widget - GUI for Step 4.
-"""
+"""Feature Filter Widget - GUI for Step 4."""
 
-from typing import Optional, Callable
+from __future__ import annotations
+
+import tkinter as tk
+from typing import Callable, Optional
+
 import customtkinter as ctk
 import pandas as pd
 
-from ms_preprocessing.gui.widgets.base_widget import BaseProcessingWidget
-from ms_preprocessing.gui.styles import PADDING, FONTS, COLORS
 from ms_core.preprocessing.ms_quality_filter import FeatureFilter
+from ms_preprocessing.gui.styles import COLORS, FONTS, PADDING
+from ms_preprocessing.gui.widgets.base_widget import BaseProcessingWidget
 
 
 class FeatureFilterWidget(BaseProcessingWidget):
-    """Widget for the Feature Filtering and Missing Value Imputation step."""
+    """Widget for the Step 4 feature filter and imputation workflow."""
 
     def __init__(
         self,
@@ -23,6 +25,8 @@ class FeatureFilterWidget(BaseProcessingWidget):
         on_log: Optional[Callable[[str], None]] = None,
         on_progress: Optional[Callable[[float, str], None]] = None,
     ):
+        self._processor = FeatureFilter()
+        self._threshold_controls: dict[str, tuple[tk.BooleanVar, ctk.CTkSlider, ctk.CTkEntry]] = {}
         super().__init__(
             parent,
             title="Step 4: 特徵篩選與缺失值填補",
@@ -33,11 +37,11 @@ class FeatureFilterWidget(BaseProcessingWidget):
             on_log=on_log,
             on_progress=on_progress,
         )
-        self._processor = FeatureFilter()
 
     def _create_parameters(self) -> None:
         """Create parameter inputs."""
-        self.params_frame.grid_columnconfigure(3, weight=1)  # 說明欄位可延伸
+        self.params_frame.grid_columnconfigure(1, weight=1)
+
         signal_label = ctk.CTkLabel(
             self.params_frame,
             text="訊號門檻值",
@@ -56,69 +60,84 @@ class FeatureFilterWidget(BaseProcessingWidget):
 
         ctk.CTkLabel(
             self.params_frame,
-            text="低於此值視為噪音，直接從資料中排除",
+            text="ratio = 組內高於訊號門檻的樣本數 / 組內總樣本數",
             font=FONTS["small"],
             text_color=COLORS["text_secondary"],
             anchor="w",
         ).grid(row=0, column=3, padx=(PADDING["medium"], PADDING["small"]), sticky="w")
 
-        bg_label = ctk.CTkLabel(
-            self.params_frame,
+        self.bg_enabled_var = tk.BooleanVar(value=True)
+        self.bg_enabled_switch = self._create_threshold_switch(
+            row=1,
             text="背景比例門檻",
-            font=FONTS["body"],
+            variable=self.bg_enabled_var,
         )
-        bg_label.grid(row=1, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
         self.bg_slider = self._create_threshold_slider(row=1, default_value=0.33, on_change=self._update_bg)
         self.bg_entry = self._create_threshold_entry(row=1, default_value=0.33, on_apply=self._apply_bg)
+        self._threshold_controls["background"] = (
+            self.bg_enabled_var,
+            self.bg_slider,
+            self.bg_entry,
+        )
 
         ctk.CTkLabel(
             self.params_frame,
-            text="「穩定型」保留規則：至少 2 組的 ratio ≥ 此值",
+            text="啟用時：至少 2 組的 ratio >= 這個門檻才算穩定型",
             font=FONTS["small"],
             text_color=COLORS["text_secondary"],
             anchor="w",
         ).grid(row=1, column=3, padx=(PADDING["medium"], PADDING["small"]), sticky="w")
 
-        skew_label = ctk.CTkLabel(
-            self.params_frame,
+        self.skew_enabled_var = tk.BooleanVar(value=True)
+        self.skew_enabled_switch = self._create_threshold_switch(
+            row=2,
             text="偏斜比例門檻",
-            font=FONTS["body"],
+            variable=self.skew_enabled_var,
         )
-        skew_label.grid(row=2, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
         self.skew_slider = self._create_threshold_slider(row=2, default_value=0.66, on_change=self._update_skew)
         self.skew_entry = self._create_threshold_entry(row=2, default_value=0.66, on_apply=self._apply_skew)
+        self._threshold_controls["skew"] = (
+            self.skew_enabled_var,
+            self.skew_slider,
+            self.skew_entry,
+        )
 
         ctk.CTkLabel(
             self.params_frame,
-            text="「偏斜型」保留規則：任一組 ratio ≥ 此值",
+            text="啟用時：任一組 ratio >= 這個門檻就算偏斜型",
             font=FONTS["small"],
             text_color=COLORS["text_secondary"],
             anchor="w",
         ).grid(row=2, column=3, padx=(PADDING["medium"], PADDING["small"]), sticky="w")
 
-        diff_label = ctk.CTkLabel(
-            self.params_frame,
+        self.diff_enabled_var = tk.BooleanVar(value=True)
+        self.diff_enabled_switch = self._create_threshold_switch(
+            row=3,
             text="組間差異門檻",
-            font=FONTS["body"],
+            variable=self.diff_enabled_var,
         )
-        diff_label.grid(row=3, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
         self.diff_slider = self._create_threshold_slider(row=3, default_value=0.30, on_change=self._update_diff)
         self.diff_entry = self._create_threshold_entry(row=3, default_value=0.30, on_apply=self._apply_diff)
+        self._threshold_controls["diff"] = (
+            self.diff_enabled_var,
+            self.diff_slider,
+            self.diff_entry,
+        )
 
         ctk.CTkLabel(
             self.params_frame,
-            text="「差異型」保留規則：最大 ratio − 最小 ratio ≥ 此值",
+            text="啟用時：最大 ratio - 最小 ratio >= 這個門檻才算差異型",
             font=FONTS["small"],
             text_color=COLORS["text_secondary"],
             anchor="w",
         ).grid(row=3, column=3, padx=(PADDING["medium"], PADDING["small"]), sticky="w")
 
-        qc_ratio_label = ctk.CTkLabel(
-            self.params_frame,
-            text="最小 QC_ratio",
-            font=FONTS["body"],
+        self.qc_ratio_enabled_var = tk.BooleanVar(value=True)
+        self.qc_ratio_enabled_switch = self._create_threshold_switch(
+            row=4,
+            text="QC_ratio 門檻",
+            variable=self.qc_ratio_enabled_var,
         )
-        qc_ratio_label.grid(row=4, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
         self.qc_ratio_slider = self._create_threshold_slider(
             row=4,
             default_value=0.00,
@@ -129,21 +148,26 @@ class FeatureFilterWidget(BaseProcessingWidget):
             default_value=0.00,
             on_apply=self._apply_qc_ratio,
         )
+        self._threshold_controls["qc_ratio"] = (
+            self.qc_ratio_enabled_var,
+            self.qc_ratio_slider,
+            self.qc_ratio_entry,
+        )
 
         ctk.CTkLabel(
             self.params_frame,
-            text="低於此值的特徵直接刪除（設 0 = 只刪 QC_ratio=0 的特徵）",
+            text="啟用時：QC_ratio = 0 或低於輸入值的 feature 會被移除",
             font=FONTS["small"],
             text_color=COLORS["text_secondary"],
             anchor="w",
         ).grid(row=4, column=3, padx=(PADDING["medium"], PADDING["small"]), sticky="w")
 
         criteria_text = (
-            "篩選規則：\n"
-            "  1. 穩定型：至少 2 組的 ratio >= 背景比例門檻\n"
-            "  2. 偏斜型：任一組 ratio >= 偏斜比例門檻\n"
-            "  3. 差異型：最大 ratio - 最小 ratio >= 組間差異門檻\n"
-            "  4. QC 規則：QC_ratio = 0 必刪；若設定最小 QC_ratio，低於該值也刪除"
+            "目前規則：\n"
+            "  1. 背景比例門檻開啟時，至少 2 組 ratio >= 背景比例門檻\n"
+            "  2. 偏斜比例門檻開啟時，任一組 ratio >= 偏斜比例門檻\n"
+            "  3. 組間差異門檻開啟時，最大 ratio - 最小 ratio >= 組間差異門檻\n"
+            "  4. QC_ratio 門檻開啟時，QC_ratio = 0 或低於設定值的 feature 會被移除"
         )
         criteria_label = ctk.CTkLabel(
             self.params_frame,
@@ -155,11 +179,31 @@ class FeatureFilterWidget(BaseProcessingWidget):
         criteria_label.grid(
             row=5,
             column=0,
-            columnspan=3,
+            columnspan=4,
             padx=PADDING["small"],
             pady=PADDING["small"],
             sticky="w",
         )
+
+        self._sync_threshold_control_states()
+
+    def _create_threshold_switch(
+        self,
+        row: int,
+        text: str,
+        variable: tk.BooleanVar,
+    ) -> ctk.CTkSwitch:
+        switch = ctk.CTkSwitch(
+            self.params_frame,
+            text=text,
+            variable=variable,
+            onvalue=True,
+            offvalue=False,
+            command=self._sync_threshold_control_states,
+            font=FONTS["body"],
+        )
+        switch.grid(row=row, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        return switch
 
     def _create_threshold_slider(
         self,
@@ -197,6 +241,13 @@ class FeatureFilterWidget(BaseProcessingWidget):
         entry.bind("<FocusOut>", lambda _: on_apply())
         return entry
 
+    def _sync_threshold_control_states(self) -> None:
+        """Enable or disable threshold inputs based on each switch state."""
+        for variable, slider, entry in self._threshold_controls.values():
+            state = "normal" if variable.get() else "disabled"
+            slider.configure(state=state)
+            entry.configure(state=state)
+
     def _sync_entry_from_slider(self, value: float, entry: ctk.CTkEntry) -> None:
         value = self._clamp_threshold(value)
         if self.focus_get() is entry:
@@ -206,6 +257,9 @@ class FeatureFilterWidget(BaseProcessingWidget):
 
     def _commit_entry_to_slider(self, entry: ctk.CTkEntry, slider: ctk.CTkSlider) -> float:
         current = float(slider.get())
+        if entry.cget("state") == "disabled":
+            return self._clamp_threshold(current)
+
         text = entry.get().strip()
         try:
             parsed = self._clamp_threshold(float(text))
@@ -252,6 +306,10 @@ class FeatureFilterWidget(BaseProcessingWidget):
             "skew_threshold": self._apply_skew(),
             "diff_threshold": self._apply_diff(),
             "qc_ratio_threshold": self._apply_qc_ratio(),
+            "enable_background_threshold": bool(self.bg_enabled_var.get()),
+            "enable_skew_threshold": bool(self.skew_enabled_var.get()),
+            "enable_diff_threshold": bool(self.diff_enabled_var.get()),
+            "enable_qc_ratio_threshold": bool(self.qc_ratio_enabled_var.get()),
         }
 
     def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
@@ -265,6 +323,10 @@ class FeatureFilterWidget(BaseProcessingWidget):
             skew_threshold=params.get("skew_threshold"),
             diff_threshold=params.get("diff_threshold"),
             qc_ratio_threshold=params.get("qc_ratio_threshold"),
+            enable_background_threshold=params.get("enable_background_threshold", True),
+            enable_skew_threshold=params.get("enable_skew_threshold", True),
+            enable_diff_threshold=params.get("enable_diff_threshold", True),
+            enable_qc_ratio_threshold=params.get("enable_qc_ratio_threshold", True),
             protected_rows=set(
                 self._context.get("protected_rows") or self._context.get("red_font_rows") or []
             ),
