@@ -114,8 +114,9 @@ class FeatureFilter(BaseProcessor):
         self.update_progress(5, "Starting feature filtering...")
 
         try:
-            # Create a copy
-            result_df = df.copy()
+            # Create a copy – force object dtype so pandas 3.x StringDtype
+            # columns accept numeric write-back during imputation.
+            result_df = df.copy().astype(object)
             deleted_features = []
 
             # Step 1: Detect sample types
