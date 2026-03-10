@@ -202,12 +202,10 @@ class FeatureFilter(BaseProcessor):
             )
 
         except Exception as e:
-            import traceback
-            tb = traceback.format_exc()
             return ProcessingResult(
                 success=False,
                 errors=[str(e)],
-                message=f"Error during feature filtering: {str(e)}\n{tb}",
+                message=f"Error during feature filtering: {str(e)}",
             )
 
     def _detect_sample_types(self, df: pd.DataFrame) -> Dict[str, Any]:
@@ -554,8 +552,11 @@ class FeatureFilter(BaseProcessor):
                         stats["cells_imputed_from_nan"] += nan_count
                         stats["cells_imputed_from_zero"] += zero_count
 
-        # Write back to DataFrame
+        # Write back to DataFrame – coerce columns to object so that
+        # pandas 3.x StringDtype columns accept numeric values.
         if all_cols:
+            for col_idx in all_cols:
+                df.iloc[:, col_idx] = df.iloc[:, col_idx].astype(object)
             df.iloc[1:, all_cols] = block_values
 
         stats["imputed_cells"] = imputed_cells
