@@ -202,6 +202,8 @@ class FeatureFilter(BaseProcessor):
             )
 
         except Exception as e:
+            import traceback as _tb
+            _tb.print_exc()
             return ProcessingResult(
                 success=False,
                 errors=[str(e)],
