@@ -29,6 +29,6 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest tests/ -v --tb=long -x
+          pytest tests/ -v --tb=short -x
         env:
           PYTHONPATH: ms-core/src

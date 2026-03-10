@@ -114,9 +114,8 @@ class FeatureFilter(BaseProcessor):
         self.update_progress(5, "Starting feature filtering...")
 
         try:
-            # Create a copy – force object dtype so pandas 3.x StringDtype
-            # columns accept numeric write-back during imputation.
-            result_df = df.copy().astype(object)
+            # Create a copy
+            result_df = df.copy()
             deleted_features = []
 
             # Step 1: Detect sample types
@@ -202,7 +201,11 @@ class FeatureFilter(BaseProcessor):
             )
 
         except Exception as e:
-            raise  # temporary: let pytest show the full traceback
+            return ProcessingResult(
+                success=False,
+                errors=[str(e)],
+                message=f"Error during feature filtering: {str(e)}",
+            )
 
     def _detect_sample_types(self, df: pd.DataFrame) -> Dict[str, Any]:
         """
@@ -548,7 +551,7 @@ class FeatureFilter(BaseProcessor):
                         stats["cells_imputed_from_nan"] += nan_count
                         stats["cells_imputed_from_zero"] += zero_count
 
-        # Write back to DataFrame – coerce columns to object so that
+        # Write back to DataFrame — coerce each column to object first so
         # pandas 3.x StringDtype columns accept numeric values.
         if all_cols:
             for col_idx in all_cols:
