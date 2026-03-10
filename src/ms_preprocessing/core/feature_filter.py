@@ -202,10 +202,12 @@ class FeatureFilter(BaseProcessor):
             )
 
         except Exception as e:
+            import traceback
+            tb = traceback.format_exc()
             return ProcessingResult(
                 success=False,
                 errors=[str(e)],
-                message=f"Error during feature filtering: {str(e)}",
+                message=f"Error during feature filtering: {str(e)}\n{tb}",
             )
 
     def _detect_sample_types(self, df: pd.DataFrame) -> Dict[str, Any]:

@@ -205,7 +205,7 @@ class TestFeatureFilter:
 
         result = filter_proc.process(df, qc_ratio_threshold=0.0)
 
-        assert result.success
+        assert result.success, f"process failed: {result.message}"
         assert "cells_imputed" in result.statistics
         assert "cells_imputed_from_nan" in result.statistics
         assert "cells_imputed_from_zero" in result.statistics
