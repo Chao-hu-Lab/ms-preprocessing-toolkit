@@ -15,7 +15,7 @@ from .bootstrap_paths import ensure_ms_core_src_on_path
 
 ensure_ms_core_src_on_path(Path(__file__).resolve())
 
-__version__ = "1.1.0"
+__version__ = "1.1.2"
 __author__ = "Your Name"
 
 from ms_core.preprocessing.data_organizer import DataOrganizer
