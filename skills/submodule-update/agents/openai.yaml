@@ -1,0 +1,4 @@
+interface:
+  display_name: "Submodule Update"
+  short_description: "Safe ms-core commit, push, pointer update, and verification flow"
+  default_prompt: "Use $submodule-update when a change touches both ms-core and the top-level repository."

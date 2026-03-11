@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release Checklist"
+  short_description: "Safe version bump, tag, push, and release verification flow"
+  default_prompt: "Use $release-checklist to ship a verified release for this repository."

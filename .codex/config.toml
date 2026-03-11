@@ -1,0 +1,16 @@
+# Conservative repository defaults for Codex.
+# Keep auth, MCP credentials, and machine-specific trust settings in the
+# user's global config; keep repo behavior here.
+
+model = "gpt-5.4"
+model_reasoning_effort = "xhigh"
+personality = "pragmatic"
+
+[features]
+rmcp_client = true
+
+[windows]
+sandbox = "elevated"
+
+[tui]
+status_line = ["model-with-reasoning", "context-remaining", "current-dir"]
