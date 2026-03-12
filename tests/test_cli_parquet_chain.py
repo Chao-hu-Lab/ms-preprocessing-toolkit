@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 
 import pandas as pd
@@ -108,8 +107,8 @@ def _patch_cli_dependencies(monkeypatch, fake_handler: _FakeFileHandler) -> None
     monkeypatch.setattr(filter_module, "FeatureFilter", _DummyFeatureFilter)
 
 
-def test_cli_step_all_default_does_not_write_step_parquet_intermediates(monkeypatch) -> None:
-    with TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+def test_cli_step_all_default_does_not_write_step_parquet_intermediates(monkeypatch, project_temp_dir) -> None:
+    with project_temp_dir() as temp_dir:
         base = Path(temp_dir)
         df = pd.DataFrame(
             {
@@ -138,8 +137,8 @@ def test_cli_step_all_default_does_not_write_step_parquet_intermediates(monkeypa
         assert save_suffixes[-1] == ".xlsx"
 
 
-def test_cli_persist_intermediate_writes_parquet_to_internal_cache_not_output(monkeypatch) -> None:
-    with TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+def test_cli_persist_intermediate_writes_parquet_to_internal_cache_not_output(monkeypatch, project_temp_dir) -> None:
+    with project_temp_dir() as temp_dir:
         base = Path(temp_dir)
         cache_root = base / "internal-cache"
         monkeypatch.setenv("MSPTK_PARQUET_CACHE_ROOT", str(cache_root))
@@ -170,8 +169,8 @@ def test_cli_persist_intermediate_writes_parquet_to_internal_cache_not_output(mo
         assert all("OUTPUT" not in str(path) for path in parquet_saves)
 
 
-def test_cli_single_step_filter_accepts_parquet_input(monkeypatch) -> None:
-    with TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+def test_cli_single_step_filter_accepts_parquet_input(monkeypatch, project_temp_dir) -> None:
+    with project_temp_dir() as temp_dir:
         base = Path(temp_dir)
         df = pd.DataFrame(
             {

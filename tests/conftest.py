@@ -1,33 +1,63 @@
 """Pytest configuration and shared fixtures."""
 
-import pytest
-import pandas as pd
-import numpy as np
+from __future__ import annotations
+
+from contextlib import contextmanager
 from pathlib import Path
-import tempfile
+import shutil
 import sys
+import uuid
+
+import numpy as np
+import pandas as pd
+import pytest
 
 # Ensure src/ is on the import path for tests
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
+TMP_ROOT = ROOT / ".tmp"
+PROJECT_TEST_TEMP_ROOT = TMP_ROOT / "tests"
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 
-def pytest_configure(config):
-    """Redirect tmp_path base to project-local dir to avoid Windows Temp permission issues."""
-    if getattr(config.option, "basetemp", None) is None:
-        basetemp = ROOT / ".pytest-tmp"
-        config.option.basetemp = str(basetemp)
+@pytest.fixture(scope="session")
+def project_temp_root() -> Path:
+    """Central temp root for tests that need explicit temporary directories."""
+    PROJECT_TEST_TEMP_ROOT.mkdir(parents=True, exist_ok=True)
+    return PROJECT_TEST_TEMP_ROOT
 
 
 @pytest.fixture
-def temp_dir():
+def project_temp_dir(project_temp_root: Path):
+    """Factory for temporary directories kept under the repo-local temp root."""
+
+    @contextmanager
+    def _factory(prefix: str = "case-"):
+        temp_dir = project_temp_root / f"{prefix}{uuid.uuid4().hex}"
+        temp_dir.mkdir(parents=True, exist_ok=False)
+        try:
+            yield temp_dir
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+    return _factory
+
+
+@pytest.fixture
+def temp_dir(project_temp_dir):
     """Create a temporary directory for test files."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        yield Path(tmpdir)
+    with project_temp_dir(prefix="fixture-") as tmpdir:
+        yield tmpdir
+
+
+@pytest.fixture
+def tmp_path(project_temp_dir) -> Path:
+    """Override pytest's builtin tmp_path to avoid Windows temp ACL issues."""
+    with project_temp_dir(prefix="tmp-path-") as tmpdir:
+        yield tmpdir
 
 
 @pytest.fixture

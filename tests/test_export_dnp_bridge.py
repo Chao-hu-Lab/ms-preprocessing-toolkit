@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from types import ModuleType
 from unittest.mock import Mock
 import sys
@@ -80,8 +79,8 @@ def _make_window_for_export(tmp_dir: Path) -> MainWindow:
     return window
 
 
-def test_dnp_bridge_always_receives_xlsx_even_when_intermediates_are_parquet(monkeypatch) -> None:
-    with TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+def test_dnp_bridge_always_receives_xlsx_even_when_intermediates_are_parquet(monkeypatch, project_temp_dir) -> None:
+    with project_temp_dir() as temp_dir:
         base = Path(temp_dir)
         window = _make_window_for_export(base)
         parquet_step4 = base / "STEP4_input.parquet"
@@ -116,8 +115,8 @@ def test_dnp_bridge_always_receives_xlsx_even_when_intermediates_are_parquet(mon
         assert captured["source"].endswith(".xlsx")
 
 
-def test_final_export_materializes_xlsx_from_parquet_intermediate() -> None:
-    with TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+def test_final_export_materializes_xlsx_from_parquet_intermediate(project_temp_dir) -> None:
+    with project_temp_dir() as temp_dir:
         base = Path(temp_dir)
         window = _make_window_for_export(base)
         window._current_data = None

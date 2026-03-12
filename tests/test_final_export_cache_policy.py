@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -108,8 +107,8 @@ def _patch_cli_dependencies(monkeypatch, fake_handler: _FakeFileHandler) -> None
     monkeypatch.setattr(filter_module, "FeatureFilter", _DummyFeatureFilter)
 
 
-def test_cli_final_xlsx_save_does_not_request_parquet_cache_by_default(monkeypatch) -> None:
-    with TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+def test_cli_final_xlsx_save_does_not_request_parquet_cache_by_default(monkeypatch, project_temp_dir) -> None:
+    with project_temp_dir() as temp_dir:
         base = Path(temp_dir)
         df = pd.DataFrame(
             {
@@ -132,8 +131,8 @@ def test_cli_final_xlsx_save_does_not_request_parquet_cache_by_default(monkeypat
         assert last_save[2].get("save_parquet_cache") is False
 
 
-def test_gui_final_export_does_not_request_parquet_cache_by_default() -> None:
-    with TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+def test_gui_final_export_does_not_request_parquet_cache_by_default(project_temp_dir) -> None:
+    with project_temp_dir() as temp_dir:
         base = Path(temp_dir)
         window = MainWindow.__new__(MainWindow)
         window._output_dir = base

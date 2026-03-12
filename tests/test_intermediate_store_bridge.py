@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from tempfile import TemporaryDirectory
-
 import pandas as pd
 
 
-def test_toolkit_file_handler_uses_intermediate_store_for_parquet_paths() -> None:
+def test_toolkit_file_handler_uses_intermediate_store_for_parquet_paths(project_temp_dir) -> None:
     from ms_preprocessing.utils.file_handler import FileHandler
 
     df = pd.DataFrame(
@@ -19,7 +17,7 @@ def test_toolkit_file_handler_uses_intermediate_store_for_parquet_paths() -> Non
     )
     handler = FileHandler()
 
-    with TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+    with project_temp_dir() as temp_dir:
         parquet_path = Path(temp_dir) / "step2.parquet"
         handler.save_data(
             df=df,

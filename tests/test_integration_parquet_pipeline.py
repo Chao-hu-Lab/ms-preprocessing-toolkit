@@ -3,19 +3,20 @@
 from __future__ import annotations
 
 from pathlib import Path
-from tempfile import TemporaryDirectory
-
 import pandas as pd
 
 from ms_core.utils.file_handler import FileHandler
 
 
-def test_parquet_pipeline_preserves_output_schema_and_key_metadata() -> None:
+def test_parquet_pipeline_preserves_output_schema_and_key_metadata(monkeypatch, project_temp_dir) -> None:
     from scripts.benchmark_pipeline_io import run_benchmark
 
-    with TemporaryDirectory(dir=Path.cwd()) as temp_dir:
+    with project_temp_dir() as temp_dir:
         base = Path(temp_dir)
+        cache_root = base / "internal-cache"
+        monkeypatch.setenv("MSPTK_PARQUET_CACHE_ROOT", str(cache_root))
         input_path = base / "input.parquet"
+        output_path = base / "BENCH_input.xlsx"
         df = pd.DataFrame(
             {
                 "Mz/RT": ["Sample_Type", "100.1/1.0"],
@@ -33,7 +34,7 @@ def test_parquet_pipeline_preserves_output_schema_and_key_metadata() -> None:
             blue_font_cells=[(1, 1)],
         )
 
-        result = run_benchmark(input_path=input_path, dry_run=False)
+        result = run_benchmark(input_path=input_path, output_path=output_path, dry_run=False)
 
         assert result["schema_invariant_ok"] is True
         assert result["metadata_invariant_ok"] is True
