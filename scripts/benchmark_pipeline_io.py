@@ -11,6 +11,12 @@ from ms_core.preprocessing.settings import Settings
 from ms_core.utils.file_handler import FileHandler
 
 
+DEFAULT_METHOD_FILE = Path(
+    r"C:\Users\user\Desktop\NTU cancer\2025台大乳癌組織數據for Jia\20260105中研院台大Breast cancer tissue\20260105 中研院分析.docx"
+)
+DEFAULT_ISTD_RECORD_FILE = Path(
+    r"C:\Users\user\Desktop\NTU cancer\2025台大乳癌組織數據for Jia\20260105中研院台大Breast cancer tissue\20260106 ISDTs record.xlsx"
+)
 METADATA_KEYS = (
     "red_font_rows",
     "blue_font_cells",
@@ -56,11 +62,17 @@ def run_benchmark(
     """Run pipeline I/O benchmark with cold/warm comparison and invariants."""
     start = perf_counter()
     input_path = Path(input_path)
+    method_file_obj = Path(method_file) if method_file else DEFAULT_METHOD_FILE
+    istd_record_file_obj = (
+        Path(istd_record_file) if istd_record_file else DEFAULT_ISTD_RECORD_FILE
+    )
 
     if dry_run:
         return {
             "input_path": str(input_path),
             "output_path": str(output_path) if output_path else "",
+            "method_file": str(method_file_obj),
+            "istd_record_file": str(istd_record_file_obj),
             "load_s": 0.0,
             "step_times": _empty_step_times(),
             "save_s": 0.0,
@@ -149,8 +161,8 @@ def run_benchmark(
     return {
         "input_path": str(input_path),
         "output_path": str(output_path_obj),
-        "method_file": str(method_file) if method_file else "",
-        "istd_record_file": str(istd_record_file) if istd_record_file else "",
+        "method_file": str(method_file_obj),
+        "istd_record_file": str(istd_record_file_obj),
         "mz_tol": float(mz_tol),
         "rt_tol": float(rt_tol),
         "load_s": float(load_s),
@@ -176,8 +188,16 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Benchmark unified parquet intermediate pipeline I/O.")
     parser.add_argument("--input", required=True, help="Input dataset path.")
     parser.add_argument("--output", help="Optional benchmark output path (.xlsx).")
-    parser.add_argument("--method-file", help="Optional method file path (.docx).")
-    parser.add_argument("--istd-record-file", help="Optional ISTD record file path (.xlsx).")
+    parser.add_argument(
+        "--method-file",
+        default=str(DEFAULT_METHOD_FILE),
+        help="Method file path (.docx). Defaults to the fixed benchmark reference file.",
+    )
+    parser.add_argument(
+        "--istd-record-file",
+        default=str(DEFAULT_ISTD_RECORD_FILE),
+        help="ISTD record file path (.xlsx). Defaults to the fixed benchmark reference file.",
+    )
     parser.add_argument("--mz-tol", type=float, default=20.0, help="m/z tolerance (ppm).")
     parser.add_argument("--rt-tol", type=float, default=1.5, help="RT tolerance (minutes).")
     parser.add_argument("--dry-run", action="store_true", help="Return empty benchmark contract.")
@@ -199,6 +219,8 @@ def main() -> int:
     for key in [
         "input_path",
         "output_path",
+        "method_file",
+        "istd_record_file",
         "load_s",
         "save_s",
         "cold_load_s",
