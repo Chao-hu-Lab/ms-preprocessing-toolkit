@@ -88,6 +88,13 @@ python -c "from ms_preprocessing import __version__; print(__version__)"
 pyinstaller ms-preprocessing.spec --clean --noconfirm
 ```
 
+## Root Hygiene Rules
+
+- Do not write test temp directories into the repository root with `TemporaryDirectory(dir=Path.cwd())`.
+- For top-level tests, use the fixtures in `tests/conftest.py`; for `ms-core`, use `ms-core/tests/conftest.py`.
+- If pytest/temp/cache behavior changes, use `skills/root-hygiene/SKILL.md` and verify that root-level `tmp*` and `.pytest*` clutter no longer appears.
+- Use `scripts/clean_local_artifacts.ps1` for routine cleanup; treat leftover blocked temp folders as a local environment issue and report them explicitly.
+
 ## Review Rules
 
 When asked to review:
@@ -138,6 +145,7 @@ Relevant workflows:
   - `skills/release-checklist/SKILL.md`
   - `skills/submodule-update/SKILL.md`
   - `skills/commit-outline/SKILL.md`
+  - `skills/root-hygiene/SKILL.md`
 
 Candidate future skills:
 
