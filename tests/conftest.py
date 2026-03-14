@@ -11,6 +11,7 @@ import uuid
 import numpy as np
 import pandas as pd
 import pytest
+import customtkinter as ctk
 
 # Ensure src/ is on the import path for tests
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,6 +22,17 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
+
+
+@pytest.fixture(scope="session")
+def ctk_root():
+    """Shared CTk root to avoid multi-root Tcl instability on Windows."""
+    root = ctk.CTk()
+    root.withdraw()
+    try:
+        yield root
+    finally:
+        root.destroy()
 
 
 @pytest.fixture(scope="session")

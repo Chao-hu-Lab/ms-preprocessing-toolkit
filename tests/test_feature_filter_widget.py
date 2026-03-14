@@ -2,23 +2,12 @@
 
 from __future__ import annotations
 
-import customtkinter as ctk
 import pandas as pd
 import pytest
 
-from ms_core.preprocessing.base import ProcessingResult
+from ms_preprocessing.adapters import feature_filter as feature_filter_adapter
 from ms_preprocessing.gui.widgets.feature_filter_widget import FeatureFilterWidget
-
-
-@pytest.fixture(scope="module")
-def ctk_root():
-    root = ctk.CTk()
-    root.withdraw()
-    try:
-        yield root
-    finally:
-        root.destroy()
-
+from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
 
 @pytest.fixture
 def widget(ctk_root):
@@ -53,14 +42,21 @@ def test_feature_filter_widget_disables_matching_inputs_when_toggle_is_off(widge
     assert widget.get_parameters()["enable_background_threshold"] is False
 
 
-def test_feature_filter_widget_run_processing_passes_toggle_flags(widget) -> None:
+def test_feature_filter_widget_run_processing_passes_toggle_flags(widget, monkeypatch) -> None:
     captured: dict[str, object] = {}
 
-    def fake_process(data, **kwargs):
+    def fake_run_from_df(data, **kwargs):
         captured.update(kwargs)
-        return ProcessingResult(success=True, data=data.copy(), statistics={}, metadata={})
+        return ProcessingResult(
+            success=True,
+            step="feature_filter",
+            output_path=None,
+            data=data.copy(),
+            metadata=ProcessingMetadata(),
+            statistics={},
+        )
 
-    widget._processor.process = fake_process
+    monkeypatch.setattr(feature_filter_adapter, "run_from_df", fake_run_from_df)
     input_df = pd.DataFrame(
         {
             "Mz/RT": ["Sample_Type", "100.0/1.0"],

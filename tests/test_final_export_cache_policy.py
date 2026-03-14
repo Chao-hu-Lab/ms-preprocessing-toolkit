@@ -10,50 +10,7 @@ import pandas as pd
 
 from ms_preprocessing.gui.main_window import MainWindow
 from ms_preprocessing.main import run_cli
-
-
-class _FakeResult:
-    def __init__(self, data: pd.DataFrame, metadata: dict | None = None) -> None:
-        self.success = True
-        self.data = data
-        self.message = ""
-        self.statistics = {}
-        self.metadata = metadata or {}
-
-
-class _DummyDataOrganizer:
-    def process(self, data: pd.DataFrame, **kwargs) -> _FakeResult:
-        _ = kwargs
-        return _FakeResult(data.copy(), metadata={"sample_info": None})
-
-
-class _DummyISTDMarker:
-    def __init__(self) -> None:
-        self.config = SimpleNamespace(default_ppm_tolerance=20.0, default_rt_tolerance=1.0)
-
-    def process(self, data: pd.DataFrame, **kwargs) -> _FakeResult:
-        _ = kwargs
-        return _FakeResult(data.copy(), metadata={"red_font_rows": [], "protected_rows": []})
-
-
-class _DummyDuplicateRemover:
-    def process(self, data: pd.DataFrame, **kwargs) -> _FakeResult:
-        _ = kwargs
-        return _FakeResult(data.copy(), metadata={"red_font_rows": [], "protected_rows": []})
-
-
-class _DummyFeatureFilter:
-    def process(self, data: pd.DataFrame, **kwargs) -> _FakeResult:
-        _ = kwargs
-        return _FakeResult(
-            data.copy(),
-            metadata={
-                "red_font_rows": [],
-                "protected_rows": [],
-                "blue_font_cells": [],
-                "deleted_features": [],
-            },
-        )
+from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
 
 
 class _FakeFileHandler:
@@ -94,17 +51,62 @@ def _make_cli_args(input_path: Path, output_path: Path) -> SimpleNamespace:
 
 
 def _patch_cli_dependencies(monkeypatch, fake_handler: _FakeFileHandler) -> None:
-    import ms_core.utils.file_handler as file_handler_module
-    import ms_core.preprocessing.data_organizer as organizer_module
-    import ms_core.preprocessing.istd_marker as istd_module
-    import ms_core.preprocessing.duplicate_remover as duplicate_module
-    import ms_core.preprocessing.ms_quality_filter as filter_module
+    import ms_preprocessing.adapters.data_organizer as organizer_module
+    import ms_preprocessing.adapters.istd_marker as istd_module
+    import ms_preprocessing.adapters.duplicate_remover as duplicate_module
+    import ms_preprocessing.adapters.feature_filter as filter_module
+    import ms_preprocessing.utils.file_handler as file_handler_module
 
     monkeypatch.setattr(file_handler_module, "FileHandler", lambda: fake_handler)
-    monkeypatch.setattr(organizer_module, "DataOrganizer", _DummyDataOrganizer)
-    monkeypatch.setattr(istd_module, "ISTDMarker", _DummyISTDMarker)
-    monkeypatch.setattr(duplicate_module, "DuplicateRemover", _DummyDuplicateRemover)
-    monkeypatch.setattr(filter_module, "FeatureFilter", _DummyFeatureFilter)
+    monkeypatch.setattr(
+        organizer_module,
+        "run_from_df",
+        lambda data, **kwargs: ProcessingResult(
+            success=True,
+            step="data_organizer",
+            output_path=None,
+            data=data.copy(),
+            metadata=ProcessingMetadata(sample_info=None),
+        ),
+    )
+    monkeypatch.setattr(
+        istd_module,
+        "run_from_df",
+        lambda data, **kwargs: ProcessingResult(
+            success=True,
+            step="istd_marker",
+            output_path=None,
+            data=data.copy(),
+            metadata=ProcessingMetadata(red_font_rows=set(), protected_rows=set()),
+        ),
+    )
+    monkeypatch.setattr(
+        duplicate_module,
+        "run_from_df",
+        lambda data, **kwargs: ProcessingResult(
+            success=True,
+            step="duplicate_remover",
+            output_path=None,
+            data=data.copy(),
+            metadata=ProcessingMetadata(red_font_rows=set(), protected_rows=set()),
+        ),
+    )
+    monkeypatch.setattr(
+        filter_module,
+        "run_from_df",
+        lambda data, **kwargs: ProcessingResult(
+            success=True,
+            step="feature_filter",
+            output_path=None,
+            data=data.copy(),
+            metadata=ProcessingMetadata(
+                red_font_rows=set(),
+                protected_rows=set(),
+                blue_font_cells=[],
+                deleted_feature_df=None,
+            ),
+        ),
+    )
 
 
 def test_cli_final_xlsx_save_does_not_request_parquet_cache_by_default(monkeypatch, project_temp_dir) -> None:

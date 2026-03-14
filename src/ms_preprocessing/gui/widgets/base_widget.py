@@ -9,6 +9,7 @@ import pandas as pd
 
 from ms_preprocessing.gui.styles import COLORS, FONTS, PADDING, DIMENSIONS
 from ms_preprocessing.utils.perf import take_snapshot, format_perf_delta
+from ms_preprocessing.utils.results import ProcessingResult
 
 
 class BaseProcessingWidget(ctk.CTkFrame, ABC):
@@ -54,6 +55,7 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         self._on_progress = on_progress
         self._data: Optional[pd.DataFrame] = None
         self._result: Optional[pd.DataFrame] = None
+        self._processing_result: Optional[ProcessingResult] = None
         self._context: dict = {}
         self._last_metadata: dict = {}
         self._last_parameters: dict = {}
@@ -205,6 +207,10 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         """Get the processing result."""
         return self._result
 
+    def get_processing_result(self) -> Optional[ProcessingResult]:
+        """Get the typed processing result from the latest run."""
+        return self._processing_result
+
     def get_last_parameters(self) -> dict:
         """Get parameters used by the latest run."""
         return dict(self._last_parameters)
@@ -244,6 +250,7 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
             self.log(f"Starting with parameters: {params}")
 
             self._last_metadata = {}
+            self._processing_result = None
             self._result = self.run_processing(self._data, **params)
 
             self.update_progress(100, "Complete!")
@@ -267,6 +274,7 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
     def _on_reset_clicked(self) -> None:
         """Handle reset button click."""
         self._result = None
+        self._processing_result = None
         self._last_metadata = {}
         self.update_progress(0, "Ready")
         self.log("Reset")

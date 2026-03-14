@@ -16,8 +16,8 @@ import numpy as np
 from openpyxl import load_workbook
 from openpyxl.styles import Font, PatternFill, Color
 
-from ms_core.preprocessing.settings import Settings
-from ms_core.utils.intermediate_store import IntermediateStore
+from ms_preprocessing.config.settings import Settings
+from ms_preprocessing.utils.intermediate_store import IntermediateStore
 
 logger = logging.getLogger(__name__)
 

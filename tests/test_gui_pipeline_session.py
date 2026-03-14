@@ -95,3 +95,42 @@ def test_gui_parameters_are_collected_in_single_pipeline_session_context(tmp_pat
     assert snapshot["step_parameters"][3]["enable_qc_ratio_threshold"] is False
     assert snapshot["metadata_refs"]["sample_info_ref"] == "SampleInfo"
     assert snapshot["metadata_refs"]["deleted_feature_ref"] == "deleted_feature"
+
+
+def test_update_from_result_merges_metadata_and_tracks_completed_steps(tmp_path) -> None:
+    from ms_preprocessing.gui.pipeline_session import PipelineSession
+    from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
+
+    base = tmp_path
+    session = PipelineSession(output_dir=base, source_file=base / "input.xlsx")
+    sample_info = pd.DataFrame({"Sample_Name": ["A"]})
+
+    session.update_from_result(
+        ProcessingResult(
+            success=True,
+            step="data_organizer",
+            output_path=str(base / "step1.parquet"),
+            data=None,
+            metadata=ProcessingMetadata(
+                red_font_rows={1},
+                protected_rows={1},
+                sample_info=sample_info,
+            ),
+        )
+    )
+    session.update_from_result(
+        ProcessingResult(
+            success=True,
+            step="duplicate_remover",
+            output_path=str(base / "step3.parquet"),
+            data=None,
+            metadata=ProcessingMetadata(protected_rows={2}),
+        )
+    )
+
+    assert session.can_run_step("duplicate_remover") is True
+    assert session.can_run_step("feature_filter") is True
+    assert session.completed_steps == {"data_organizer", "duplicate_remover"}
+    assert session.metadata.sample_info is sample_info
+    assert session.context["sample_info"] is sample_info
+    assert session.step_outputs["data_organizer"].endswith("step1.parquet")

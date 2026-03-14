@@ -20,3 +20,7 @@ def test_project_temp_dir_factory_creates_dirs_under_dot_tmp(project_temp_dir) -
 
 def test_cleanup_script_exists() -> None:
     assert Path("scripts/clean_local_artifacts.ps1").exists()
+
+
+def test_legacy_core_boundary_directory_removed() -> None:
+    assert not Path("src/ms_preprocessing/core").exists()
