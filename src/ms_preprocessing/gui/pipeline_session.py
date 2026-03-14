@@ -38,6 +38,7 @@ class PipelineSession:
             "sample_info_ref": None,
             "deleted_feature_ref": None,
         }
+        # TODO(arch-refactor): retire this legacy dict once GUI consumers read ProcessingMetadata directly.
         self.context: dict[str, Any] = {}
         self._sync_context_from_metadata()
 
@@ -118,15 +119,18 @@ class PipelineSession:
 
         new_metadata = result.metadata
         if new_metadata.red_font_rows:
-            self.metadata.red_font_rows = set(new_metadata.red_font_rows)
+            self.metadata.red_font_rows |= set(new_metadata.red_font_rows)
         if new_metadata.protected_rows:
-            self.metadata.protected_rows = set(new_metadata.protected_rows)
+            self.metadata.protected_rows |= set(new_metadata.protected_rows)
         elif new_metadata.red_font_rows:
-            self.metadata.protected_rows = set(new_metadata.red_font_rows)
+            self.metadata.protected_rows |= set(new_metadata.red_font_rows)
         if new_metadata.blue_font_cells:
-            self.metadata.blue_font_cells = list(new_metadata.blue_font_cells)
+            self.metadata.blue_font_cells = self._merge_sequence(
+                self.metadata.blue_font_cells,
+                new_metadata.blue_font_cells,
+            )
         if new_metadata.highlight_rows:
-            self.metadata.highlight_rows = set(new_metadata.highlight_rows)
+            self.metadata.highlight_rows |= set(new_metadata.highlight_rows)
         if new_metadata.sample_info is not None:
             self.metadata.sample_info = new_metadata.sample_info
             self._metadata_refs["sample_info_ref"] = "SampleInfo"
@@ -189,7 +193,7 @@ class PipelineSession:
         }
 
     def _sync_context_from_metadata(self) -> None:
-        self.context = {
+        next_context = {
             "red_font_rows": set(self.metadata.red_font_rows),
             "protected_rows": set(self.metadata.protected_rows),
             "blue_font_cells": list(self.metadata.blue_font_cells),
@@ -198,6 +202,8 @@ class PipelineSession:
             "deleted_feature_df": self.metadata.deleted_feature_df,
             "metadata_refs": dict(self._metadata_refs),
         }
+        self.context.clear()
+        self.context.update(next_context)
 
     def _sync_metadata_from_context(self) -> None:
         self.metadata.red_font_rows = set(self.context.get("red_font_rows") or [])
@@ -213,6 +219,14 @@ class PipelineSession:
             deleted_feature_df if isinstance(deleted_feature_df, pd.DataFrame) else None
         )
         self._metadata_refs = dict(self.context.get("metadata_refs", self._metadata_refs))
+
+    @staticmethod
+    def _merge_sequence(existing: list[Any], incoming: list[Any]) -> list[Any]:
+        merged = list(existing)
+        for value in incoming:
+            if value not in merged:
+                merged.append(value)
+        return merged
 
     @staticmethod
     def _get_base_stem(path: Path | None) -> str:

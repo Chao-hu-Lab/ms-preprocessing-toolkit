@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pandas as pd
+
 from ms_preprocessing.adapters import data_organizer
 from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
 
@@ -23,10 +25,20 @@ class TestDataOrganizerAdapter:
         assert result.metadata.red_font_rows == set()
         assert result.metadata.protected_rows == set()
 
-    def test_valid_input_returns_processing_result(self, sample_excel_file) -> None:
-        result = data_organizer.run(str(sample_excel_file))
+    def test_valid_input_returns_processing_result(self) -> None:
+        df = pd.DataFrame(
+            {
+                "Mz": [100.1234, 200.5678],
+                "RT": [1.5, 2.5],
+                "Sample1": [1000, 1100],
+                "Sample2": [1200, 1300],
+                "QC1": [1050, 1150],
+            }
+        )
+        result = data_organizer.run_from_df(df)
 
         assert isinstance(result, ProcessingResult)
+        assert result.success is True
         assert result.step == "data_organizer"
         assert isinstance(result.metadata, ProcessingMetadata)
         assert isinstance(result.metadata.red_font_rows, set)

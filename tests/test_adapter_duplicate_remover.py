@@ -26,6 +26,7 @@ class TestDuplicateRemoverAdapter:
         result = duplicate_remover.run(str(sample_excel_file))
 
         assert isinstance(result, ProcessingResult)
+        assert result.success is True
         assert isinstance(result.metadata, ProcessingMetadata)
         assert isinstance(result.metadata.red_font_rows, set)
         assert isinstance(result.metadata.protected_rows, set)

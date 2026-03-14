@@ -19,6 +19,7 @@ class TestFeatureFilterAdapter:
     def test_valid_input_metadata_types(self, sample_excel_file) -> None:
         result = feature_filter.run(str(sample_excel_file))
 
+        assert result.success is True
         assert isinstance(result.metadata, ProcessingMetadata)
         assert isinstance(result.metadata.red_font_rows, set)
 

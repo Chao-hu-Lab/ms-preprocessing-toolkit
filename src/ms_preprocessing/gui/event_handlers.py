@@ -9,26 +9,64 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox
-from typing import Optional
+from typing import TYPE_CHECKING, Any, Optional, Protocol
 
 import pandas as pd
 
+from ms_preprocessing.config.settings import Settings
 from ms_preprocessing.gui.pipeline_session import PipelineSession
 from ms_preprocessing.gui.styles import COLORS
 
 
-class MainWindowEventHandlersMixin:
-    """Encapsulate file loading, step execution, and export flows."""
+if TYPE_CHECKING:
+    class _MainWindowEventHost(Protocol):
+        """Document the attributes and callbacks MainWindowEventHandlersMixin expects."""
 
-    def _new_pipeline_session(self, source_file: Path | None) -> PipelineSession:
+        _output_dir: Path
+        _project_root: Path
+        _file_handler: Any
+        _current_data: pd.DataFrame | None
+        _original_data: pd.DataFrame | None
+        _source_file: Path | None
+        _current_step: int
+        _completed_steps: set[int]
+        _last_completed_step: int | None
+        _last_run_all: bool
+        _last_materialized_export_path: Path | None
+        _pipeline_session: PipelineSession
+        _step_output_paths: dict[int, Path]
+        _context: dict[str, Any]
+        step_widgets: list[Any]
+        step_buttons: list[Any]
+        _step_status_labels: list[Any]
+        export_dnp_btn: Any
+        log_text: Any
+
+        def _show_step(self, step_index: int) -> None: ...
+        def update_idletasks(self) -> None: ...
+        def configure(self, *args: Any, **kwargs: Any) -> None: ...
+
+
+class MainWindowEventHandlersMixin:
+    """Encapsulate file loading, step execution, and export flows.
+
+    Expected host attributes and callbacks are documented by
+    ``_MainWindowEventHost`` above.
+    """
+
+    def _new_pipeline_session(self: "_MainWindowEventHost", source_file: Path | None) -> PipelineSession:
         return PipelineSession(output_dir=self._output_dir, source_file=source_file)
 
-    def _attach_pipeline_session(self, session: PipelineSession) -> None:
+    def _attach_pipeline_session(self: "_MainWindowEventHost", session: PipelineSession) -> None:
         self._pipeline_session = session
         self._step_output_paths = session.step_output_paths
         self._context = session.context
 
-    def _load_file_for_step(self, step_index: int, path: Optional[Path] = None) -> None:
+    def _load_file_for_step(
+        self: "_MainWindowEventHost",
+        step_index: int,
+        path: Optional[Path] = None,
+    ) -> None:
         filetypes = [
             ("Excel files", "*.xlsx *.xls"),
             ("Parquet files", "*.parquet"),
@@ -99,14 +137,14 @@ class MainWindowEventHandlersMixin:
             self._log(f"Error loading file: {exc}")
             self._show_error(f"Failed to load file:\n{exc}")
 
-    def _show_error(self, message: str) -> None:
+    def _show_error(self: "_MainWindowEventHost", message: str) -> None:
         self._log(f"ERROR: {message}")
         try:
             messagebox.showerror("Error", message)
         except Exception:
             pass
 
-    def _switch_step(self, step_index: int) -> None:
+    def _switch_step(self: "_MainWindowEventHost", step_index: int) -> None:
         if step_index < 0 or step_index >= len(self.step_widgets):
             return
 
@@ -127,15 +165,19 @@ class MainWindowEventHandlersMixin:
                 button.configure(fg_color="transparent")
                 status_label.configure(text="-", text_color="#4a6fa5")
 
-    def _run_current_step(self) -> None:
+    def _run_current_step(self: "_MainWindowEventHost") -> None:
         if 0 <= self._current_step < len(self.step_widgets):
             self.step_widgets[self._current_step]._on_run_clicked()
 
-    def _reset_current_step(self) -> None:
+    def _reset_current_step(self: "_MainWindowEventHost") -> None:
         if 0 <= self._current_step < len(self.step_widgets):
             self.step_widgets[self._current_step]._on_reset_clicked()
 
-    def _on_step_complete(self, result_data: pd.DataFrame, metadata: Optional[dict] = None) -> None:
+    def _on_step_complete(
+        self: "_MainWindowEventHost",
+        result_data: pd.DataFrame,
+        metadata: Optional[dict] = None,
+    ) -> None:
         self._current_data = result_data
         current_widget = self.step_widgets[self._current_step]
         self._pipeline_session.record_step_parameters(
@@ -171,7 +213,7 @@ class MainWindowEventHandlersMixin:
                 self.step_widgets[next_step].set_input_file(str(output_path))
             self._log(f"Data passed to Step {next_step + 1}")
 
-    def _run_all_steps(self) -> None:
+    def _run_all_steps(self: "_MainWindowEventHost") -> None:
         if self._current_data is None or self._original_data is None:
             self._log("Error: Please load a file first")
             return
@@ -181,6 +223,11 @@ class MainWindowEventHandlersMixin:
             data = self._original_data.copy()
 
             for index, widget in enumerate(self.step_widgets):
+                step_name = Settings.WORKFLOW_STEPS[index][0]
+                if not self._pipeline_session.can_run_step(step_name):
+                    raise RuntimeError(
+                        f"Cannot run Step {index + 1} ({step_name}) before its prerequisites are complete."
+                    )
                 self._current_step = index
                 self._log(f"Running Step {index + 1}...")
                 widget.set_data(data)
@@ -217,7 +264,7 @@ class MainWindowEventHandlersMixin:
         finally:
             self._switch_step(min(original_step, len(self.step_widgets) - 1))
 
-    def _export_results(self) -> Optional[Path]:
+    def _export_results(self: "_MainWindowEventHost") -> Optional[Path]:
         if self._current_data is None:
             materialized = self._materialize_final_xlsx_from_latest_step()
             if materialized is None:
@@ -232,11 +279,12 @@ class MainWindowEventHandlersMixin:
         )
 
         try:
+            session_context = self._pipeline_session.context
             extra_sheets: dict[str, pd.DataFrame] = {}
-            sample_info = self._context.get("sample_info")
+            sample_info = session_context.get("sample_info")
             if sample_info is not None:
                 extra_sheets["SampleInfo"] = sample_info
-            deleted_df = self._context.get("deleted_feature_df")
+            deleted_df = session_context.get("deleted_feature_df")
             if isinstance(deleted_df, pd.DataFrame) and not deleted_df.empty:
                 extra_sheets["deleted_feature"] = deleted_df
 
@@ -244,9 +292,9 @@ class MainWindowEventHandlersMixin:
                 self._current_data,
                 filepath,
                 sheet_name="RawIntensity",
-                highlight_rows=self._context.get("highlight_rows"),
-                blue_font_cells=self._context.get("blue_font_cells"),
-                red_font_rows=self._context.get("red_font_rows"),
+                highlight_rows=session_context.get("highlight_rows"),
+                blue_font_cells=session_context.get("blue_font_cells"),
+                red_font_rows=session_context.get("red_font_rows"),
                 extra_sheets=extra_sheets or None,
                 save_parquet_cache=False,
             )
@@ -257,7 +305,7 @@ class MainWindowEventHandlersMixin:
             self._log(f"Export error: {exc}")
             return None
 
-    def _update_export_dnp_btn(self) -> None:
+    def _update_export_dnp_btn(self: "_MainWindowEventHost") -> None:
         ready = self._last_completed_step is not None and self._last_completed_step >= 3
         if ready:
             self.export_dnp_btn.configure(
@@ -272,7 +320,7 @@ class MainWindowEventHandlersMixin:
                 fg_color="#6b7280",
             )
 
-    def _export_to_dnp(self) -> None:
+    def _export_to_dnp(self: "_MainWindowEventHost") -> None:
         if self._last_completed_step is None or self._last_completed_step < 3:
             messagebox.showwarning(
                 "Not Ready",
@@ -334,7 +382,7 @@ class MainWindowEventHandlersMixin:
             self.export_dnp_btn.configure(text=original_text, state="normal")
             self._update_export_dnp_btn()
 
-    def _materialize_final_xlsx_from_latest_step(self) -> Optional[Path]:
+    def _materialize_final_xlsx_from_latest_step(self: "_MainWindowEventHost") -> Optional[Path]:
         if self._last_completed_step is None:
             return None
         source_path = self._step_output_paths.get(self._last_completed_step)
@@ -359,11 +407,12 @@ class MainWindowEventHandlersMixin:
             self._context = self._pipeline_session.context
             self._current_data = data
 
+            session_context = self._pipeline_session.context
             extra_sheets: dict[str, pd.DataFrame] = {}
-            sample_info = self._context.get("sample_info")
+            sample_info = session_context.get("sample_info")
             if sample_info is not None:
                 extra_sheets["SampleInfo"] = sample_info
-            deleted_df = self._context.get("deleted_feature_df")
+            deleted_df = session_context.get("deleted_feature_df")
             if isinstance(deleted_df, pd.DataFrame) and not deleted_df.empty:
                 extra_sheets["deleted_feature"] = deleted_df
 
@@ -371,9 +420,9 @@ class MainWindowEventHandlersMixin:
                 data,
                 target_path,
                 sheet_name="RawIntensity",
-                highlight_rows=self._context.get("highlight_rows"),
-                blue_font_cells=self._context.get("blue_font_cells"),
-                red_font_rows=self._context.get("red_font_rows"),
+                highlight_rows=session_context.get("highlight_rows"),
+                blue_font_cells=session_context.get("blue_font_cells"),
+                red_font_rows=session_context.get("red_font_rows"),
                 extra_sheets=extra_sheets or None,
                 save_parquet_cache=False,
             )
@@ -385,7 +434,7 @@ class MainWindowEventHandlersMixin:
             self._log(f"Materialization error: {exc}")
             return None
 
-    def _launch_dnp(self) -> None:
+    def _launch_dnp(self: "_MainWindowEventHost") -> None:
         desktop = Path.home() / "Desktop"
         candidates = [
             desktop / "Data_Normalization_project_v2" / "src" / "metabolomics" / "__main__.py",
@@ -403,7 +452,11 @@ class MainWindowEventHandlersMixin:
             "Could not find Data_Normalization_project_v2.\nPlease launch it manually.",
         )
 
-    def _save_step_output(self, step_index: int, data: pd.DataFrame) -> Optional[Path]:
+    def _save_step_output(
+        self: "_MainWindowEventHost",
+        step_index: int,
+        data: pd.DataFrame,
+    ) -> Optional[Path]:
         if data is None:
             return None
         try:
@@ -419,7 +472,7 @@ class MainWindowEventHandlersMixin:
             self._log(f"Auto-save error: {exc}")
             return None
 
-    def _open_output_folder(self) -> None:
+    def _open_output_folder(self: "_MainWindowEventHost") -> None:
         try:
             self._output_dir.mkdir(parents=True, exist_ok=True)
             system = platform.system()
@@ -432,14 +485,17 @@ class MainWindowEventHandlersMixin:
         except Exception as exc:
             self._log(f"Open output folder error: {exc}")
 
-    def _log(self, message: str) -> None:
+    def _log(self: "_MainWindowEventHost", message: str) -> None:
         timestamp = datetime.now().strftime("%H:%M:%S")
         self.log_text.insert("end", f"[{timestamp}] {message}\n")
         self.log_text.see("end")
 
-    def _clear_log(self) -> None:
+    def _clear_log(self: "_MainWindowEventHost") -> None:
         self.log_text.delete("1.0", "end")
 
-    def _update_context_from_metadata(self, metadata: Optional[dict]) -> None:
+    def _update_context_from_metadata(
+        self: "_MainWindowEventHost",
+        metadata: Optional[dict],
+    ) -> None:
         self._pipeline_session.update_context_from_metadata(metadata)
         self._context = self._pipeline_session.context

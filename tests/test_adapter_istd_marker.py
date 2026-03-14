@@ -25,6 +25,7 @@ class TestISTDMarkerAdapter:
         result = istd_marker.run(str(sample_excel_file))
 
         assert isinstance(result, ProcessingResult)
+        assert result.success is True
         assert result.step == "istd_marker"
         assert isinstance(result.metadata, ProcessingMetadata)
         assert isinstance(result.metadata.red_font_rows, set)

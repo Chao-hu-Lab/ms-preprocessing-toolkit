@@ -116,6 +116,7 @@ class Settings:
     # GUI Settings
     WINDOW_TITLE = "MS Preprocessing Toolkit"
     WINDOW_SIZE = (1280, 800)
+    WINDOW_MIN_SIZE = (1000, 650)
     THEME = "dark-blue"  # customtkinter theme
 
     # Workflow steps

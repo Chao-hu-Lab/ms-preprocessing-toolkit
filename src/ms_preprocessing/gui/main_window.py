@@ -26,7 +26,7 @@ class MainWindow(MainWindowEventHandlersMixin, MainWindowLayoutMixin, ctk.CTk):
 
         self.title(Settings.WINDOW_TITLE)
         self.geometry(f"{Settings.WINDOW_SIZE[0]}x{Settings.WINDOW_SIZE[1]}")
-        self.minsize(1000, 650)
+        self.minsize(*Settings.WINDOW_MIN_SIZE)
 
         self._project_root = Path(__file__).resolve().parents[3]
         self._output_dir = self._project_root / "OUTPUT"

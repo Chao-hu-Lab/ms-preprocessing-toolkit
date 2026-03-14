@@ -160,3 +160,47 @@ def test_gui_final_export_does_not_request_parquet_cache_by_default(project_temp
         assert out is not None
         kwargs = window._file_handler.save_data.call_args.kwargs
         assert kwargs.get("save_parquet_cache") is False
+
+
+def test_gui_final_export_uses_live_pipeline_session_context_when_window_alias_is_stale(project_temp_dir) -> None:
+    with project_temp_dir() as temp_dir:
+        base = Path(temp_dir)
+        sample_info = pd.DataFrame({"Sample_Name": ["S1"]})
+        deleted_feature = pd.DataFrame({"Feature": ["F1"]})
+
+        window = MainWindow.__new__(MainWindow)
+        window._output_dir = base
+        window._project_root = base
+        window._source_file = base / "input.xlsx"
+        window._last_completed_step = 3
+        window._last_run_all = True
+        window._current_data = pd.DataFrame({"Mz/RT": ["Sample_Type", "100.0/1.0"], "S1": ["case", 123]})
+        window._context = {
+            "sample_info": None,
+            "deleted_feature_df": None,
+            "highlight_rows": set(),
+            "blue_font_cells": [],
+            "red_font_rows": set(),
+        }
+        window._pipeline_session = Mock()
+        window._pipeline_session.build_final_export_path.return_value = base / "ALL_input.xlsx"
+        window._pipeline_session.set_source_file.return_value = None
+        window._pipeline_session.context = {
+            "sample_info": sample_info,
+            "deleted_feature_df": deleted_feature,
+            "highlight_rows": {7},
+            "blue_font_cells": ["C3"],
+            "red_font_rows": {5},
+        }
+        window._file_handler = Mock()
+        window._log = lambda *_args, **_kwargs: None
+
+        out = window._export_results()
+
+        assert out is not None
+        kwargs = window._file_handler.save_data.call_args.kwargs
+        assert kwargs["highlight_rows"] == {7}
+        assert kwargs["blue_font_cells"] == ["C3"]
+        assert kwargs["red_font_rows"] == {5}
+        assert kwargs["extra_sheets"]["SampleInfo"] is sample_info
+        assert kwargs["extra_sheets"]["deleted_feature"] is deleted_feature

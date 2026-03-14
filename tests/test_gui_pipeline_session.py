@@ -103,6 +103,7 @@ def test_update_from_result_merges_metadata_and_tracks_completed_steps(tmp_path)
 
     base = tmp_path
     session = PipelineSession(output_dir=base, source_file=base / "input.xlsx")
+    context_alias = session.context
     sample_info = pd.DataFrame({"Sample_Name": ["A"]})
 
     session.update_from_result(
@@ -114,6 +115,8 @@ def test_update_from_result_merges_metadata_and_tracks_completed_steps(tmp_path)
             metadata=ProcessingMetadata(
                 red_font_rows={1},
                 protected_rows={1},
+                blue_font_cells=["B2"],
+                highlight_rows={4},
                 sample_info=sample_info,
             ),
         )
@@ -124,13 +127,26 @@ def test_update_from_result_merges_metadata_and_tracks_completed_steps(tmp_path)
             step="duplicate_remover",
             output_path=str(base / "step3.parquet"),
             data=None,
-            metadata=ProcessingMetadata(protected_rows={2}),
+            metadata=ProcessingMetadata(
+                protected_rows={2},
+                blue_font_cells=["C3"],
+                highlight_rows={5},
+            ),
         )
     )
 
     assert session.can_run_step("duplicate_remover") is True
     assert session.can_run_step("feature_filter") is True
     assert session.completed_steps == {"data_organizer", "duplicate_remover"}
+    assert session.metadata.red_font_rows == {1}
+    assert session.metadata.protected_rows == {1, 2}
+    assert session.metadata.blue_font_cells == ["B2", "C3"]
+    assert session.metadata.highlight_rows == {4, 5}
     assert session.metadata.sample_info is sample_info
+    assert context_alias is session.context
+    assert context_alias["red_font_rows"] == {1}
+    assert context_alias["protected_rows"] == {1, 2}
+    assert context_alias["blue_font_cells"] == ["B2", "C3"]
+    assert context_alias["highlight_rows"] == {4, 5}
     assert session.context["sample_info"] is sample_info
     assert session.step_outputs["data_organizer"].endswith("step1.parquet")
