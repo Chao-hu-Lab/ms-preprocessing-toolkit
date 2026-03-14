@@ -1,5 +1,5 @@
 """Configuration module for MS Preprocessing Toolkit."""
 
-from ms_core.preprocessing.settings import Settings, ProcessingConfig
+from ms_preprocessing.config.settings import Settings
 
-__all__ = ["Settings", "ProcessingConfig"]
+__all__ = ["Settings"]

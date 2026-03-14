@@ -7,9 +7,9 @@ from tkinter import filedialog
 import customtkinter as ctk
 import pandas as pd
 
+from ms_preprocessing.adapters import istd_marker as istd_marker_adapter
 from ms_preprocessing.gui.widgets.base_widget import BaseProcessingWidget
 from ms_preprocessing.gui.styles import PADDING, FONTS
-from ms_core.preprocessing.istd_marker import ISTDMarker
 
 
 class ISTDMarkerWidget(BaseProcessingWidget):
@@ -24,9 +24,6 @@ class ISTDMarkerWidget(BaseProcessingWidget):
         on_log: Optional[Callable[[str], None]] = None,
         on_progress: Optional[Callable[[float, str], None]] = None,
     ):
-        # Initialize processor before BaseProcessingWidget builds UI
-        # (BaseProcessingWidget.__init__ calls _create_parameters)
-        self._processor = ISTDMarker()
         self._istd_features: Set[str] = set()
         super().__init__(
             parent,
@@ -90,7 +87,7 @@ class ISTDMarkerWidget(BaseProcessingWidget):
             font=FONTS["body"],
         )
         # Pre-fill default ISTD list
-        default_list = ", ".join(f"{mz:.4f}" for mz in self._processor.config.default_istd_mz)
+        default_list = ", ".join(f"{mz:.4f}" for mz in istd_marker_adapter.get_default_istd_mz())
         self.istd_entry.insert(0, default_list)
         self.istd_entry.grid(row=2, column=1, padx=PADDING["small"], pady=PADDING["small"])
 
@@ -167,7 +164,7 @@ class ISTDMarkerWidget(BaseProcessingWidget):
         """Parse ISTD m/z list from entry, fallback to default."""
         istd_text = self.istd_entry.get().strip()
         if not istd_text:
-            return list(self._processor.config.default_istd_mz)
+            return list(istd_marker_adapter.get_default_istd_mz())
         try:
             return [float(x.strip()) for x in istd_text.split(",") if x.strip()]
         except ValueError:
@@ -175,27 +172,27 @@ class ISTDMarkerWidget(BaseProcessingWidget):
 
     def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
         """Run the ISTD marking step."""
-        self._processor.set_progress_callback(self.update_progress)
-
-        # Update processor config
-        self._processor.config.default_ppm_tolerance = params.get("ppm_tolerance", 20)
-        self._processor.config.default_rt_tolerance = params.get("rt_tolerance", 1.0)
-
-        result = self._processor.process(
+        result = istd_marker_adapter.run_from_df(
             data,
             istd_features=params.get("istd_features", set()),
             istd_mz_list=params.get("istd_mz_list"),
             istd_record_file=params.get("istd_record_file"),
             istd_record_date=params.get("istd_record_date"),
+            ppm_tolerance=params.get("ppm_tolerance", 20),
+            rt_tolerance=params.get("rt_tolerance", 1.0),
+            progress_callback=self.update_progress,
         )
 
         if not result.success:
-            raise Exception(result.message)
+            raise Exception(result.error or "Processing failed")
 
-        self.log(f"Statistics: {result.statistics}")
-        if result.metadata.get("warning"):
-            self.log(f"Warning: {result.metadata.get('warning')}")
-        if result.metadata.get("available_dates"):
-            self.log(f"Available ISTD dates: {result.metadata.get('available_dates')}")
-        self._last_metadata = result.metadata
+        self._processing_result = result
+        if result.statistics:
+            self.log(f"Statistics: {result.statistics}")
+        self._last_metadata = {
+            **result.metadata.as_context_dict(),
+            "statistics": dict(result.statistics),
+        }
+        if result.data is None:
+            raise Exception("Adapter returned no data")
         return result.data

@@ -176,13 +176,16 @@ def run_cli(args):
         return 1
 
     # Import processing modules
-    from ms_core.utils.file_handler import FileHandler
-    from ms_core.preprocessing.data_organizer import DataOrganizer
-    from ms_core.preprocessing.istd_marker import ISTDMarker
-    from ms_core.preprocessing.duplicate_remover import DuplicateRemover
-    from ms_core.preprocessing.ms_quality_filter import FeatureFilter
+    from ms_preprocessing.adapters import (
+        data_organizer as _adapter_do,
+        duplicate_remover as _adapter_dr,
+        feature_filter as _adapter_ff,
+        istd_marker as _adapter_istd,
+    )
+    from ms_preprocessing.config.settings import Settings
+    from ms_preprocessing.gui.pipeline_session import PipelineSession
+    from ms_preprocessing.utils.file_handler import FileHandler
     from ms_preprocessing.utils.perf import take_snapshot, format_perf_delta
-    from ms_core.preprocessing.settings import Settings
 
     def _compact_stats(stats: dict) -> dict:
         compact = {}
@@ -199,11 +202,16 @@ def run_cli(args):
         handler = FileHandler()
         df, metadata = handler.load_data(input_path)
         print(f"Loaded {len(df)} rows, {len(df.columns)} columns")
-        red_font_rows = set(metadata.get("red_font_rows", []))
-        protected_rows = set(metadata.get("protected_rows") or metadata.get("red_font_rows") or [])
-        blue_font_cells = []
-        sample_info_df = None
-        deleted_feature_df = None
+        session = PipelineSession(
+            output_dir=Settings.get_parquet_cache_root() / "cli",
+            source_file=input_path,
+        )
+        session.update_context_from_metadata(
+            {
+                "red_font_rows": metadata.get("red_font_rows", []),
+                "protected_rows": metadata.get("protected_rows") or metadata.get("red_font_rows") or [],
+            }
+        )
         preserved_sheets = {}
 
         # Preserve auxiliary sheets (e.g., SampleInfo) when running Step2+ on prior outputs.
@@ -229,9 +237,11 @@ def run_cli(args):
                     preserved_sheets[sheet] = pd.read_excel(input_path, sheet_name=sheet, engine="openpyxl")
 
                 if "SampleInfo" in preserved_sheets:
-                    sample_info_df = preserved_sheets.pop("SampleInfo")
+                    session.update_context_from_metadata({"sample_info": preserved_sheets.pop("SampleInfo")})
                 if "deleted_feature" in preserved_sheets:
-                    deleted_feature_df = preserved_sheets.pop("deleted_feature")
+                    session.update_context_from_metadata(
+                        {"deleted_feature_df": preserved_sheets.pop("deleted_feature")}
+                    )
             except Exception:
                 # Continue processing even if auxiliary-sheet preservation fails.
                 preserved_sheets = {}
@@ -240,14 +250,13 @@ def run_cli(args):
         step = args.step
         project_root = Path(__file__).resolve().parents[2]
         intermediate_dir: Path | None = None
-        last_parquet_handoff: Path | None = None
         if step == "all" and args.persist_intermediate:
             intermediate_dir = Settings.get_parquet_cache_root() / "cli-intermediate"
             intermediate_dir.mkdir(parents=True, exist_ok=True)
 
         def _persist_parquet_handoff(step_index: int) -> None:
             """Persist current state to parquet for optional diagnostics."""
-            nonlocal df, red_font_rows, protected_rows, blue_font_cells, last_parquet_handoff
+            nonlocal df
 
             if step != "all" or not args.persist_intermediate or intermediate_dir is None:
                 return
@@ -259,34 +268,30 @@ def run_cli(args):
             handler.save_data(
                 df,
                 handoff_path,
-                red_font_rows=red_font_rows,
-                blue_font_cells=blue_font_cells,
+                red_font_rows=session.metadata.red_font_rows,
+                blue_font_cells=session.metadata.blue_font_cells,
                 save_parquet_cache=False,
             )
-            last_parquet_handoff = handoff_path
 
         if step in ["organize", "all"]:
             print("Step 1: Data Organization...")
             perf_start = take_snapshot()
-            organizer = DataOrganizer()
-            result = organizer.process(df, method_file=args.method_file)
+            session.record_step_parameters(0, {"method_file": args.method_file})
+            result = _adapter_do.run_from_df(df, method_file=args.method_file)
             if result.success:
                 df = result.data
-                sample_info_df = result.metadata.get("sample_info")
+                session.update_from_result(result)
                 perf_end = take_snapshot()
                 print(f"  Perf: {format_perf_delta(perf_start, perf_end)}")
-                print(f"  Done: {_compact_stats(result.statistics)}")
+                print("  Done")
                 _persist_parquet_handoff(1)
             else:
-                print(f"  Error: {result.message}")
+                print(f"  Error: {result.error or 'Processing failed'}")
                 return 1
 
         if step in ["istd", "all"]:
             print("Step 2: ISTD Marking...")
             perf_start = take_snapshot()
-            marker = ISTDMarker()
-            marker.config.default_ppm_tolerance = args.mz_tol
-            marker.config.default_rt_tolerance = args.rt_tol
             istd_mz_list = None
             if args.istd_mz:
                 try:
@@ -295,83 +300,93 @@ def run_cli(args):
                     print("  Error: Invalid --istd-mz format")
                     return 1
 
-            result = marker.process(
+            session.record_step_parameters(
+                1,
+                {
+                    "istd_mz_list": istd_mz_list,
+                    "istd_record_file": args.istd_record_file,
+                    "istd_record_date": args.istd_record_date,
+                    "ppm_tolerance": args.mz_tol,
+                    "rt_tolerance": args.rt_tol,
+                },
+            )
+            result = _adapter_istd.run_from_df(
                 df,
                 istd_mz_list=istd_mz_list,
                 istd_record_file=Path(args.istd_record_file) if args.istd_record_file else None,
                 istd_record_date=args.istd_record_date,
+                ppm_tolerance=args.mz_tol,
+                rt_tolerance=args.rt_tol,
             )
             if result.success:
                 df = result.data
-                red_font_rows = set(result.metadata.get("red_font_rows", []))
-                protected_rows = set(
-                    result.metadata.get("protected_rows") or result.metadata.get("istd_rows") or red_font_rows
-                )
+                session.update_from_result(result)
                 perf_end = take_snapshot()
                 print(f"  Perf: {format_perf_delta(perf_start, perf_end)}")
-                if result.metadata.get("warning"):
-                    print(f"  Warning: {result.metadata.get('warning')}")
-                print(f"  Done: {_compact_stats(result.statistics)}")
+                print("  Done")
                 _persist_parquet_handoff(2)
             else:
-                print(f"  Error: {result.message}")
+                print(f"  Error: {result.error or 'Processing failed'}")
                 return 1
 
         if step in ["duplicate-removal", "all"]:
             print("Step 3: Duplicate Removal...")
             perf_start = take_snapshot()
-            remover = DuplicateRemover()
-            result = remover.process(
+            session.record_step_parameters(
+                2,
+                {
+                    "mz_tolerance_ppm": args.mz_tol,
+                    "rt_tolerance": args.rt_tol,
+                    "protected_rows": set(session.metadata.protected_rows),
+                },
+            )
+            result = _adapter_dr.run_from_df(
                 df,
                 mz_tolerance_ppm=args.mz_tol,
                 rt_tolerance=args.rt_tol,
-                protected_rows=protected_rows,
+                protected_rows=session.metadata.protected_rows,
             )
             if result.success:
                 df = result.data
-                red_font_rows = set(result.metadata.get("red_font_rows", red_font_rows))
-                protected_rows = set(result.metadata.get("protected_rows") or red_font_rows)
+                session.update_from_result(result)
                 perf_end = take_snapshot()
                 print(f"  Perf: {format_perf_delta(perf_start, perf_end)}")
-                print(f"  Done: {_compact_stats(result.statistics)}")
+                print("  Done")
                 _persist_parquet_handoff(3)
             else:
-                print(f"  Error: {result.message}")
+                print(f"  Error: {result.error or 'Processing failed'}")
                 return 1
 
         if step in ["filter", "all"]:
             print("Step 4: Feature Filtering...")
             perf_start = take_snapshot()
-            filter_proc = FeatureFilter()
-            result = filter_proc.process(
+            session.record_step_parameters(
+                3,
+                {
+                    "background_threshold": args.bg_threshold,
+                    "skew_threshold": args.skew_threshold,
+                    "diff_threshold": args.diff_threshold,
+                    "qc_ratio_threshold": args.qc_ratio_threshold,
+                    "protected_rows": set(session.metadata.protected_rows),
+                },
+            )
+            result = _adapter_ff.run_from_df(
                 df,
                 background_threshold=args.bg_threshold,
                 skew_threshold=args.skew_threshold,
                 diff_threshold=args.diff_threshold,
                 qc_ratio_threshold=args.qc_ratio_threshold,
-                protected_rows=protected_rows,
+                protected_rows=session.metadata.protected_rows,
             )
             if result.success:
                 df = result.data
-                red_font_rows = set(result.metadata.get("red_font_rows", red_font_rows))
-                protected_rows = set(result.metadata.get("protected_rows") or red_font_rows)
-                blue_font_cells = result.metadata.get("blue_font_cells", blue_font_cells)
-                deleted_features = result.metadata.get("deleted_features", [])
-                if deleted_features:
-                    try:
-                        import pandas as pd
-                        # Support duplicate column labels by building from row values.
-                        deleted_columns = list(deleted_features[0].index)
-                        deleted_values = [row.tolist() for row in deleted_features]
-                        deleted_feature_df = pd.DataFrame(deleted_values, columns=deleted_columns)
-                    except Exception:
-                        deleted_feature_df = None
+                session.update_from_result(result)
                 perf_end = take_snapshot()
                 print(f"  Perf: {format_perf_delta(perf_start, perf_end)}")
-                print(f"  Done: {_compact_stats(result.statistics)}")
+                print("  Done")
                 _persist_parquet_handoff(4)
             else:
-                print(f"  Error: {result.message}")
+                print(f"  Error: {result.error or 'Processing failed'}")
                 return 1
 
         # Save output
@@ -411,18 +426,18 @@ def run_cli(args):
         extra_sheets = {}
         if preserved_sheets:
             extra_sheets.update(preserved_sheets)
-        if sample_info_df is not None:
-            extra_sheets["SampleInfo"] = sample_info_df
-        if deleted_feature_df is not None and not deleted_feature_df.empty:
-            extra_sheets["deleted_feature"] = deleted_feature_df
+        if session.metadata.sample_info is not None:
+            extra_sheets["SampleInfo"] = session.metadata.sample_info
+        if session.metadata.deleted_feature_df is not None and not session.metadata.deleted_feature_df.empty:
+            extra_sheets["deleted_feature"] = session.metadata.deleted_feature_df
 
         print(f"Saving to: {output_path}")
         handler.save_data(
             df,
             output_path,
             sheet_name="RawIntensity",
-            red_font_rows=red_font_rows,
-            blue_font_cells=blue_font_cells,
+            red_font_rows=session.metadata.red_font_rows,
+            blue_font_cells=session.metadata.blue_font_cells,
             extra_sheets=extra_sheets or None,
             save_parquet_cache=False,
         )

@@ -5,6 +5,7 @@ This module provides validation functions for mass spectrometry data
 to ensure data quality before processing.
 """
 
+from dataclasses import dataclass, field
 from typing import List, Tuple, Optional, Dict, Any
 import pandas as pd
 import numpy as np
@@ -22,6 +23,15 @@ class ValidationWarning:
     def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
         self.message = message
         self.details = details or {}
+
+
+@dataclass
+class ValidationResult:
+    """Structured validation response for new step-order checks."""
+
+    is_valid: bool
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
 
 class DataValidator:
@@ -272,6 +282,29 @@ class DataValidator:
             lines.append("No issues found.")
 
         return "\n".join(lines)
+
+    def validate_step_prerequisites(
+        self,
+        step: str,
+        session: "PipelineSession",
+    ) -> ValidationResult:
+        """Check GUI step-order prerequisites against a pipeline session."""
+        prerequisites: dict[str, set[str]] = {
+            "data_organizer": set(),
+            "istd_marker": set(),
+            "duplicate_remover": {"data_organizer"},
+            "feature_filter": {"data_organizer"},
+        }
+        required = prerequisites.get(step, set())
+        missing = required - session.completed_steps
+
+        if missing:
+            return ValidationResult(
+                is_valid=False,
+                errors=[f"Step '{step}' requires completed steps: {sorted(missing)}"],
+            )
+
+        return ValidationResult(is_valid=True)
 
 
 # Fixed column names that precede sample data columns.

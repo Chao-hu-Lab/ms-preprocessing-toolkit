@@ -7,17 +7,20 @@ commonly used in mass spectrometry data processing.
 
 import logging
 from pathlib import Path
-from typing import Optional, Union, Tuple, Any
+from typing import Optional, Union, Tuple
 from datetime import datetime
 import json
 
 import pandas as pd
-import numpy as np
 from openpyxl import load_workbook
 from openpyxl.styles import Font, PatternFill, Color
 
-from ms_core.preprocessing.settings import Settings
-from ms_core.utils.intermediate_store import IntermediateStore
+from ms_preprocessing.config.settings import Settings
+from ms_preprocessing.utils.intermediate_store import IntermediateStore
+from ms_preprocessing.utils.parquet_compat import (
+    normalize_dataframe_for_parquet,
+    write_parquet_with_normalized_fallback,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -226,7 +229,7 @@ class FileHandler:
                 )
             except Exception as exc:
                 logger.warning("Intermediate store save failed, falling back to raw parquet write: %s", exc)
-                df.to_parquet(path, index=index)
+                write_parquet_with_normalized_fallback(df, path, index=index)
         else:
             # Default to Excel format
             path = path.with_suffix(".xlsx")
@@ -351,28 +354,8 @@ class FileHandler:
                 metadata=meta,
                 index=False,
             )
-            return
         except Exception as exc:
-            logger.debug("Intermediate store cache save failed; using legacy fallback: %s", exc)
-
-        if df.columns.duplicated().any():
-            logger.debug("Skipping parquet cache because dataframe has duplicate column labels.")
-            return
-
-        try:
-            df.to_parquet(parquet_path, index=False)
-        except Exception as exc:
-            logger.debug(
-                "Parquet cache raw write failed; retrying with normalized object columns: %s",
-                exc,
-            )
-            normalized_df = self._normalize_for_parquet(df)
-            normalized_df.to_parquet(parquet_path, index=False)
-        meta_path = self._parquet_meta_path(parquet_path)
-        try:
-            meta_path.write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
-        except Exception as exc:
-            logger.warning("Parquet meta write failed: %s", exc)
+            logger.warning("Parquet cache save failed (non-fatal): %s", exc)
 
     def _load_parquet_meta(self, parquet_path: Path) -> Optional[dict]:
         """Load parquet metadata sidecar if it exists."""
@@ -407,70 +390,8 @@ class FileHandler:
 
     @staticmethod
     def _normalize_for_parquet(df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Normalize object columns to parquet-friendly scalar types.
-
-        This keeps numeric-like object columns numeric, preserves pure text
-        columns, decodes bytes, and stringifies mixed object columns.
-        """
-        normalized = df.copy()
-        object_positions = [
-            idx for idx, dtype in enumerate(normalized.dtypes)
-            if dtype == "object"
-        ]
-
-        for col_idx in object_positions:
-            # Use positional indexing to support duplicate column labels.
-            series = normalized.iloc[:, col_idx]
-            non_null = series[series.notna()]
-            if non_null.empty:
-                continue
-
-            if non_null.map(lambda v: isinstance(v, str)).all():
-                continue
-
-            if non_null.map(lambda v: isinstance(v, (bytes, bytearray))).all():
-                converted = series.map(FileHandler._decode_bytes_value)
-                normalized.iloc[:, col_idx] = converted.to_numpy()
-                continue
-
-            if non_null.map(lambda v: isinstance(v, (int, float, bool, np.number, np.bool_))).all():
-                converted = pd.to_numeric(series, errors="coerce")
-                normalized.iloc[:, col_idx] = converted.to_numpy()
-                continue
-
-            converted = series.map(FileHandler._stringify_mixed_value)
-            normalized.iloc[:, col_idx] = converted.to_numpy()
-
-        return normalized
-
-    @staticmethod
-    def _decode_bytes_value(value: Any) -> Any:
-        """Decode bytes-like values to UTF-8 strings while preserving nulls."""
-        if value is None:
-            return np.nan
-        try:
-            if pd.isna(value):
-                return np.nan
-        except Exception:
-            pass
-        if isinstance(value, (bytes, bytearray)):
-            return bytes(value).decode("utf-8", errors="replace")
-        return value
-
-    @staticmethod
-    def _stringify_mixed_value(value: Any) -> Any:
-        """Convert mixed-type object values to strings while preserving nulls."""
-        if value is None:
-            return np.nan
-        try:
-            if pd.isna(value):
-                return np.nan
-        except Exception:
-            pass
-        if isinstance(value, (bytes, bytearray)):
-            return bytes(value).decode("utf-8", errors="replace")
-        return str(value)
+        """Backward-compatible wrapper around the shared parquet normalizer."""
+        return normalize_dataframe_for_parquet(df)
 
     @staticmethod
     def _load_delimited(path: Path, header_row: int, sep: str) -> pd.DataFrame:

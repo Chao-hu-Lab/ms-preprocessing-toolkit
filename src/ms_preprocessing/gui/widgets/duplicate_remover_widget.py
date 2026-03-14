@@ -6,9 +6,9 @@ from typing import Optional, Callable
 import customtkinter as ctk
 import pandas as pd
 
+from ms_preprocessing.adapters import duplicate_remover as duplicate_remover_adapter
 from ms_preprocessing.gui.widgets.base_widget import BaseProcessingWidget
 from ms_preprocessing.gui.styles import PADDING, FONTS
-from ms_core.preprocessing.duplicate_remover import DuplicateRemover
 
 
 class DuplicateRemoverWidget(BaseProcessingWidget):
@@ -33,7 +33,6 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
             on_log=on_log,
             on_progress=on_progress,
         )
-        self._processor = DuplicateRemover()
 
     def _create_parameters(self) -> None:
         """Create parameter inputs."""
@@ -116,25 +115,31 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
 
     def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
         """Run the duplicate removal step."""
-        self._processor.set_progress_callback(self.update_progress)
-
         protected_rows = set()
         if params.get("preserve_red_font", True):
             protected_rows = set(
                 self._context.get("protected_rows") or self._context.get("red_font_rows") or []
             )
 
-        result = self._processor.process(
+        result = duplicate_remover_adapter.run_from_df(
             data,
             mz_tolerance_ppm=params.get("mz_tolerance_ppm"),
             rt_tolerance=params.get("rt_tolerance"),
             top_n=params.get("top_n"),
             protected_rows=protected_rows,
+            progress_callback=self.update_progress,
         )
 
         if not result.success:
-            raise Exception(result.message)
+            raise Exception(result.error or "Processing failed")
 
-        self.log(f"Statistics: {result.statistics}")
-        self._last_metadata = result.metadata
+        self._processing_result = result
+        if result.statistics:
+            self.log(f"Statistics: {result.statistics}")
+        self._last_metadata = {
+            **result.metadata.as_context_dict(),
+            "statistics": dict(result.statistics),
+        }
+        if result.data is None:
+            raise Exception("Adapter returned no data")
         return result.data

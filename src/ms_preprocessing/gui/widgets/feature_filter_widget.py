@@ -8,7 +8,7 @@ from typing import Callable, Optional
 import customtkinter as ctk
 import pandas as pd
 
-from ms_core.preprocessing.ms_quality_filter import FeatureFilter
+from ms_preprocessing.adapters import feature_filter as feature_filter_adapter
 from ms_preprocessing.gui.styles import COLORS, FONTS, PADDING
 from ms_preprocessing.gui.widgets.base_widget import BaseProcessingWidget
 
@@ -25,7 +25,6 @@ class FeatureFilterWidget(BaseProcessingWidget):
         on_log: Optional[Callable[[str], None]] = None,
         on_progress: Optional[Callable[[float, str], None]] = None,
     ):
-        self._processor = FeatureFilter()
         self._threshold_controls: dict[str, tuple[tk.BooleanVar, ctk.CTkSlider, ctk.CTkEntry]] = {}
         super().__init__(
             parent,
@@ -314,10 +313,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
 
     def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
         """Run the feature filtering step."""
-        self._processor.set_progress_callback(self.update_progress)
-        self._processor.config.signal_threshold = params.get("signal_threshold", 5000)
-
-        result = self._processor.process(
+        result = feature_filter_adapter.run_from_df(
             data,
             background_threshold=params.get("background_threshold"),
             skew_threshold=params.get("skew_threshold"),
@@ -327,17 +323,22 @@ class FeatureFilterWidget(BaseProcessingWidget):
             enable_skew_threshold=params.get("enable_skew_threshold", True),
             enable_diff_threshold=params.get("enable_diff_threshold", True),
             enable_qc_ratio_threshold=params.get("enable_qc_ratio_threshold", True),
+            signal_threshold=params.get("signal_threshold", 5000),
             protected_rows=set(
                 self._context.get("protected_rows") or self._context.get("red_font_rows") or []
             ),
+            progress_callback=self.update_progress,
         )
 
         if not result.success:
-            raise Exception(result.message)
+            raise Exception(result.error or "Processing failed")
 
-        self.log(f"Statistics: {result.statistics}")
+        self._processing_result = result
+        if result.statistics:
+            self.log(f"Statistics: {result.statistics}")
         self._last_metadata = {
-            **(result.metadata or {}),
+            **result.metadata.as_context_dict(),
+            "statistics": dict(result.statistics),
             "step_parameters": dict(params),
             "imputation_stats": {
                 "cells_imputed": result.statistics.get("cells_imputed", 0),
@@ -345,4 +346,6 @@ class FeatureFilterWidget(BaseProcessingWidget):
                 "cells_imputed_from_zero": result.statistics.get("cells_imputed_from_zero", 0),
             },
         }
+        if result.data is None:
+            raise Exception("Adapter returned no data")
         return result.data

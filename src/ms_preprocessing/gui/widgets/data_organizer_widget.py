@@ -7,9 +7,9 @@ from tkinter import filedialog
 import customtkinter as ctk
 import pandas as pd
 
+from ms_preprocessing.adapters import data_organizer as data_organizer_adapter
 from ms_preprocessing.gui.widgets.base_widget import BaseProcessingWidget
 from ms_preprocessing.gui.styles import PADDING, FONTS
-from ms_core.preprocessing.data_organizer import DataOrganizer
 
 
 class DataOrganizerWidget(BaseProcessingWidget):
@@ -36,7 +36,6 @@ class DataOrganizerWidget(BaseProcessingWidget):
             on_log=on_log,
             on_progress=on_progress,
         )
-        self._processor = DataOrganizer()
 
     def _create_parameters(self) -> None:
         """Create parameter inputs."""
@@ -131,25 +130,25 @@ class DataOrganizerWidget(BaseProcessingWidget):
 
     def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
         """Run the data organization step."""
-        self._processor.set_progress_callback(self.update_progress)
-
-        mode = params.get("mode", "normalization")
-        sample_type_mapping = params.get("sample_type_mapping")
-        if params.get("auto_detect", True) and not sample_type_mapping:
-            sample_type_mapping = self._processor.auto_detect_sample_types(
-                list(data.columns[2:])
-            )
-
-        result = self._processor.process(
+        result = data_organizer_adapter.run_from_df(
             data,
-            mode=mode,
-            sample_type_mapping=sample_type_mapping,
+            mode=params.get("mode", "normalization"),
+            sample_type_mapping=params.get("sample_type_mapping"),
+            auto_detect=params.get("auto_detect", True),
             method_file=params.get("method_file"),
+            progress_callback=self.update_progress,
         )
 
         if not result.success:
-            raise Exception(result.message)
+            raise Exception(result.error or "Processing failed")
 
-        self.log(f"Statistics: {result.statistics}")
-        self._last_metadata = result.metadata
+        self._processing_result = result
+        if result.statistics:
+            self.log(f"Statistics: {result.statistics}")
+        self._last_metadata = {
+            **result.metadata.as_context_dict(),
+            "statistics": dict(result.statistics),
+        }
+        if result.data is None:
+            raise Exception("Adapter returned no data")
         return result.data

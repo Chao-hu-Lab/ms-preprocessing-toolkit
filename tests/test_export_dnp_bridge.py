@@ -105,10 +105,10 @@ def test_dnp_bridge_always_receives_xlsx_even_when_intermediates_are_parquet(mon
         monkeypatch.setitem(sys.modules, "metabolomics.adapters.preprocessing_to_dnp", mod_bridge)
 
         out_path = base / "dnp.xlsx"
-        monkeypatch.setattr("ms_preprocessing.gui.main_window.filedialog.asksaveasfilename", lambda **_k: str(out_path))
-        monkeypatch.setattr("ms_preprocessing.gui.main_window.messagebox.askyesno", lambda *_a, **_k: False)
-        monkeypatch.setattr("ms_preprocessing.gui.main_window.messagebox.showerror", lambda *_a, **_k: None)
-        monkeypatch.setattr("ms_preprocessing.gui.main_window.messagebox.showwarning", lambda *_a, **_k: None)
+        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.filedialog.asksaveasfilename", lambda **_k: str(out_path))
+        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.messagebox.askyesno", lambda *_a, **_k: False)
+        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.messagebox.showerror", lambda *_a, **_k: None)
+        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.messagebox.showwarning", lambda *_a, **_k: None)
 
         window._export_to_dnp()
 
