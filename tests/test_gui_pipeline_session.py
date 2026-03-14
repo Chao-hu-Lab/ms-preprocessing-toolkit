@@ -150,3 +150,35 @@ def test_update_from_result_merges_metadata_and_tracks_completed_steps(tmp_path)
     assert context_alias["highlight_rows"] == {4, 5}
     assert session.context["sample_info"] is sample_info
     assert session.step_outputs["data_organizer"].endswith("step1.parquet")
+
+
+def test_update_context_from_metadata_merges_legacy_formatting_across_steps(tmp_path) -> None:
+    from ms_preprocessing.gui.pipeline_session import PipelineSession
+
+    base = tmp_path
+    session = PipelineSession(output_dir=base, source_file=base / "input.xlsx")
+
+    session.update_context_from_metadata(
+        {
+            "red_font_rows": [1],
+            "protected_rows": [1],
+            "blue_font_cells": ["B2"],
+            "highlight_rows": [4],
+        }
+    )
+    session.update_context_from_metadata(
+        {
+            "protected_rows": [2],
+            "blue_font_cells": ["C3"],
+            "highlight_rows": [5],
+        }
+    )
+
+    assert session.metadata.red_font_rows == {1}
+    assert session.metadata.protected_rows == {1, 2}
+    assert session.metadata.blue_font_cells == ["B2", "C3"]
+    assert session.metadata.highlight_rows == {4, 5}
+    assert session.context["red_font_rows"] == {1}
+    assert session.context["protected_rows"] == {1, 2}
+    assert session.context["blue_font_cells"] == ["B2", "C3"]
+    assert session.context["highlight_rows"] == {4, 5}

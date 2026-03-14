@@ -18,7 +18,6 @@ from openpyxl.styles import Font, PatternFill, Color
 from ms_preprocessing.config.settings import Settings
 from ms_preprocessing.utils.intermediate_store import IntermediateStore
 from ms_preprocessing.utils.parquet_compat import (
-    has_duplicate_columns,
     normalize_dataframe_for_parquet,
     write_parquet_with_normalized_fallback,
 )
@@ -355,24 +354,8 @@ class FileHandler:
                 metadata=meta,
                 index=False,
             )
-            return
         except Exception as exc:
-            logger.debug("Intermediate store cache save failed; using legacy fallback: %s", exc)
-
-        if has_duplicate_columns(df):
-            logger.debug("Skipping parquet cache because dataframe has duplicate column labels.")
-            return
-
-        try:
-            write_parquet_with_normalized_fallback(df, parquet_path, index=False)
-        except Exception as exc:
-            logger.warning("Parquet cache raw write failed: %s", exc)
-            return
-        meta_path = self._parquet_meta_path(parquet_path)
-        try:
-            meta_path.write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
-        except Exception as exc:
-            logger.warning("Parquet meta write failed: %s", exc)
+            logger.warning("Parquet cache save failed (non-fatal): %s", exc)
 
     def _load_parquet_meta(self, parquet_path: Path) -> Optional[dict]:
         """Load parquet metadata sidecar if it exists."""

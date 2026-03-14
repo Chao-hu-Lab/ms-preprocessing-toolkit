@@ -53,12 +53,12 @@ class PipelineSession:
         if not metadata:
             return
 
-        if "red_font_rows" in metadata:
-            self.metadata.red_font_rows = set(metadata.get("red_font_rows") or [])
-        if "protected_rows" in metadata:
-            self.metadata.protected_rows = set(metadata.get("protected_rows") or [])
-        elif "red_font_rows" in metadata:
-            self.metadata.protected_rows = set(metadata.get("red_font_rows") or [])
+        self._merge_formatting_metadata(
+            red_font_rows=set(metadata.get("red_font_rows") or []) if "red_font_rows" in metadata else None,
+            protected_rows=set(metadata.get("protected_rows") or []) if "protected_rows" in metadata else None,
+            blue_font_cells=list(metadata.get("blue_font_cells") or []) if "blue_font_cells" in metadata else None,
+            highlight_rows=set(metadata.get("highlight_rows") or []) if "highlight_rows" in metadata else None,
+        )
 
         if "sample_info" in metadata:
             sample_info = metadata.get("sample_info")
@@ -95,11 +95,6 @@ class PipelineSession:
         if "deleted_feature_ref" in metadata:
             self._metadata_refs["deleted_feature_ref"] = metadata.get("deleted_feature_ref")
 
-        if "blue_font_cells" in metadata:
-            self.metadata.blue_font_cells = list(metadata.get("blue_font_cells") or [])
-        if "highlight_rows" in metadata:
-            self.metadata.highlight_rows = set(metadata.get("highlight_rows") or [])
-
         self._sync_context_from_metadata()
 
     def can_run_step(self, step: str) -> bool:
@@ -118,19 +113,12 @@ class PipelineSession:
             return
 
         new_metadata = result.metadata
-        if new_metadata.red_font_rows:
-            self.metadata.red_font_rows |= set(new_metadata.red_font_rows)
-        if new_metadata.protected_rows:
-            self.metadata.protected_rows |= set(new_metadata.protected_rows)
-        elif new_metadata.red_font_rows:
-            self.metadata.protected_rows |= set(new_metadata.red_font_rows)
-        if new_metadata.blue_font_cells:
-            self.metadata.blue_font_cells = self._merge_sequence(
-                self.metadata.blue_font_cells,
-                new_metadata.blue_font_cells,
-            )
-        if new_metadata.highlight_rows:
-            self.metadata.highlight_rows |= set(new_metadata.highlight_rows)
+        self._merge_formatting_metadata(
+            red_font_rows=set(new_metadata.red_font_rows),
+            protected_rows=set(new_metadata.protected_rows),
+            blue_font_cells=list(new_metadata.blue_font_cells),
+            highlight_rows=set(new_metadata.highlight_rows),
+        )
         if new_metadata.sample_info is not None:
             self.metadata.sample_info = new_metadata.sample_info
             self._metadata_refs["sample_info_ref"] = "SampleInfo"
@@ -219,6 +207,28 @@ class PipelineSession:
             deleted_feature_df if isinstance(deleted_feature_df, pd.DataFrame) else None
         )
         self._metadata_refs = dict(self.context.get("metadata_refs", self._metadata_refs))
+
+    def _merge_formatting_metadata(
+        self,
+        *,
+        red_font_rows: set[Any] | None = None,
+        protected_rows: set[Any] | None = None,
+        blue_font_cells: list[Any] | None = None,
+        highlight_rows: set[Any] | None = None,
+    ) -> None:
+        if red_font_rows is not None:
+            self.metadata.red_font_rows |= set(red_font_rows)
+        if protected_rows is not None:
+            self.metadata.protected_rows |= set(protected_rows)
+        elif red_font_rows is not None:
+            self.metadata.protected_rows |= set(red_font_rows)
+        if blue_font_cells is not None:
+            self.metadata.blue_font_cells = self._merge_sequence(
+                self.metadata.blue_font_cells,
+                blue_font_cells,
+            )
+        if highlight_rows is not None:
+            self.metadata.highlight_rows |= set(highlight_rows)
 
     @staticmethod
     def _merge_sequence(existing: list[Any], incoming: list[Any]) -> list[Any]:
