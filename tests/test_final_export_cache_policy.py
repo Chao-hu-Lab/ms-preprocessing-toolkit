@@ -153,6 +153,10 @@ def test_gui_final_export_does_not_request_parquet_cache_by_default(project_temp
         window._pipeline_session = Mock()
         window._pipeline_session.build_final_export_path.return_value = base / "ALL_input.xlsx"
         window._pipeline_session.set_source_file.return_value = None
+        step4_widget = Mock()
+        step4_widget._export_deleted_var = Mock()
+        step4_widget._export_deleted_var.get.return_value = False
+        window.step_widgets = [Mock(), Mock(), Mock(), step4_widget]
         window._file_handler = Mock()
         window._log = lambda *_args, **_kwargs: None
 
@@ -192,6 +196,10 @@ def test_gui_final_export_uses_live_pipeline_session_context_when_window_alias_i
             "blue_font_cells": ["C3"],
             "red_font_rows": {5},
         }
+        step4_widget = Mock()
+        step4_widget._export_deleted_var = Mock()
+        step4_widget._export_deleted_var.get.return_value = True
+        window.step_widgets = [Mock(), Mock(), Mock(), step4_widget]
         window._file_handler = Mock()
         window._log = lambda *_args, **_kwargs: None
 
