@@ -110,9 +110,13 @@ def test_dnp_bridge_always_receives_xlsx_even_when_intermediates_are_parquet(mon
 
         out_path = base / "dnp.xlsx"
         monkeypatch.setattr("ms_preprocessing.gui.event_handlers.filedialog.asksaveasfilename", lambda **_k: str(out_path))
-        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.messagebox.askyesno", lambda *_a, **_k: False)
+        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.messagebox.showinfo", lambda *_a, **_k: None)
         monkeypatch.setattr("ms_preprocessing.gui.event_handlers.messagebox.showerror", lambda *_a, **_k: None)
         monkeypatch.setattr("ms_preprocessing.gui.event_handlers.messagebox.showwarning", lambda *_a, **_k: None)
+        monkeypatch.setattr(
+            "ms_preprocessing.gui.event_handlers.MainWindowEventHandlersMixin._open_file_in_system_app",
+            lambda *_a, **_k: None,
+        )
 
         window._export_to_dnp()
 
@@ -147,3 +151,95 @@ def test_final_export_materializes_xlsx_from_parquet_intermediate(project_temp_d
 
         assert saved["path"].suffix == ".xlsx"
         assert saved_kwargs.get("save_parquet_cache") is False
+
+
+def test_sample_info_requires_user_completion_detects_missing_batch_and_dna(tmp_path) -> None:
+    bridge_path = tmp_path / "bridge.xlsx"
+
+    # Missing values → needs completion
+    with pd.ExcelWriter(bridge_path) as writer:
+        pd.DataFrame({
+            "Sample_Name": ["S1", "S2"],
+            "Sample_Type": ["Exposure", "Control"],
+            "Batch": [None, "B1"],
+            "DNA_mg/20uL": [None, None],
+        }).to_excel(writer, sheet_name="SampleInfo", index=False)
+
+    window = MainWindow.__new__(MainWindow)
+    assert window._sample_info_requires_user_completion(bridge_path) is True
+
+    # All filled → no completion needed
+    with pd.ExcelWriter(bridge_path) as writer:
+        pd.DataFrame({
+            "Sample_Name": ["S1", "S2"],
+            "Sample_Type": ["Exposure", "Control"],
+            "Batch": ["B1", "B1"],
+            "DNA_mg/20uL": [1.25, 0.98],
+        }).to_excel(writer, sheet_name="SampleInfo", index=False)
+
+    assert window._sample_info_requires_user_completion(bridge_path) is False
+
+
+def test_sample_info_requires_completion_when_column_missing(tmp_path) -> None:
+    bridge_path = tmp_path / "bridge.xlsx"
+    with pd.ExcelWriter(bridge_path) as writer:
+        pd.DataFrame({
+            "Sample_Name": ["S1"],
+            "Sample_Type": ["Exposure"],
+            # No Batch, no DNA_mg/20uL columns
+        }).to_excel(writer, sheet_name="SampleInfo", index=False)
+
+    window = MainWindow.__new__(MainWindow)
+    assert window._sample_info_requires_user_completion(bridge_path) is True
+
+
+def test_sample_info_requires_completion_when_file_unreadable(tmp_path) -> None:
+    window = MainWindow.__new__(MainWindow)
+    assert window._sample_info_requires_user_completion(tmp_path / "nonexistent.xlsx") is True
+
+
+def test_export_to_dnp_shows_completion_warning_when_sample_info_incomplete(
+    monkeypatch, project_temp_dir
+) -> None:
+    with project_temp_dir() as temp_dir:
+        base = Path(temp_dir)
+        window = _make_window_for_export(base)
+        step4_xlsx = base / "STEP4_input.xlsx"
+        step4_xlsx.write_text("placeholder", encoding="utf-8")
+        window._step_output_paths = {3: step4_xlsx}
+        window._pipeline_session = _FakePipelineSession(output_path=base / "ALL_input.xlsx")
+        window._file_handler.save_data.return_value = base / "ALL_input.xlsx"
+
+        # Bridge file has incomplete SampleInfo (no Batch/DNA columns)
+        out_path = base / "dnp.xlsx"
+        with pd.ExcelWriter(out_path) as writer:
+            pd.DataFrame({"Sample_Name": ["S1"]}).to_excel(
+                writer, sheet_name="SampleInfo", index=False
+            )
+
+        monkeypatch.setattr(
+            "ms_preprocessing.gui.event_handlers.filedialog.asksaveasfilename",
+            lambda **_k: str(out_path),
+        )
+        shown_messages: list[str] = []
+        monkeypatch.setattr(
+            "ms_preprocessing.gui.event_handlers.messagebox.showinfo",
+            lambda title, msg, **_k: shown_messages.append(msg),
+        )
+        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.messagebox.showerror", lambda *_a, **_k: None)
+        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.messagebox.showwarning", lambda *_a, **_k: None)
+        monkeypatch.setattr(
+            "ms_preprocessing.gui.event_handlers.MainWindowEventHandlersMixin._open_file_in_system_app",
+            lambda *_a, **_k: None,
+        )
+
+        mod_bridge = ModuleType("metabolomics.adapters.preprocessing_to_dnp")
+        mod_bridge.convert_preprocessing_to_dnp = lambda source, target: str(out_path)
+        monkeypatch.setitem(sys.modules, "metabolomics", ModuleType("metabolomics"))
+        monkeypatch.setitem(sys.modules, "metabolomics.adapters", ModuleType("metabolomics.adapters"))
+        monkeypatch.setitem(sys.modules, "metabolomics.adapters.preprocessing_to_dnp", mod_bridge)
+
+        window._export_to_dnp()
+
+        assert any("Batch" in msg and "DNA_mg/20uL" in msg for msg in shown_messages)
+

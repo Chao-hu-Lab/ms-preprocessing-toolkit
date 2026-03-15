@@ -362,13 +362,19 @@ class MainWindowEventHandlersMixin:
             from metabolomics.adapters.preprocessing_to_dnp import convert_preprocessing_to_dnp
 
             self._log(f"Converting to DNP format: {source_path}")
-            result = convert_preprocessing_to_dnp(str(source_path), output_path)
+            result = Path(convert_preprocessing_to_dnp(str(source_path), output_path))
             self._log(f"DNP export complete: {result}")
-            if messagebox.askyesno(
-                "Export Successful",
-                f"File exported:\n{Path(result).name}\n\nLaunch DNP now?",
-            ):
-                self._launch_dnp()
+            self._open_file_in_system_app(result)
+            needs_completion = self._sample_info_requires_user_completion(result)
+            message = (
+                "請在 SampleInfo 工作表補齊 Batch 與 DNA_mg/20uL 欄位後，再手動啟動 DNP。"
+                if needs_completion
+                else "Bridge 檔案已就緒，請手動啟動 DNP。"
+            )
+            messagebox.showinfo(
+                "匯出成功",
+                f"DNP bridge 檔案已匯出：\n{result}\n\n{message}",
+            )
         except ImportError:
             self._log("Error: DNP adapter not found. Ensure Data_Normalization_project_v2 is available.")
             messagebox.showerror(
@@ -382,6 +388,33 @@ class MainWindowEventHandlersMixin:
             self.configure(cursor="")
             self.export_dnp_btn.configure(text=original_text, state="normal")
             self._update_export_dnp_btn()
+
+    def _sample_info_requires_user_completion(self, bridge_path: "str | Path") -> bool:
+        """Return True when SampleInfo sheet is missing Batch or DNA_mg/20uL values."""
+        try:
+            sample_info = pd.read_excel(Path(bridge_path), sheet_name="SampleInfo")
+        except Exception:
+            return True
+        for column in ("Batch", "DNA_mg/20uL"):
+            if column not in sample_info.columns:
+                return True
+            if sample_info[column].fillna("").astype(str).str.strip().eq("").any():
+                return True
+        return False
+
+    def _open_file_in_system_app(self, target: "str | Path") -> None:
+        """Open a file using the system default application."""
+        try:
+            target_path = Path(target)
+            system = platform.system()
+            if system == "Windows":
+                os.startfile(target_path)
+            elif system == "Darwin":
+                subprocess.Popen(["open", str(target_path)])
+            else:
+                subprocess.Popen(["xdg-open", str(target_path)])
+        except Exception as exc:
+            self._log(f"Open file error: {exc}")
 
     def _materialize_final_xlsx_from_latest_step(self: "_MainWindowEventHost") -> Optional[Path]:
         if self._last_completed_step is None:
