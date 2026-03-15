@@ -161,6 +161,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
             anchor="w",
         ).grid(row=4, column=3, padx=(PADDING["medium"], PADDING["small"]), sticky="w")
 
+        # criteria + switch 放在 params_frame 外層的 _content_frame，避免被截斷
         criteria_text = (
             "目前規則：\n"
             "  1. 背景比例門檻開啟時，至少 2 組 ratio >= 背景比例門檻\n"
@@ -168,21 +169,30 @@ class FeatureFilterWidget(BaseProcessingWidget):
             "  3. 組間差異門檻開啟時，最大 ratio - 最小 ratio >= 組間差異門檻\n"
             "  4. QC_ratio 門檻開啟時，QC_ratio = 0 或低於設定值的 feature 會被移除"
         )
-        criteria_label = ctk.CTkLabel(
-            self.params_frame,
+        ctk.CTkLabel(
+            self._content_frame,
             text=criteria_text,
             font=FONTS["small"],
             text_color=COLORS["text_secondary"],
             justify="left",
-        )
-        criteria_label.grid(
-            row=5,
-            column=0,
-            columnspan=4,
-            padx=PADDING["small"],
-            pady=PADDING["small"],
-            sticky="w",
-        )
+            anchor="w",
+        ).pack(fill="x", padx=PADDING["large"], pady=(PADDING["small"], 0))
+
+        ctk.CTkFrame(
+            self._content_frame,
+            height=1,
+            fg_color="#2a3f5a",
+        ).pack(fill="x", padx=PADDING["large"], pady=(PADDING["medium"], 0))
+
+        self._export_deleted_var = tk.BooleanVar(value=False)
+        ctk.CTkSwitch(
+            self._content_frame,
+            text="匯出時包含已刪除特徵清單（deleted_feature 工作表）",
+            variable=self._export_deleted_var,
+            onvalue=True,
+            offvalue=False,
+            font=FONTS["body"],
+        ).pack(anchor="w", padx=PADDING["large"], pady=(PADDING["small"], PADDING["medium"]))
 
         self._sync_threshold_control_states()
 

@@ -284,9 +284,10 @@ class MainWindowEventHandlersMixin:
             sample_info = session_context.get("sample_info")
             if sample_info is not None:
                 extra_sheets["SampleInfo"] = sample_info
-            deleted_df = session_context.get("deleted_feature_df")
-            if isinstance(deleted_df, pd.DataFrame) and not deleted_df.empty:
-                extra_sheets["deleted_feature"] = deleted_df
+            if self.step_widgets[3]._export_deleted_var.get():
+                deleted_df = session_context.get("deleted_feature_df")
+                if isinstance(deleted_df, pd.DataFrame) and not deleted_df.empty:
+                    extra_sheets["deleted_feature"] = deleted_df
 
             self._file_handler.save_data(
                 self._current_data,
@@ -412,9 +413,10 @@ class MainWindowEventHandlersMixin:
             sample_info = session_context.get("sample_info")
             if sample_info is not None:
                 extra_sheets["SampleInfo"] = sample_info
-            deleted_df = session_context.get("deleted_feature_df")
-            if isinstance(deleted_df, pd.DataFrame) and not deleted_df.empty:
-                extra_sheets["deleted_feature"] = deleted_df
+            if self.step_widgets[3]._export_deleted_var.get():
+                deleted_df = session_context.get("deleted_feature_df")
+                if isinstance(deleted_df, pd.DataFrame) and not deleted_df.empty:
+                    extra_sheets["deleted_feature"] = deleted_df
 
             self._file_handler.save_data(
                 data,

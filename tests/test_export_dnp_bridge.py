@@ -69,6 +69,10 @@ def _make_window_for_export(tmp_dir: Path) -> MainWindow:
         "blue_font_cells": [],
         "red_font_rows": set(),
     }
+    step4_widget = Mock()
+    step4_widget._export_deleted_var = Mock()
+    step4_widget._export_deleted_var.get.return_value = False
+    window.step_widgets = [Mock(), Mock(), Mock(), step4_widget]
     window._file_handler = Mock()
     window._log = lambda *_args, **_kwargs: None
     window.configure = lambda *_args, **_kwargs: None
