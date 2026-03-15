@@ -423,6 +423,32 @@ git commit -m "feat(validators): add ValidationResult dataclass and validate_ste
 >     return output_path
 > ```
 
+**Integration Boundary Risks (read before writing any adapter):**
+
+> **Risk A — `utils/__init__.py` re-exports ms_core's `DataValidator`:**
+> `src/ms_preprocessing/utils/__init__.py` currently does:
+> ```python
+> from ms_core.utils.validators import DataValidator, detect_fixed_columns
+> ```
+> This shadows the toolkit's own `DataValidator` in `utils/validators.py`.
+> Before finishing Task 3, decide one of:
+> - **Remove the re-export** (preferred): callers import directly from `ms_core.utils.validators` if they need it
+> - **Rename** the re-export to `MSCoreDataValidator` to avoid collision
+> This decision must be made in Task 7 (Settings cleanup) at the latest.
+> A regression test (`tests/test_utils_reexports.py`) verifying the chosen
+> behaviour is required in Step 7.5.
+
+> **Risk B — Adapters must NOT flatten typed Config objects to primitives:**
+> `ISTDMarker.process()` accepts an `ISTDConfig` object (from `ms_core.preprocessing.settings`).
+> `DuplicateRemover.process()` uses `DuplicateRemovalConfig`.
+> `FeatureFilter.process()` uses `FeatureFilterConfig`.
+> Read each Config class definition before writing the adapter signature.
+> Adapters should accept the Config object as an optional parameter **or** accept
+> individual primitive params and construct the Config internally — never silently
+> ignore Config fields.
+> Acceptance criteria: each adapter test (Task 4) must pass a non-default Config
+> value and assert it reaches the processor (i.e., the result reflects the config).
+
 - [ ] **Step 3.1: Create empty package**
 
 ```python
@@ -903,7 +929,16 @@ git commit -m "feat(adapters): add four thin adapter wrappers around ms_core pro
 - Create: `tests/test_adapter_duplicate_remover.py`
 - Create: `tests/test_adapter_feature_filter.py`
 
-> **Context:** Each adapter test covers three scenarios: valid input → success, missing file → failure with error message, and correct metadata field types. Use `sample_excel_file` fixture from `conftest.py`.
+> **Context:** Each adapter test covers four scenarios:
+> 1. Valid input → `ProcessingResult(success=True)` with correct metadata field types
+> 2. Missing file → `ProcessingResult(success=False, error=...)`
+> 3. Correct metadata fields populated (`red_font_rows`, `protected_rows`, etc.)
+> 4. **(New — Risk B)** Non-default Config value reaches the processor:
+>    e.g. pass a custom `ISTDConfig(mz_tolerance_ppm=1.0)` to `istd_marker.run()`
+>    and assert the result differs from a run with `mz_tolerance_ppm=50.0`,
+>    confirming Config is not silently ignored.
+>
+> Use `sample_excel_file` fixture from `conftest.py`.
 
 - [ ] **Step 4.1: Write `test_adapter_data_organizer.py`**
 
@@ -1288,11 +1323,49 @@ PYTHONPATH=ms-core/src pytest tests/ -v --tb=short -x
 
 Expected: all tests PASS
 
-- [ ] **Step 7.5: Commit**
+- [ ] **Step 7.5: Add `utils/__init__.py` re-export regression test**
+
+Before committing, resolve the `DataValidator` re-export collision (Risk A from Task 3):
+
+1. Decide: remove `from ms_core.utils.validators import DataValidator` from `utils/__init__.py`, or rename it
+2. Create `tests/test_utils_reexports.py`:
+
+```python
+# tests/test_utils_reexports.py
+"""Regression: verify utils/__init__.py re-export boundaries after refactor."""
+from ms_preprocessing.utils.validators import DataValidator as ToolkitValidator
+
+
+def test_toolkit_datavalidator_is_local_not_mscore():
+    """DataValidator from utils.validators must be the toolkit class, not ms_core's."""
+    # The toolkit DataValidator has validate_dataframe() and validate_step_prerequisites()
+    v = ToolkitValidator()
+    assert hasattr(v, "validate_dataframe"), "should be toolkit DataValidator"
+    assert hasattr(v, "validate_step_prerequisites"), "should have new method from Task 2"
+
+
+def test_mscore_datavalidator_not_re_exported():
+    """utils/__init__ must not re-export ms_core's DataValidator directly."""
+    import ms_preprocessing.utils as utils_pkg
+    # After fix: ms_core's DataValidator should NOT be importable from utils directly
+    # (users must import from ms_core explicitly if they need it)
+    assert not hasattr(utils_pkg, "DataValidator") or utils_pkg.DataValidator is ToolkitValidator
+```
+
+- [ ] **Step 7.6: Run full suite**
 
 ```bash
-git add src/ms_preprocessing/config/__init__.py src/ms_preprocessing/config/settings.py
-git commit -m "refactor(config): remove ms_core Settings re-export; config/__init__ for GUI constants only"
+PYTHONPATH=ms-core/src pytest tests/test_utils_reexports.py tests/ -v --tb=short -x
+```
+
+Expected: all tests PASS
+
+- [ ] **Step 7.7: Commit**
+
+```bash
+git add src/ms_preprocessing/config/__init__.py src/ms_preprocessing/config/settings.py \
+        src/ms_preprocessing/utils/__init__.py tests/test_utils_reexports.py
+git commit -m "refactor(config): remove ms_core re-exports; fix DataValidator collision in utils/__init__"
 ```
 
 ---
@@ -1587,8 +1660,8 @@ git commit -m "refactor(cleanup): delete deprecated core/ layer; update public A
 | Chunk | Tasks | New files | Key outcome |
 |-------|-------|-----------|------------|
 | 1 — Foundation | 1–2 | results.py, test_results.py, test_validators_new.py | Typed result dataclasses available |
-| 2 — Adapters | 3–4 | adapters/ (5 files), 4 test files | Single ms_core boundary established |
-| 3 — CLI Migration | 5–7 | — | CLI uses adapters + PipelineSession; Settings unified |
+| 2 — Adapters | 3–4 | adapters/ (5 files), 4 test files | Single ms_core boundary; Config passthrough verified |
+| 3 — CLI Migration | 5–7 | test_utils_reexports.py | CLI uses adapters + PipelineSession; DataValidator collision fixed |
 | 4 — GUI Refactor | 8–9 | layout.py, event_handlers.py | main_window.py < 200 LOC; widgets use adapters |
 | 5 — Cleanup | 10 | — | core/ deleted; layer boundary verified |
 
