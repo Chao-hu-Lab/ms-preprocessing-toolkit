@@ -244,3 +244,58 @@ class TestDataOrganizer:
         """Compound prefixes like program2_DNA_program1_ should be removed."""
         header = r"Intensity of C:\data\program2_DNA_program1_TumorBC2257_DNA.tsv"
         assert organizer._extract_sample_name(header) == "TumorBC2257_DNA"
+
+    # ------------------------------------------------------------------
+    # Pre-merged Mz/RT input (file already has combined "Mz/RT" column)
+    # ------------------------------------------------------------------
+
+    @pytest.fixture
+    def pre_merged_data(self):
+        """Input that already has a combined Mz/RT column (e.g. from VBA processing)."""
+        data = {
+            "Mz/RT": [
+                "Sample_Type",
+                "359.045013/2.72",
+                "274.092012345/18.3267",
+                "100.1234/5.00",
+            ],
+            "QC_1": ["QC", 2024319.647, 1234567.0, 999999.0],
+            "TumorBC01": ["Exposure", None, 8660497.854, 111111.0],
+        }
+        return pd.DataFrame(data)
+
+    def test_validate_input_accepts_pre_merged_mz_rt(self, organizer, pre_merged_data):
+        """validate_input should accept a file whose first column is already Mz/RT."""
+        is_valid, message = organizer.validate_input(pre_merged_data)
+        assert is_valid, message
+
+    def test_expand_pre_merged_mz_rt_splits_values(self, organizer, pre_merged_data):
+        """_expand_pre_merged_mz_rt should split parseable rows into Mz and RT floats."""
+        # Remove Sample_Type row first (as the pipeline does)
+        data_df = pre_merged_data.iloc[1:].reset_index(drop=True)
+        expanded, was_expanded = organizer._expand_pre_merged_mz_rt(data_df)
+        assert was_expanded
+        assert list(expanded.columns[:2]) == ["Mz", "RT"]
+        assert abs(expanded.iloc[0, 0] - 359.045013) < 1e-6
+        assert abs(expanded.iloc[0, 1] - 2.72) < 1e-6
+
+    def test_process_normalizes_pre_merged_mz_rt_precision(self, organizer, pre_merged_data):
+        """Step 1 must reformat Mz/RT to 4-decimal/2-decimal standard precision."""
+        result = organizer.process(pre_merged_data)
+        assert result.success, result.message
+        data_rows = [
+            v for v in result.data.iloc[:, 0].tolist()
+            if isinstance(v, str) and "/" in v and v != "Sample_Type"
+        ]
+        assert len(data_rows) > 0
+        # 359.045013/2.72 → 359.0450/2.72
+        assert data_rows[0] == "359.0450/2.72"
+        # 274.092012345/18.3267 → 274.0920/18.33
+        assert data_rows[1] == "274.0920/18.33"
+
+    def test_expand_pre_merged_ignores_non_mz_rt_column(self, organizer):
+        """_expand_pre_merged_mz_rt must leave standard Mz/RT columns unchanged."""
+        df = pd.DataFrame({"Mz": [100.0, 200.0], "RT": [1.5, 2.5], "S1": [1, 2]})
+        expanded, was_expanded = organizer._expand_pre_merged_mz_rt(df)
+        assert not was_expanded
+        assert list(expanded.columns) == ["Mz", "RT", "S1"]
