@@ -42,8 +42,8 @@ def run_benchmark(
     input_path: Path,
     output_path: Path,
     bg_threshold: float,
-    skew_threshold: float,
     diff_threshold: float,
+    intensity_fc_threshold: float,
     qc_threshold: float,
 ) -> dict[str, Any]:
     """Execute load/process/save benchmark and return summary metrics."""
@@ -61,8 +61,8 @@ def run_benchmark(
     result = filter_proc.process(
         input_df,
         background_threshold=bg_threshold,
-        skew_threshold=skew_threshold,
         diff_threshold=diff_threshold,
+        intensity_fc_threshold=intensity_fc_threshold,
         qc_ratio_threshold=qc_threshold,
     )
     process_seconds = time.perf_counter() - t1
@@ -128,7 +128,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input", required=True, help="Input dataset path (typically STEP3 output xlsx).")
     parser.add_argument("--output", help="Optional benchmark output path (xlsx).")
     parser.add_argument("--bg", type=float, default=0.5, help="Background threshold.")
-    parser.add_argument("--skew", type=float, default=0.66, help="Skew threshold.")
+    parser.add_argument("--intensity-fc", type=float, default=2.0, help="Intensity fold-change threshold.")
     parser.add_argument("--diff", type=float, default=0.5, help="Diff threshold.")
     parser.add_argument("--qc", type=float, default=0.4, help="QC ratio threshold.")
     return parser.parse_args()
@@ -153,7 +153,7 @@ def main() -> int:
         input_path=input_path,
         output_path=output_path,
         bg_threshold=args.bg,
-        skew_threshold=args.skew,
+        intensity_fc_threshold=args.intensity_fc,
         diff_threshold=args.diff,
         qc_threshold=args.qc,
     )

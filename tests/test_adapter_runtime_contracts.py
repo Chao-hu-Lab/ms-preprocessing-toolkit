@@ -147,11 +147,11 @@ def test_feature_filter_run_from_df_applies_signal_threshold_and_flags(monkeypat
     result = module.run_from_df(
         df,
         background_threshold=0.1,
-        skew_threshold=0.2,
+        intensity_fc_threshold=0.2,
         diff_threshold=0.3,
         qc_ratio_threshold=0.4,
         enable_background_threshold=False,
-        enable_skew_threshold=True,
+        enable_intensity_fc_threshold=True,
         enable_diff_threshold=False,
         enable_qc_ratio_threshold=True,
         signal_threshold=123.0,
@@ -164,11 +164,11 @@ def test_feature_filter_run_from_df_applies_signal_threshold_and_flags(monkeypat
     assert processor.config.signal_threshold == 123.0
     assert calls["kwargs"] == {
         "background_threshold": 0.1,
-        "skew_threshold": 0.2,
+        "intensity_fc_threshold": 0.2,
         "diff_threshold": 0.3,
         "qc_ratio_threshold": 0.4,
         "enable_background_threshold": False,
-        "enable_skew_threshold": True,
+        "enable_intensity_fc_threshold": True,
         "enable_diff_threshold": False,
         "enable_qc_ratio_threshold": True,
         "protected_rows": {9},

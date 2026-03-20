@@ -62,7 +62,6 @@ class TestFeatureFilter:
         result = filter_proc.process(
             sample_data,
             background_threshold=0.33,
-            skew_threshold=0.66,
             diff_threshold=0.30,
         )
 
@@ -111,7 +110,6 @@ class TestFeatureFilter:
         result = filter_proc.process(
             df,
             background_threshold=0.33,
-            skew_threshold=0.66,
             diff_threshold=0.30,
             qc_ratio_threshold=0.60,
         )
@@ -138,7 +136,6 @@ class TestFeatureFilter:
         result = filter_proc.process(
             df,
             background_threshold=0.33,
-            skew_threshold=0.66,
             diff_threshold=0.30,
             qc_ratio_threshold=0.0,
         )
@@ -164,49 +161,17 @@ class TestFeatureFilter:
         enabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            skew_threshold=0.66,
             diff_threshold=0.30,
             qc_ratio_threshold=0.0,
+            enable_intensity_fc_threshold=False,
         )
         disabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            skew_threshold=0.66,
             diff_threshold=0.30,
             qc_ratio_threshold=0.0,
             enable_background_threshold=False,
-        )
-
-        assert enabled.success
-        assert disabled.success
-        assert "100.000/1.0" in enabled.data["Mz/RT"].tolist()
-        assert "100.000/1.0" not in disabled.data["Mz/RT"].tolist()
-
-    def test_disabling_skew_rule_removes_feature_kept_only_by_skew_ratio(self, filter_proc):
-        df = pd.DataFrame(
-            {
-                "Mz/RT": ["Sample_Type", "100.000/1.0"],
-                "Tolerance": ["na", "na"],
-                "Case1": ["case", 8000],
-                "Case2": ["case", 9000],
-                "QC1": ["qc", 8000],
-            }
-        )
-
-        enabled = filter_proc.process(
-            df,
-            background_threshold=0.33,
-            skew_threshold=0.66,
-            diff_threshold=0.30,
-            qc_ratio_threshold=0.0,
-        )
-        disabled = filter_proc.process(
-            df,
-            background_threshold=0.33,
-            skew_threshold=0.66,
-            diff_threshold=0.30,
-            qc_ratio_threshold=0.0,
-            enable_skew_threshold=False,
+            enable_intensity_fc_threshold=False,
         )
 
         assert enabled.success
@@ -230,17 +195,17 @@ class TestFeatureFilter:
         enabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            skew_threshold=0.66,
             diff_threshold=0.30,
             qc_ratio_threshold=0.0,
+            enable_intensity_fc_threshold=False,
         )
         disabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            skew_threshold=0.66,
             diff_threshold=0.30,
             qc_ratio_threshold=0.0,
             enable_diff_threshold=False,
+            enable_intensity_fc_threshold=False,
         )
 
         assert enabled.success
@@ -264,14 +229,12 @@ class TestFeatureFilter:
         enabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            skew_threshold=0.66,
             diff_threshold=0.30,
             qc_ratio_threshold=0.0,
         )
         disabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            skew_threshold=0.66,
             diff_threshold=0.30,
             qc_ratio_threshold=0.0,
             enable_qc_ratio_threshold=False,
@@ -300,14 +263,12 @@ class TestFeatureFilter:
         enabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            skew_threshold=0.66,
             diff_threshold=0.30,
             qc_ratio_threshold=0.75,
         )
         disabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            skew_threshold=0.66,
             diff_threshold=0.30,
             qc_ratio_threshold=0.75,
             enable_qc_ratio_threshold=False,
@@ -449,3 +410,141 @@ class TestFeatureFilter:
         assert "imputation_stats" in result.metadata
         assert result.metadata["imputation_stats"]["cells_imputed_from_nan"] == 1
         assert result.metadata["imputation_stats"]["cells_imputed_from_zero"] == 2
+
+    def test_intensity_fc_keeps_high_fold_change_feature(self, filter_proc):
+        """A feature with high intensity fold-change between groups should be kept."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 50000],
+                "Case2": ["case", 60000],
+                "Control1": ["control", 5000],
+                "Control2": ["control", 6000],
+                "QC1": ["qc", 30000],
+            }
+        )
+
+        result = filter_proc.process(
+            df,
+            intensity_fc_threshold=2.0,
+            enable_background_threshold=False,
+            enable_diff_threshold=False,
+        )
+
+        assert result.success
+        assert "100.000/1.0" in result.data["Mz/RT"].tolist()
+        assert result.statistics.get("intensity_fc_kept", 0) >= 1
+
+    def test_intensity_fc_does_not_keep_similar_intensity_feature(self, filter_proc):
+        """A feature where groups have similar intensity should NOT pass intensity FC gate."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Case2": ["case", 8500],
+                "Control1": ["control", 8200],
+                "Control2": ["control", 8300],
+                "QC1": ["qc", 8000],
+            }
+        )
+
+        result = filter_proc.process(
+            df,
+            intensity_fc_threshold=2.0,
+            enable_background_threshold=False,
+            enable_diff_threshold=False,
+        )
+
+        assert result.success
+        assert "100.000/1.0" not in result.data["Mz/RT"].tolist()
+
+    def test_disabling_intensity_fc_rule_removes_feature_kept_only_by_fc(self, filter_proc):
+        """Disabling the intensity FC gate should remove a feature kept only by that gate.
+
+        Data design: Case ratio=0.5 (1/2 above 5000), Control ratio=0 (0/2 above 5000).
+        - Stable gate: only 1 group >= 0.33 → FAIL (needs >=2)
+        - Diff gate: 0.5 - 0.0 = 0.5 < 0.60 → FAIL with high threshold
+        - Intensity FC: Case mean=25050, Control mean=100 → FC=250.5 → PASS
+        """
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 50000],
+                "Case2": ["case", 100],
+                "Control1": ["control", 100],
+                "Control2": ["control", 100],
+                "QC1": ["qc", 8000],
+            }
+        )
+
+        enabled = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            diff_threshold=0.60,
+            intensity_fc_threshold=2.0,
+        )
+        disabled = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            diff_threshold=0.60,
+            intensity_fc_threshold=2.0,
+            enable_intensity_fc_threshold=False,
+        )
+
+        assert enabled.success
+        assert disabled.success
+        assert "100.000/1.0" in enabled.data["Mz/RT"].tolist()
+        assert "100.000/1.0" not in disabled.data["Mz/RT"].tolist()
+
+    def test_unique_stats_marginal_contribution(self, filter_proc):
+        """Unique stats should reflect marginal contribution of each gate."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0", "200.000/2.0"],
+                "Tolerance": ["na", "na", "na"],
+                "Case1": ["case", 8000, 50000],
+                "Case2": ["case", 8500, 60000],
+                "Control1": ["control", 8200, 5000],
+                "Control2": ["control", 8300, 6000],
+                "QC1": ["qc", 8000, 30000],
+            }
+        )
+
+        result = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            diff_threshold=0.30,
+            intensity_fc_threshold=2.0,
+        )
+
+        assert result.success
+        stats = result.statistics
+        assert "unique_stable_kept" in stats
+        assert "unique_diff_kept" in stats
+        assert "unique_intensity_fc_kept" in stats
+
+    def test_deprecated_skew_parameter_warns(self, filter_proc):
+        """Passing removed skew_threshold should emit a DeprecationWarning."""
+        import warnings
+
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Control1": ["control", 8000],
+                "QC1": ["qc", 8000],
+            }
+        )
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = filter_proc.process(df, skew_threshold=0.66)
+            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+            assert len(deprecation_warnings) >= 1
+            assert "skew_threshold" in str(deprecation_warnings[0].message)
+
+        assert result.success

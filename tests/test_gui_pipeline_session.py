@@ -72,7 +72,7 @@ def test_gui_parameters_are_collected_in_single_pipeline_session_context(tmp_pat
         {
             "qc_ratio_threshold": 0.25,
             "enable_background_threshold": True,
-            "enable_skew_threshold": False,
+            "enable_intensity_fc_threshold": False,
             "enable_diff_threshold": True,
             "enable_qc_ratio_threshold": False,
         },
@@ -90,7 +90,7 @@ def test_gui_parameters_are_collected_in_single_pipeline_session_context(tmp_pat
     assert snapshot["step_parameters"][0]["mode"] == "normalization"
     assert snapshot["step_parameters"][3]["qc_ratio_threshold"] == 0.25
     assert snapshot["step_parameters"][3]["enable_background_threshold"] is True
-    assert snapshot["step_parameters"][3]["enable_skew_threshold"] is False
+    assert snapshot["step_parameters"][3]["enable_intensity_fc_threshold"] is False
     assert snapshot["step_parameters"][3]["enable_diff_threshold"] is True
     assert snapshot["step_parameters"][3]["enable_qc_ratio_threshold"] is False
     assert snapshot["metadata_refs"]["sample_info_ref"] == "SampleInfo"
