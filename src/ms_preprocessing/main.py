@@ -95,10 +95,10 @@ Examples:
     )
 
     parser.add_argument(
-        "--skew-threshold",
+        "--intensity-fc-threshold",
         type=float,
-        default=0.66,
-        help="Skew threshold for feature filtering (default: 0.66)",
+        default=2.0,
+        help="Intensity fold-change threshold for feature filtering (default: 2.0)",
     )
 
     parser.add_argument(
@@ -364,8 +364,8 @@ def run_cli(args):
                 3,
                 {
                     "background_threshold": args.bg_threshold,
-                    "skew_threshold": args.skew_threshold,
                     "diff_threshold": args.diff_threshold,
+                    "intensity_fc_threshold": args.intensity_fc_threshold,
                     "qc_ratio_threshold": args.qc_ratio_threshold,
                     "protected_rows": set(session.metadata.protected_rows),
                 },
@@ -373,8 +373,8 @@ def run_cli(args):
             result = _adapter_ff.run_from_df(
                 df,
                 background_threshold=args.bg_threshold,
-                skew_threshold=args.skew_threshold,
                 diff_threshold=args.diff_threshold,
+                intensity_fc_threshold=args.intensity_fc_threshold,
                 qc_ratio_threshold=args.qc_ratio_threshold,
                 protected_rows=session.metadata.protected_rows,
             )

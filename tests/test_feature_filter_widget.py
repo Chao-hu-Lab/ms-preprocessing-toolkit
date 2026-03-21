@@ -24,11 +24,11 @@ def test_feature_filter_widget_defaults_all_threshold_toggles_to_enabled(widget)
     params = widget.get_parameters()
 
     assert widget.bg_enabled_switch.get() == 1
-    assert widget.skew_enabled_switch.get() == 1
+    assert widget.intensity_fc_enabled_switch.get() == 1
     assert widget.diff_enabled_switch.get() == 1
     assert widget.qc_ratio_enabled_switch.get() == 1
     assert params["enable_background_threshold"] is True
-    assert params["enable_skew_threshold"] is True
+    assert params["enable_intensity_fc_threshold"] is True
     assert params["enable_diff_threshold"] is True
     assert params["enable_qc_ratio_threshold"] is True
 
@@ -71,17 +71,17 @@ def test_feature_filter_widget_run_processing_passes_toggle_flags(widget, monkey
         input_df,
         signal_threshold=5000,
         background_threshold=0.33,
-        skew_threshold=0.66,
+        intensity_fc_threshold=2.0,
         diff_threshold=0.30,
         qc_ratio_threshold=0.25,
         enable_background_threshold=True,
-        enable_skew_threshold=False,
+        enable_intensity_fc_threshold=False,
         enable_diff_threshold=True,
         enable_qc_ratio_threshold=False,
     )
 
     assert result.equals(input_df)
     assert captured["enable_background_threshold"] is True
-    assert captured["enable_skew_threshold"] is False
+    assert captured["enable_intensity_fc_threshold"] is False
     assert captured["enable_diff_threshold"] is True
     assert captured["enable_qc_ratio_threshold"] is False

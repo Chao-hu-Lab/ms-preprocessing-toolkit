@@ -87,23 +87,28 @@ class FeatureFilterWidget(BaseProcessingWidget):
             anchor="w",
         ).grid(row=1, column=3, padx=(PADDING["medium"], PADDING["small"]), sticky="w")
 
-        self.skew_enabled_var = tk.BooleanVar(value=True)
-        self.skew_enabled_switch = self._create_threshold_switch(
+        self.intensity_fc_enabled_var = tk.BooleanVar(value=True)
+        self.intensity_fc_enabled_switch = self._create_threshold_switch(
             row=2,
-            text="偏斜比例門檻",
-            variable=self.skew_enabled_var,
+            text="強度倍率門檻",
+            variable=self.intensity_fc_enabled_var,
         )
-        self.skew_slider = self._create_threshold_slider(row=2, default_value=0.66, on_change=self._update_skew)
-        self.skew_entry = self._create_threshold_entry(row=2, default_value=0.66, on_apply=self._apply_skew)
-        self._threshold_controls["skew"] = (
-            self.skew_enabled_var,
-            self.skew_slider,
-            self.skew_entry,
+        self.intensity_fc_slider = self._create_threshold_slider(
+            row=2, default_value=2.0, on_change=self._update_intensity_fc,
+            from_=1.0, to=10.0,
+        )
+        self.intensity_fc_entry = self._create_threshold_entry(
+            row=2, default_value=2.0, on_apply=self._apply_intensity_fc,
+        )
+        self._threshold_controls["intensity_fc"] = (
+            self.intensity_fc_enabled_var,
+            self.intensity_fc_slider,
+            self.intensity_fc_entry,
         )
 
         ctk.CTkLabel(
             self.params_frame,
-            text="啟用時：任一組 ratio >= 這個門檻就算偏斜型",
+            text="啟用時：任兩組平均強度 fold-change >= 門檻才算強度差異型",
             font=FONTS["small"],
             text_color=COLORS["text_secondary"],
             anchor="w",
@@ -165,7 +170,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
         criteria_text = (
             "目前規則：\n"
             "  1. 背景比例門檻開啟時，至少 2 組 ratio >= 背景比例門檻\n"
-            "  2. 偏斜比例門檻開啟時，任一組 ratio >= 偏斜比例門檻\n"
+            "  2. 強度倍率門檻開啟時，任兩組平均強度 fold-change >= 強度倍率門檻\n"
             "  3. 組間差異門檻開啟時，最大 ratio - 最小 ratio >= 組間差異門檻\n"
             "  4. QC_ratio 門檻開啟時，QC_ratio = 0 或低於設定值的 feature 會被移除"
         )
@@ -219,11 +224,13 @@ class FeatureFilterWidget(BaseProcessingWidget):
         row: int,
         default_value: float,
         on_change: Callable[[float], None],
+        from_: float = 0,
+        to: float = 1,
     ) -> ctk.CTkSlider:
         slider = ctk.CTkSlider(
             self.params_frame,
-            from_=0,
-            to=1,
+            from_=from_,
+            to=to,
             number_of_steps=1000,
             command=on_change,
         )
@@ -267,27 +274,29 @@ class FeatureFilterWidget(BaseProcessingWidget):
     def _commit_entry_to_slider(self, entry: ctk.CTkEntry, slider: ctk.CTkSlider) -> float:
         current = float(slider.get())
         if entry.cget("state") == "disabled":
-            return self._clamp_threshold(current)
+            return self._clamp_to_slider(current, slider)
 
         text = entry.get().strip()
         try:
-            parsed = self._clamp_threshold(float(text))
+            parsed = self._clamp_to_slider(float(text), slider)
         except ValueError:
-            parsed = self._clamp_threshold(current)
+            parsed = self._clamp_to_slider(current, slider)
         slider.set(parsed)
         entry.delete(0, "end")
         entry.insert(0, f"{parsed:.3f}")
         return parsed
 
     @staticmethod
-    def _clamp_threshold(value: float) -> float:
-        return max(0.0, min(1.0, value))
+    def _clamp_to_slider(value: float, slider: ctk.CTkSlider) -> float:
+        lo = float(slider.cget("from_"))
+        hi = float(slider.cget("to"))
+        return max(lo, min(hi, value))
 
     def _update_bg(self, value: float) -> None:
         self._sync_entry_from_slider(float(value), self.bg_entry)
 
-    def _update_skew(self, value: float) -> None:
-        self._sync_entry_from_slider(float(value), self.skew_entry)
+    def _update_intensity_fc(self, value: float) -> None:
+        self._sync_entry_from_slider(float(value), self.intensity_fc_entry)
 
     def _update_diff(self, value: float) -> None:
         self._sync_entry_from_slider(float(value), self.diff_entry)
@@ -298,8 +307,8 @@ class FeatureFilterWidget(BaseProcessingWidget):
     def _apply_bg(self) -> float:
         return self._commit_entry_to_slider(self.bg_entry, self.bg_slider)
 
-    def _apply_skew(self) -> float:
-        return self._commit_entry_to_slider(self.skew_entry, self.skew_slider)
+    def _apply_intensity_fc(self) -> float:
+        return self._commit_entry_to_slider(self.intensity_fc_entry, self.intensity_fc_slider)
 
     def _apply_diff(self) -> float:
         return self._commit_entry_to_slider(self.diff_entry, self.diff_slider)
@@ -312,13 +321,13 @@ class FeatureFilterWidget(BaseProcessingWidget):
         return {
             "signal_threshold": float(self.signal_entry.get() or "5000"),
             "background_threshold": self._apply_bg(),
-            "skew_threshold": self._apply_skew(),
             "diff_threshold": self._apply_diff(),
             "qc_ratio_threshold": self._apply_qc_ratio(),
+            "intensity_fc_threshold": self._apply_intensity_fc(),
             "enable_background_threshold": bool(self.bg_enabled_var.get()),
-            "enable_skew_threshold": bool(self.skew_enabled_var.get()),
             "enable_diff_threshold": bool(self.diff_enabled_var.get()),
             "enable_qc_ratio_threshold": bool(self.qc_ratio_enabled_var.get()),
+            "enable_intensity_fc_threshold": bool(self.intensity_fc_enabled_var.get()),
         }
 
     def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
@@ -326,13 +335,13 @@ class FeatureFilterWidget(BaseProcessingWidget):
         result = feature_filter_adapter.run_from_df(
             data,
             background_threshold=params.get("background_threshold"),
-            skew_threshold=params.get("skew_threshold"),
             diff_threshold=params.get("diff_threshold"),
             qc_ratio_threshold=params.get("qc_ratio_threshold"),
+            intensity_fc_threshold=params.get("intensity_fc_threshold"),
             enable_background_threshold=params.get("enable_background_threshold", True),
-            enable_skew_threshold=params.get("enable_skew_threshold", True),
             enable_diff_threshold=params.get("enable_diff_threshold", True),
             enable_qc_ratio_threshold=params.get("enable_qc_ratio_threshold", True),
+            enable_intensity_fc_threshold=params.get("enable_intensity_fc_threshold", True),
             signal_threshold=params.get("signal_threshold", 5000),
             protected_rows=set(
                 self._context.get("protected_rows") or self._context.get("red_font_rows") or []

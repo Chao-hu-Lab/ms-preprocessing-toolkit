@@ -45,7 +45,7 @@ def _make_cli_args(input_path: Path, output_path: Path | None, step: str) -> Sim
         istd_record_date=None,
         rt_tol=1.0,
         bg_threshold=0.33,
-        skew_threshold=0.66,
+        intensity_fc_threshold=2.0,
         diff_threshold=0.30,
         qc_ratio_threshold=0.0,
         persist_intermediate=False,
