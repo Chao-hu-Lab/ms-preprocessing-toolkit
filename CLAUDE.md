@@ -80,6 +80,13 @@ Use the `finishing-a-development-branch` skill to choose:
 - **NO** merging without passing tests
 - **NO** skipping `git status` check before starting work
 
+## Hygiene Rules
+
+- **測試暫存一律在 `.tmp/` 下**：使用 `conftest.py` 的 `project_temp_dir` fixture，禁止用 `Path.cwd()` 產生暫存
+- **`tests/` 是原始碼，`.tmp/tests/` 是 runtime 暫存**，兩者不同
+- **`tests/` 下只放 `.py` 檔案**，測試用的固定資料放 `tests/fixtures/`
+- 清理：`find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; rm -rf .tmp/ .pytest_cache/`
+
 ## Key Commands
 
 ```bash
