@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import py_compile
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -33,6 +34,16 @@ def test_cli_version_smoke() -> None:
 
     assert result.returncode == 0, result.stderr or result.stdout
     assert "MS Preprocessing Toolkit v" in result.stdout
+
+
+def test_runtime_version_matches_pyproject() -> None:
+    from ms_preprocessing import __version__
+
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    match = re.search(r'^version = "([^"]+)"$', pyproject, re.MULTILINE)
+
+    assert match is not None
+    assert __version__ == match.group(1)
 
 
 def test_parquet_cache_default_enabled() -> None:

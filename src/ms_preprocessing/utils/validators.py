@@ -106,6 +106,9 @@ class DataValidator:
                     )
                 )
 
+        if require_sample_type and not self._has_sample_type_row(df):
+            self.errors.append("Sample_Type row not found")
+
         return len(self.errors) == 0
 
     def validate_mz_rt_format(self, df: pd.DataFrame, column: str = "Mz/RT") -> bool:
@@ -242,6 +245,23 @@ class DataValidator:
                 if pattern.replace("_", "") in col_lower:
                     return col
         return None
+
+    @staticmethod
+    def _has_sample_type_row(df: pd.DataFrame) -> bool:
+        """Return whether the first column contains the Sample_Type marker row."""
+        if df.empty or len(df.columns) == 0:
+            return False
+
+        first_col = df.iloc[:, 0]
+        normalized = (
+            first_col.fillna("")
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            .str.replace(" ", "", regex=False)
+            .str.replace("_", "", regex=False)
+        )
+        return bool(normalized.eq("sampletype").any())
 
     @staticmethod
     def _is_valid_mz_rt(value: Any) -> bool:

@@ -42,6 +42,7 @@ class MainWindow(MainWindowEventHandlersMixin, MainWindowLayoutMixin, ctk.CTk):
         self._pipeline_session = PipelineSession(output_dir=self._output_dir, source_file=None)
         self._step_output_paths = self._pipeline_session.step_output_paths
         self._context = self._pipeline_session.context
+        self._source_context_snapshot: dict[str, object] | None = None
         self._last_materialized_export_path: Optional[Path] = None
 
         self._create_layout()
