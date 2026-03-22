@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import os
 import platform
 import subprocess
@@ -36,6 +37,7 @@ if TYPE_CHECKING:
         _pipeline_session: PipelineSession
         _step_output_paths: dict[int, Path]
         _context: dict[str, Any]
+        _source_context_snapshot: dict[str, Any] | None
         step_widgets: list[Any]
         step_buttons: list[Any]
         _step_status_labels: list[Any]
@@ -60,6 +62,28 @@ class MainWindowEventHandlersMixin:
     def _attach_pipeline_session(self: "_MainWindowEventHost", session: PipelineSession) -> None:
         self._pipeline_session = session
         self._step_output_paths = session.step_output_paths
+        self._context = session.context
+
+    def _snapshot_context(self: "_MainWindowEventHost", context: dict[str, Any]) -> dict[str, Any]:
+        """Copy source metadata so reruns can rebuild a clean pipeline session."""
+        return copy.deepcopy(context)
+
+    def _reset_pipeline_for_run_all(self: "_MainWindowEventHost") -> None:
+        """Start Run All from the originally loaded source metadata, not prior run state."""
+        self._completed_steps = set()
+        self._last_completed_step = None
+        self._last_run_all = False
+        self._last_materialized_export_path = None
+
+        source_snapshot = copy.deepcopy(self.__dict__.get("_source_context_snapshot"))
+        if source_snapshot is None:
+            if "_step_output_paths" in self.__dict__:
+                self._step_output_paths.clear()
+            return
+
+        session = self._new_pipeline_session(self._source_file)
+        self._attach_pipeline_session(session)
+        session.update_context_from_metadata(source_snapshot)
         self._context = session.context
 
     def _load_file_for_step(
@@ -124,6 +148,7 @@ class MainWindowEventHandlersMixin:
                     {"deleted_feature_df": loaded_deleted_feature}
                 )
             self._context = self._pipeline_session.context
+            self._source_context_snapshot = self._snapshot_context(self._context)
 
             if 0 <= step_index < len(self.step_widgets):
                 self.step_widgets[step_index].set_input_file(filepath)
@@ -221,6 +246,7 @@ class MainWindowEventHandlersMixin:
         original_step = self._current_step
         try:
             data = self._original_data.copy()
+            self._reset_pipeline_for_run_all()
 
             for index, widget in enumerate(self.step_widgets):
                 step_name = Settings.WORKFLOW_STEPS[index][0]

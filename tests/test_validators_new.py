@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pandas as pd
+
 from ms_preprocessing.gui.pipeline_session import PipelineSession
 from ms_preprocessing.utils.validators import DataValidator, ValidationResult
 
@@ -69,3 +71,23 @@ class TestValidateStepPrerequisites:
 
         assert result.is_valid is False
         assert any("data_organizer" in error for error in result.errors)
+
+
+class TestValidateDataframeSampleTypeContract:
+    def test_validate_dataframe_requires_sample_type_row_when_requested(self) -> None:
+        validator = DataValidator()
+        df = pd.DataFrame({"Mz/RT": ["100.0/1.0"], "S1": [123]})
+
+        result = validator.validate_dataframe(df, require_sample_type=True)
+
+        assert result is False
+        assert "Sample_Type row not found" in validator.errors
+
+    def test_validate_dataframe_accepts_sample_type_row_when_present(self) -> None:
+        validator = DataValidator()
+        df = pd.DataFrame({"Mz/RT": ["Sample_Type", "100.0/1.0"], "S1": ["case", 123]})
+
+        result = validator.validate_dataframe(df, require_sample_type=True)
+
+        assert result is True
+        assert validator.errors == []

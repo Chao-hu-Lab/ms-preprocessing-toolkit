@@ -21,18 +21,31 @@ Step 4 的可調參數請見 feature_filter_presets.py。
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 # ── 預設檔案路徑（機器相依，換電腦時更新此處）─────────────────────────────
-DEFAULT_METHOD_FILE = Path(
+METHOD_FILE_ENV = "MSPTK_METHOD_FILE"
+ISTD_RECORD_FILE_ENV = "MSPTK_ISTD_RECORD_FILE"
+
+_DEFAULT_METHOD_FILE_FALLBACK = Path(
     r"C:\Users\user\Desktop\NTU cancer\2025台大乳癌組織數據for Jia"
     r"\20260105中研院台大Breast cancer tissue\20260105 中研院分析.docx"
 )
 
-DEFAULT_ISTD_RECORD_FILE = Path(
+_DEFAULT_ISTD_RECORD_FILE_FALLBACK = Path(
     r"C:\Users\user\Desktop\NTU cancer\2025台大乳癌組織數據for Jia"
     r"\20260105中研院台大Breast cancer tissue\20260106 ISDTs record.xlsx"
 )
+
+
+def _resolve_path(env_var: str, fallback: Path) -> Path:
+    override = os.getenv(env_var)
+    return Path(override) if override else fallback
+
+
+DEFAULT_METHOD_FILE = _resolve_path(METHOD_FILE_ENV, _DEFAULT_METHOD_FILE_FALLBACK)
+DEFAULT_ISTD_RECORD_FILE = _resolve_path(ISTD_RECORD_FILE_ENV, _DEFAULT_ISTD_RECORD_FILE_FALLBACK)
 
 # ── Step 1：Data Organizer ────────────────────────────────────────────────────
 STEP1_PARAMS: dict = {

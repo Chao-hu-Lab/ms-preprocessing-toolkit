@@ -4,19 +4,20 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import sys
 from time import perf_counter
 from typing import Any
 
 from ms_core.preprocessing.settings import Settings
 from ms_core.utils.file_handler import FileHandler
 
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
 
-DEFAULT_METHOD_FILE = Path(
-    r"C:\Users\user\Desktop\NTU cancer\2025台大乳癌組織數據for Jia\20260105中研院台大Breast cancer tissue\20260105 中研院分析.docx"
-)
-DEFAULT_ISTD_RECORD_FILE = Path(
-    r"C:\Users\user\Desktop\NTU cancer\2025台大乳癌組織數據for Jia\20260105中研院台大Breast cancer tissue\20260106 ISDTs record.xlsx"
-)
+from ms_preprocessing.config.pipeline_defaults import DEFAULT_ISTD_RECORD_FILE, DEFAULT_METHOD_FILE
+
 METADATA_KEYS = (
     "red_font_rows",
     "blue_font_cells",

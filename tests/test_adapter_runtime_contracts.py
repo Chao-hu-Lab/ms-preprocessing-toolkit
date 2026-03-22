@@ -215,3 +215,52 @@ def test_adapter_run_from_df_returns_failure_when_processor_raises(
     assert result.success is False
     assert result.step == step
     assert result.error == "boom"
+
+
+@pytest.mark.parametrize(
+    "module_name",
+    [
+        "ms_preprocessing.adapters.data_organizer",
+        "ms_preprocessing.adapters.istd_marker",
+        "ms_preprocessing.adapters.duplicate_remover",
+        "ms_preprocessing.adapters.feature_filter",
+    ],
+)
+def test_adapter_run_from_df_keeps_success_when_handoff_persistence_raises(
+    monkeypatch,
+    module_name: str,
+) -> None:
+    module = importlib.import_module(module_name)
+    df = pd.DataFrame({"Mz/RT": ["Sample_Type", "100.0/1.0"], "S1": ["case", 1]})
+
+    class SuccessfulProcessor:
+        def __init__(self) -> None:
+            self.config = SimpleNamespace(
+                default_ppm_tolerance=20.0,
+                default_rt_tolerance=1.0,
+                signal_threshold=5000.0,
+            )
+
+        def set_progress_callback(self, callback) -> None:
+            _ = callback
+
+        def process(self, input_df, **kwargs):
+            _ = kwargs
+            return SimpleNamespace(success=True, data=input_df.copy(), metadata={}, statistics={})
+
+    processor_attr = {
+        "ms_preprocessing.adapters.data_organizer": "_DataOrganizer",
+        "ms_preprocessing.adapters.istd_marker": "_ISTDMarker",
+        "ms_preprocessing.adapters.duplicate_remover": "_DuplicateRemover",
+        "ms_preprocessing.adapters.feature_filter": "_FeatureFilter",
+    }[module_name]
+
+    monkeypatch.setattr(module, processor_attr, SuccessfulProcessor)
+    monkeypatch.setattr(module, "_save_output", lambda _df: (_ for _ in ()).throw(PermissionError("denied")))
+
+    result = module.run_from_df(df)
+
+    assert result.success is True
+    assert result.data is not None
+    assert result.data.equals(df)
+    assert result.output_path is None

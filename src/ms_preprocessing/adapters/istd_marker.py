@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import time
 from pathlib import Path
 from typing import Any, Callable
 
@@ -12,7 +11,7 @@ import pandas as pd
 from ms_core.preprocessing.istd_marker import ISTDMarker as _ISTDMarker
 from ms_core.preprocessing.settings import Settings as _CoreSettings
 
-from ms_preprocessing.adapters import _prepare_cache_root, _write_parquet_output
+from ms_preprocessing.adapters import _capture_output_path, _persist_adapter_output
 from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
 
 _STEP = "istd_marker"
@@ -35,11 +34,12 @@ def _read_input(input_path: str) -> pd.DataFrame:
     return pd.read_excel(input_path)
 
 
-def _save_output(df: pd.DataFrame) -> str:
-    cache_root = _prepare_cache_root(_CoreSettings.get_parquet_cache_root() / "adapters")
-    output_path = cache_root / f"{_STEP}_{time.time_ns()}.parquet"
-    _write_parquet_output(df, output_path)
-    return str(output_path)
+def _save_output(df: pd.DataFrame) -> str | None:
+    return _persist_adapter_output(
+        df,
+        step_name=_STEP,
+        preferred_root=_CoreSettings.get_parquet_cache_root() / "adapters",
+    )
 
 
 def _build_metadata(raw_meta: dict[str, Any]) -> ProcessingMetadata:
@@ -110,7 +110,7 @@ def _run_processor(
 
     output_path = None
     if core_result.success and core_result.data is not None:
-        output_path = _save_output(core_result.data)
+        output_path = _capture_output_path(_save_output, core_result.data, step_name=_STEP)
 
     raw_meta = core_result.metadata if isinstance(core_result.metadata, dict) else {}
     return ProcessingResult(
