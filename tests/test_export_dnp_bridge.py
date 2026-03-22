@@ -123,6 +123,10 @@ def test_dnp_bridge_always_receives_xlsx_even_when_intermediates_are_parquet(mon
             "ms_preprocessing.gui.event_handlers.MainWindowEventHandlersMixin._open_file_in_system_app",
             lambda *_a, **_k: None,
         )
+        monkeypatch.setattr(
+            "ms_preprocessing.gui.event_handlers.ensure_dnp_bridge_on_path",
+            lambda *_a, **_k: base / "fake-dnp" / "src",
+        )
 
         window._export_to_dnp()
 
@@ -237,6 +241,10 @@ def test_export_to_dnp_shows_completion_warning_when_sample_info_incomplete(
         monkeypatch.setattr(
             "ms_preprocessing.gui.event_handlers.MainWindowEventHandlersMixin._open_file_in_system_app",
             lambda *_a, **_k: None,
+        )
+        monkeypatch.setattr(
+            "ms_preprocessing.gui.event_handlers.ensure_dnp_bridge_on_path",
+            lambda *_a, **_k: base / "fake-dnp" / "src",
         )
 
         mod_bridge = ModuleType("metabolomics.adapters.preprocessing_to_dnp")
