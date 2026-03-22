@@ -81,11 +81,23 @@ Current behavior:
   `ms_preprocessing.utils.results.ProcessingResult`.
 - This branch only fixed local handoff persistence behavior.
 
-Follow-up work:
-- Reconfirm which fields from `ms-core` metadata are guaranteed stable.
-- Decide whether adapter success should ever depend on cache/handoff artifacts.
-- Add integration coverage that pins the expected metadata contract across both
-  repositories.
+Status:
+- Partially completed in `feature/cross-project-bootstrap-boundaries`.
+
+Implemented:
+- Added cross-repo adapter contract tests that pin the current `ms-core`
+  metadata shapes consumed by toolkit adapters.
+- Covered the current contract for:
+  - `DataOrganizer` -> `sample_info`
+  - `DuplicateRemover` -> row-marking metadata
+  - `FeatureFilter` -> `deleted_features` normalization and row-marking metadata
+  - `ISTDMarker` -> row-marking metadata
+
+Remaining:
+- Reconfirm which fields from `ms-core` metadata are intended to be long-term
+  stable and document them explicitly.
+- Decide whether adapter success should ever depend on cache/handoff artifacts
+  as a shared cross-repo contract rather than a toolkit-only choice.
 
 ### 4. Release/version coordination across repositories
 
@@ -94,15 +106,26 @@ Files to review:
 - `src/ms_preprocessing/__init__.py`
 - `ms-core` release notes or tags if version coupling exists
 
-Follow-up work:
-- Confirm whether toolkit and `ms-core` version bumps need explicit pairing.
-- If they do, document the pairing rule in release instructions and CI notes.
+Status:
+- Clarified current state in `feature/cross-project-bootstrap-boundaries`.
+
+Current state:
+- No repo-local evidence currently requires toolkit version bumps to match
+  `ms-core` package version bumps.
+- The strongest compatibility boundary today is the checked-in `ms-core`
+  submodule pointer, not a shared semantic version number.
+
+Remaining:
+- If any non-submodule deployment flow depends on a sibling `ms-core` checkout,
+  document how compatibility should be validated there.
+- If a release pairing rule is later introduced, add it to release
+  instructions and CI notes rather than relying on convention.
 
 ## Suggested Order
 
 1. Recheck import-time bootstrap behavior for `ms-core`
-2. Cross-repo adapter metadata contract tests
-3. Release/version coordination notes
+2. Decide whether non-submodule deployments need a documented compatibility
+   check against sibling `ms-core` checkouts
 
 ## Exit Criteria
 
