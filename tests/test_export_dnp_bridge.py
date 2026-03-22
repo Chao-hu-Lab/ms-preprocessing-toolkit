@@ -83,6 +83,12 @@ def _make_window_for_export(tmp_dir: Path) -> MainWindow:
     return window
 
 
+def _clear_metabolomics_modules() -> None:
+    for name in list(sys.modules):
+        if name == "metabolomics" or name.startswith("metabolomics."):
+            sys.modules.pop(name, None)
+
+
 def test_dnp_bridge_always_receives_xlsx_even_when_intermediates_are_parquet(monkeypatch, project_temp_dir) -> None:
     with project_temp_dir() as temp_dir:
         base = Path(temp_dir)
@@ -242,4 +248,126 @@ def test_export_to_dnp_shows_completion_warning_when_sample_info_incomplete(
         window._export_to_dnp()
 
         assert any("Batch" in msg and "DNA_mg/20uL" in msg for msg in shown_messages)
+
+
+def test_export_to_dnp_uses_dnp_src_override(monkeypatch, project_temp_dir) -> None:
+    with project_temp_dir() as temp_dir:
+        base = Path(temp_dir)
+        window = _make_window_for_export(base)
+        step4_xlsx = base / "STEP4_input.xlsx"
+        step4_xlsx.write_text("placeholder", encoding="utf-8")
+        window._step_output_paths = {3: step4_xlsx}
+        window._pipeline_session = _FakePipelineSession(output_path=base / "ALL_input.xlsx")
+        window._file_handler.save_data.return_value = base / "ALL_input.xlsx"
+
+        dnp_src = base / "external-dnp" / "src"
+        bridge_module = dnp_src / "metabolomics" / "adapters" / "preprocessing_to_dnp.py"
+        bridge_module.parent.mkdir(parents=True, exist_ok=True)
+        (dnp_src / "metabolomics" / "__init__.py").write_text("", encoding="utf-8")
+        (dnp_src / "metabolomics" / "adapters" / "__init__.py").write_text("", encoding="utf-8")
+        bridge_module.write_text(
+            "def convert_preprocessing_to_dnp(source, target):\n"
+            "    return target\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("MSPTK_DNP_SRC", str(dnp_src))
+        monkeypatch.setattr(sys, "path", list(sys.path))
+        _clear_metabolomics_modules()
+
+        out_path = base / "dnp.xlsx"
+        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.filedialog.asksaveasfilename", lambda **_k: str(out_path))
+        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.messagebox.showinfo", lambda *_a, **_k: None)
+        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.messagebox.showerror", lambda *_a, **_k: None)
+        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.messagebox.showwarning", lambda *_a, **_k: None)
+        monkeypatch.setattr(
+            "ms_preprocessing.gui.event_handlers.MainWindowEventHandlersMixin._open_file_in_system_app",
+            lambda *_a, **_k: None,
+        )
+
+        window._export_to_dnp()
+
+        assert str(dnp_src) in sys.path
+
+
+def test_export_to_dnp_shows_error_when_dnp_project_not_found(monkeypatch, project_temp_dir) -> None:
+    with project_temp_dir() as temp_dir:
+        base = Path(temp_dir)
+        window = _make_window_for_export(base)
+        step4_xlsx = base / "STEP4_input.xlsx"
+        step4_xlsx.write_text("placeholder", encoding="utf-8")
+        window._step_output_paths = {3: step4_xlsx}
+        window._pipeline_session = _FakePipelineSession(output_path=base / "ALL_input.xlsx")
+
+        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.ensure_dnp_bridge_on_path", lambda *_a, **_k: None)
+        monkeypatch.setattr(
+            "ms_preprocessing.gui.event_handlers.filedialog.asksaveasfilename",
+            lambda **_k: str(base / "dnp.xlsx"),
+        )
+        shown_errors: list[str] = []
+        monkeypatch.setattr(
+            "ms_preprocessing.gui.event_handlers.messagebox.showerror",
+            lambda title, msg, **_k: shown_errors.append(msg),
+        )
+        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.messagebox.showinfo", lambda *_a, **_k: None)
+        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.messagebox.showwarning", lambda *_a, **_k: None)
+
+        _clear_metabolomics_modules()
+        window._export_to_dnp()
+
+        assert any("Could not find the DNP adapter module." in msg for msg in shown_errors)
+
+
+def test_export_to_dnp_shows_error_when_bridge_module_missing(monkeypatch, project_temp_dir) -> None:
+    with project_temp_dir() as temp_dir:
+        base = Path(temp_dir)
+        window = _make_window_for_export(base)
+        step4_xlsx = base / "STEP4_input.xlsx"
+        step4_xlsx.write_text("placeholder", encoding="utf-8")
+        window._step_output_paths = {3: step4_xlsx}
+        window._pipeline_session = _FakePipelineSession(output_path=base / "ALL_input.xlsx")
+
+        dnp_src = base / "external-dnp" / "src"
+        (dnp_src / "metabolomics").mkdir(parents=True, exist_ok=True)
+        (dnp_src / "metabolomics" / "__init__.py").write_text("", encoding="utf-8")
+        monkeypatch.setenv("MSPTK_DNP_SRC", str(dnp_src))
+        _clear_metabolomics_modules()
+
+        shown_errors: list[str] = []
+        monkeypatch.setattr(
+            "ms_preprocessing.gui.event_handlers.filedialog.asksaveasfilename",
+            lambda **_k: str(base / "dnp.xlsx"),
+        )
+        monkeypatch.setattr(
+            "ms_preprocessing.gui.event_handlers.messagebox.showerror",
+            lambda title, msg, **_k: shown_errors.append(msg),
+        )
+        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.messagebox.showinfo", lambda *_a, **_k: None)
+        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.messagebox.showwarning", lambda *_a, **_k: None)
+
+        window._export_to_dnp()
+
+        assert any("Could not find the DNP adapter module." in msg for msg in shown_errors)
+
+
+def test_launch_dnp_uses_discovered_main_module(monkeypatch, project_temp_dir) -> None:
+    with project_temp_dir() as temp_dir:
+        base = Path(temp_dir)
+        window = _make_window_for_export(base)
+        window._launch_dnp = MainWindow._launch_dnp.__get__(window, MainWindow)
+        main_py = base / "external-dnp" / "src" / "metabolomics" / "__main__.py"
+        main_py.parent.mkdir(parents=True, exist_ok=True)
+        main_py.write_text("print('ok')", encoding="utf-8")
+
+        launched: dict[str, object] = {}
+
+        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.find_dnp_main_module", lambda *_a, **_k: main_py)
+        monkeypatch.setattr(
+            "ms_preprocessing.gui.event_handlers.subprocess.Popen",
+            lambda cmd, cwd: launched.update({"cmd": cmd, "cwd": cwd}),
+        )
+
+        window._launch_dnp()
+
+        assert launched["cmd"] == [sys.executable, "-m", "metabolomics"]
+        assert launched["cwd"] == str(main_py.parent.parent)
 

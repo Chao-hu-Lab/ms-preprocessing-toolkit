@@ -25,12 +25,26 @@ Current behavior:
 - `_launch_dnp()` separately discovers and launches the external project from a
   Desktop-relative path.
 
-Follow-up work:
-- Define a single discovery strategy for the DNP project root.
-- Replace ad-hoc `sys.path.insert()` calls with one tested helper.
-- Decide whether bridge discovery should come from config/env vars instead of
-  Desktop-relative conventions.
-- Add tests for "bridge project not found" and "bridge path found via override".
+Status:
+- Completed in `feature/cross-project-bootstrap-boundaries`.
+
+Implemented:
+- Added `bootstrap_paths.find_dnp_src()` / `ensure_dnp_src_on_path()` /
+  `find_dnp_main_module()`.
+- Added `find_dnp_bridge_module()` / `ensure_dnp_bridge_on_path()` so export
+  discovery verifies the bridge adapter module, not just the package root.
+- Export and launch now share the same discovery policy.
+- Added env overrides:
+  - `MSPTK_DNP_SRC`
+  - `MSPTK_DNP_PROJECT_ROOT`
+- Added tests for:
+  - "bridge project not found"
+  - "bridge path found via override"
+  - "package found but bridge adapter missing"
+
+Remaining:
+- Decide whether DNP launch should eventually move to an explicit configured
+  project root instead of layout discovery.
 
 ### 2. Bootstrap path policy for `ms-core`
 
@@ -41,11 +55,26 @@ Current behavior:
 - The toolkit searches upward for `ms-core/src`, including worktree-specific
   layouts, and mutates `sys.path` at import time.
 
-Follow-up work:
-- Confirm the supported checkout layouts and remove any accidental path probes.
-- Decide whether import-time path mutation should remain implicit or move to a
+Status:
+- Partially completed in `feature/cross-project-bootstrap-boundaries`.
+
+Implemented:
+- Added explicit env overrides:
+  - `MSPTK_MS_CORE_SRC`
+  - `MSPTK_MS_CORE_ROOT`
+- Added `BootstrapResolution` so bootstrap decisions are observable in tests.
+- Added a clearer bootstrap error path when no local `ms-core` checkout is found
+  and `ms_core` is not already importable from the Python environment.
+- Narrowed automatic discovery to the toolkit-local `ms-core` submodule /
+  submodule worktree layout.
+- Treat sibling `ms-core` checkouts as dev-only env-override scenarios instead
+  of an implicit runtime contract.
+- Added tests covering override paths, path insertion behavior, duplicate-path
+  avoidance, and the "missing vs preinstalled module" split.
+
+Remaining:
+- Confirm whether import-time path mutation should remain implicit or move to a
   clearer bootstrap step.
-- Verify the behavior against real multi-worktree usage on the target machines.
 
 ### 3. Adapter/runtime contract with `ms-core`
 
@@ -58,11 +87,23 @@ Current behavior:
   `ms_preprocessing.utils.results.ProcessingResult`.
 - This branch only fixed local handoff persistence behavior.
 
-Follow-up work:
-- Reconfirm which fields from `ms-core` metadata are guaranteed stable.
-- Decide whether adapter success should ever depend on cache/handoff artifacts.
-- Add integration coverage that pins the expected metadata contract across both
-  repositories.
+Status:
+- Partially completed in `feature/cross-project-bootstrap-boundaries`.
+
+Implemented:
+- Added cross-repo adapter contract tests that pin the current `ms-core`
+  metadata shapes consumed by toolkit adapters.
+- Covered the current contract for:
+  - `DataOrganizer` -> `sample_info`
+  - `DuplicateRemover` -> row-marking metadata
+  - `FeatureFilter` -> `deleted_features` normalization and row-marking metadata
+  - `ISTDMarker` -> row-marking metadata
+
+Remaining:
+- Reconfirm which fields from `ms-core` metadata are intended to be long-term
+  stable and document them explicitly.
+- Decide whether adapter success should ever depend on cache/handoff artifacts
+  as a shared cross-repo contract rather than a toolkit-only choice.
 
 ### 4. Release/version coordination across repositories
 
@@ -71,20 +112,27 @@ Files to review:
 - `src/ms_preprocessing/__init__.py`
 - `ms-core` release notes or tags if version coupling exists
 
-Follow-up work:
-- Confirm whether toolkit and `ms-core` version bumps need explicit pairing.
-- If they do, document the pairing rule in release instructions and CI notes.
+Status:
+- Clarified current state in `feature/cross-project-bootstrap-boundaries`.
+
+Current state:
+- No repo-local evidence currently requires toolkit version bumps to match
+  `ms-core` package version bumps.
+- The strongest compatibility boundary today is the checked-in `ms-core`
+  submodule pointer, not a shared semantic version number.
+
+Remaining:
+- If a release pairing rule is later introduced, add it to release
+  instructions and CI notes rather than relying on convention.
 
 ## Suggested Order
 
-1. DNP bridge discovery and override policy
-2. `ms-core` bootstrap path policy
-3. Cross-repo adapter metadata contract tests
-4. Release/version coordination notes
+1. Recheck import-time bootstrap behavior for `ms-core`
 
 ## Exit Criteria
 
 - Cross-project discovery paths are explicit and testable.
-- Runtime imports no longer depend on implicit Desktop-relative assumptions.
+- Runtime imports no longer depend only on implicit Desktop-relative
+  assumptions.
 - Any shared contract with `ms-core` or DNP bridge code is documented and
   covered by at least one integration test.

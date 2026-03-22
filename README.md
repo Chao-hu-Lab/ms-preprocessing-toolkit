@@ -73,6 +73,18 @@ pip install -e .
 git submodule update --init --recursive
 ```
 
+#### Advanced Dependency Overrides
+
+- Officially supported runtime layout: this repository plus the checked-in `ms-core` submodule.
+- External sibling `ms-core` checkouts are treated as a development-only override, not the default deployment contract.
+- If you intentionally want to use an external `ms-core` checkout, set one of:
+  - `MSPTK_MS_CORE_SRC`
+  - `MSPTK_MS_CORE_ROOT`
+- If `Data_Normalization_project_v2` lives outside the default discovery layout, set one of:
+  - `MSPTK_DNP_SRC`
+  - `MSPTK_DNP_PROJECT_ROOT`
+- DNP export and launch prefer these explicit overrides before falling back to layout discovery.
+
 ## 使用方式
 
 ### GUI 模式
