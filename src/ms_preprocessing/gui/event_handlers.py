@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, Optional, Protocol
 
 import pandas as pd
 
+from ms_preprocessing.bootstrap_paths import ensure_dnp_src_on_path, find_dnp_main_module
 from ms_preprocessing.config.settings import Settings
 from ms_preprocessing.gui.pipeline_session import PipelineSession
 from ms_preprocessing.gui.styles import COLORS
@@ -375,15 +376,10 @@ class MainWindowEventHandlersMixin:
         self.update_idletasks()
 
         try:
-            desktop = Path.home() / "Desktop"
-            dnp_candidates = [
-                desktop / "Data_Normalization_project_v2" / "src",
-                self._project_root.parent / "Data_Normalization_project_v2" / "src",
-            ]
-            for dnp_src in dnp_candidates:
-                if dnp_src.exists() and str(dnp_src) not in sys.path:
-                    sys.path.insert(0, str(dnp_src))
-                    break
+            dnp_src = ensure_dnp_src_on_path(self._project_root)
+            if dnp_src is None:
+                raise ImportError("Data_Normalization_project_v2 src not found")
+            self._log(f"Using DNP bridge source: {dnp_src}")
 
             from metabolomics.adapters.preprocessing_to_dnp import convert_preprocessing_to_dnp
 
@@ -496,18 +492,14 @@ class MainWindowEventHandlersMixin:
             return None
 
     def _launch_dnp(self: "_MainWindowEventHost") -> None:
-        desktop = Path.home() / "Desktop"
-        candidates = [
-            desktop / "Data_Normalization_project_v2" / "src" / "metabolomics" / "__main__.py",
-        ]
-        for main_py in candidates:
-            if main_py.exists():
-                self._log(f"Launching DNP: {main_py}")
-                subprocess.Popen(
-                    [sys.executable, "-m", "metabolomics"],
-                    cwd=str(main_py.parent.parent),
-                )
-                return
+        main_py = find_dnp_main_module(self._project_root)
+        if main_py is not None:
+            self._log(f"Launching DNP: {main_py}")
+            subprocess.Popen(
+                [sys.executable, "-m", "metabolomics"],
+                cwd=str(main_py.parent.parent),
+            )
+            return
         messagebox.showwarning(
             "Not Found",
             "Could not find Data_Normalization_project_v2.\nPlease launch it manually.",

@@ -1,6 +1,14 @@
 from pathlib import Path
 
-from ms_preprocessing.bootstrap_paths import find_ms_core_src
+from ms_preprocessing.bootstrap_paths import (
+    DNP_PROJECT_ROOT_ENV,
+    DNP_SRC_ENV,
+    MS_CORE_PROJECT_ROOT_ENV,
+    MS_CORE_SRC_ENV,
+    find_dnp_main_module,
+    find_dnp_src,
+    find_ms_core_src,
+)
 
 
 def test_find_ms_core_src_prefers_worktree_copy(tmp_path):
@@ -29,6 +37,27 @@ def test_find_ms_core_src_prefers_worktree_copy(tmp_path):
     assert find_ms_core_src(toolkit_root) == worktree_src, (
         f"Expected worktree src at {worktree_src}, got {find_ms_core_src(toolkit_root)}"
     )
+
+
+def test_find_ms_core_src_supports_env_override(monkeypatch, tmp_path):
+    ms_core_src = tmp_path / "custom-ms-core" / "src"
+    (ms_core_src / "ms_core").mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setenv(MS_CORE_SRC_ENV, str(ms_core_src))
+    monkeypatch.delenv(MS_CORE_PROJECT_ROOT_ENV, raising=False)
+
+    assert find_ms_core_src(tmp_path) == ms_core_src
+
+
+def test_find_ms_core_src_uses_project_root_override(monkeypatch, tmp_path):
+    ms_core_root = tmp_path / "external-ms-core"
+    ms_core_src = ms_core_root / "src"
+    (ms_core_src / "ms_core").mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.delenv(MS_CORE_SRC_ENV, raising=False)
+    monkeypatch.setenv(MS_CORE_PROJECT_ROOT_ENV, str(ms_core_root))
+
+    assert find_ms_core_src(tmp_path) == ms_core_src
 
 
 def test_find_ms_core_src_finds_submodule_at_toolkit_root(tmp_path):
@@ -67,3 +96,39 @@ def test_find_ms_core_src_submodule_takes_priority_over_sibling(tmp_path):
     assert result == submodule_src, (
         f"Submodule should take priority over sibling; got {result}"
     )
+
+
+def test_find_dnp_src_supports_env_override(monkeypatch, tmp_path):
+    dnp_src = tmp_path / "custom-dnp" / "src"
+    (dnp_src / "metabolomics").mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setenv(DNP_SRC_ENV, str(dnp_src))
+    monkeypatch.delenv(DNP_PROJECT_ROOT_ENV, raising=False)
+
+    assert find_dnp_src(tmp_path) == dnp_src
+
+
+def test_find_dnp_src_finds_sibling_repo_from_toolkit_root(monkeypatch, tmp_path):
+    monkeypatch.delenv(DNP_SRC_ENV, raising=False)
+    monkeypatch.delenv(DNP_PROJECT_ROOT_ENV, raising=False)
+
+    toolkit_root = tmp_path / "MS Data process package" / "ms-preprocessing-toolkit"
+    anchor = toolkit_root / "src" / "ms_preprocessing"
+    anchor.mkdir(parents=True, exist_ok=True)
+
+    dnp_src = tmp_path / "MS Data process package" / "Data_Normalization_project_v2" / "src"
+    (dnp_src / "metabolomics").mkdir(parents=True, exist_ok=True)
+
+    assert find_dnp_src(anchor) == dnp_src
+
+
+def test_find_dnp_main_module_uses_project_root_override(monkeypatch, tmp_path):
+    dnp_root = tmp_path / "external-dnp"
+    main_py = dnp_root / "src" / "metabolomics" / "__main__.py"
+    main_py.parent.mkdir(parents=True, exist_ok=True)
+    main_py.write_text("print('ok')", encoding="utf-8")
+
+    monkeypatch.delenv(DNP_SRC_ENV, raising=False)
+    monkeypatch.setenv(DNP_PROJECT_ROOT_ENV, str(dnp_root))
+
+    assert find_dnp_main_module(tmp_path) == main_py

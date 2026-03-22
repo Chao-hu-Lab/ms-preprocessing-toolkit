@@ -25,12 +25,25 @@ Current behavior:
 - `_launch_dnp()` separately discovers and launches the external project from a
   Desktop-relative path.
 
-Follow-up work:
-- Define a single discovery strategy for the DNP project root.
-- Replace ad-hoc `sys.path.insert()` calls with one tested helper.
-- Decide whether bridge discovery should come from config/env vars instead of
-  Desktop-relative conventions.
-- Add tests for "bridge project not found" and "bridge path found via override".
+Status:
+- Completed in `feature/cross-project-bootstrap-boundaries`.
+
+Implemented:
+- Added `bootstrap_paths.find_dnp_src()` / `ensure_dnp_src_on_path()` /
+  `find_dnp_main_module()`.
+- Export and launch now share the same discovery policy.
+- Added env overrides:
+  - `MSPTK_DNP_SRC`
+  - `MSPTK_DNP_PROJECT_ROOT`
+- Added tests for:
+  - "bridge project not found"
+  - "bridge path found via override"
+
+Remaining:
+- Reconfirm whether DNP bridge import should validate adapter-module presence
+  instead of package-level presence only.
+- Decide whether DNP launch should eventually move to an explicit configured
+  project root instead of layout discovery.
 
 ### 2. Bootstrap path policy for `ms-core`
 
@@ -41,11 +54,21 @@ Current behavior:
 - The toolkit searches upward for `ms-core/src`, including worktree-specific
   layouts, and mutates `sys.path` at import time.
 
-Follow-up work:
-- Confirm the supported checkout layouts and remove any accidental path probes.
-- Decide whether import-time path mutation should remain implicit or move to a
+Status:
+- Partially completed in `feature/cross-project-bootstrap-boundaries`.
+
+Implemented:
+- Added explicit env overrides:
+  - `MSPTK_MS_CORE_SRC`
+  - `MSPTK_MS_CORE_ROOT`
+- Kept current supported layout probes as fallback after explicit overrides.
+- Added tests covering both override paths.
+
+Remaining:
+- Confirm whether import-time path mutation should remain implicit or move to a
   clearer bootstrap step.
-- Verify the behavior against real multi-worktree usage on the target machines.
+- Verify the fallback layout probes against the actual target machine layouts
+  and trim any unsupported search patterns.
 
 ### 3. Adapter/runtime contract with `ms-core`
 
@@ -77,14 +100,14 @@ Follow-up work:
 
 ## Suggested Order
 
-1. DNP bridge discovery and override policy
-2. `ms-core` bootstrap path policy
-3. Cross-repo adapter metadata contract tests
-4. Release/version coordination notes
+1. Recheck import-time bootstrap behavior for `ms-core`
+2. Cross-repo adapter metadata contract tests
+3. Release/version coordination notes
 
 ## Exit Criteria
 
 - Cross-project discovery paths are explicit and testable.
-- Runtime imports no longer depend on implicit Desktop-relative assumptions.
+- Runtime imports no longer depend only on implicit Desktop-relative
+  assumptions.
 - Any shared contract with `ms-core` or DNP bridge code is documented and
   covered by at least one integration test.
