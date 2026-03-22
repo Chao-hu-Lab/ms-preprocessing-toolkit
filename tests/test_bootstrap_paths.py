@@ -1,10 +1,19 @@
+import sys
+
+import pytest
+
 from pathlib import Path
 
 from ms_preprocessing.bootstrap_paths import (
+    BootstrapResolution,
+    bootstrap_ms_core,
     DNP_PROJECT_ROOT_ENV,
     DNP_SRC_ENV,
+    ensure_ms_core_src_on_path,
+    find_dnp_bridge_module,
     MS_CORE_PROJECT_ROOT_ENV,
     MS_CORE_SRC_ENV,
+    resolve_ms_core_src,
     find_dnp_main_module,
     find_dnp_src,
     find_ms_core_src,
@@ -47,6 +56,51 @@ def test_find_ms_core_src_supports_env_override(monkeypatch, tmp_path):
     monkeypatch.delenv(MS_CORE_PROJECT_ROOT_ENV, raising=False)
 
     assert find_ms_core_src(tmp_path) == ms_core_src
+
+
+def test_resolve_ms_core_src_reports_env_override_source(monkeypatch, tmp_path):
+    ms_core_src = tmp_path / "custom-ms-core" / "src"
+    (ms_core_src / "ms_core").mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setenv(MS_CORE_SRC_ENV, str(ms_core_src))
+    monkeypatch.delenv(MS_CORE_PROJECT_ROOT_ENV, raising=False)
+
+    resolution = resolve_ms_core_src(tmp_path)
+
+    assert resolution.src_dir == ms_core_src
+    assert resolution.source == "env_src"
+    assert resolution.added_to_sys_path is False
+
+
+def test_bootstrap_ms_core_reports_when_it_adds_sys_path(monkeypatch, tmp_path):
+    ms_core_src = tmp_path / "custom-ms-core" / "src"
+    (ms_core_src / "ms_core").mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setenv(MS_CORE_SRC_ENV, str(ms_core_src))
+    monkeypatch.delenv(MS_CORE_PROJECT_ROOT_ENV, raising=False)
+    monkeypatch.setattr(sys, "path", list(sys.path))
+
+    resolution = bootstrap_ms_core(tmp_path)
+
+    assert resolution.src_dir == ms_core_src
+    assert resolution.source == "env_src"
+    assert resolution.added_to_sys_path is True
+    assert sys.path[0] == str(ms_core_src)
+
+
+def test_bootstrap_ms_core_does_not_duplicate_existing_sys_path(monkeypatch, tmp_path):
+    ms_core_src = tmp_path / "custom-ms-core" / "src"
+    (ms_core_src / "ms_core").mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setenv(MS_CORE_SRC_ENV, str(ms_core_src))
+    monkeypatch.delenv(MS_CORE_PROJECT_ROOT_ENV, raising=False)
+    monkeypatch.setattr(sys, "path", [str(ms_core_src), *sys.path])
+
+    resolution = bootstrap_ms_core(tmp_path)
+
+    assert resolution.src_dir == ms_core_src
+    assert resolution.added_to_sys_path is False
+    assert sys.path.count(str(ms_core_src)) == 1
 
 
 def test_find_ms_core_src_uses_project_root_override(monkeypatch, tmp_path):
@@ -98,6 +152,36 @@ def test_find_ms_core_src_submodule_takes_priority_over_sibling(tmp_path):
     )
 
 
+def test_ensure_ms_core_src_on_path_raises_clear_error_when_missing(monkeypatch, tmp_path):
+    monkeypatch.delenv(MS_CORE_SRC_ENV, raising=False)
+    monkeypatch.delenv(MS_CORE_PROJECT_ROOT_ENV, raising=False)
+    monkeypatch.setattr(
+        "ms_preprocessing.bootstrap_paths.resolve_ms_core_src",
+        lambda *_a, **_k: BootstrapResolution(src_dir=None, source="not_found"),
+    )
+    monkeypatch.setattr("ms_preprocessing.bootstrap_paths.importlib.util.find_spec", lambda _name: None)
+
+    with pytest.raises(ModuleNotFoundError) as exc:
+        ensure_ms_core_src_on_path(tmp_path)
+
+    message = str(exc.value)
+    assert "--recurse-submodules" in message
+    assert MS_CORE_SRC_ENV in message
+    assert MS_CORE_PROJECT_ROOT_ENV in message
+
+
+def test_ensure_ms_core_src_on_path_allows_preinstalled_module(monkeypatch, tmp_path):
+    monkeypatch.delenv(MS_CORE_SRC_ENV, raising=False)
+    monkeypatch.delenv(MS_CORE_PROJECT_ROOT_ENV, raising=False)
+    monkeypatch.setattr(
+        "ms_preprocessing.bootstrap_paths.resolve_ms_core_src",
+        lambda *_a, **_k: BootstrapResolution(src_dir=None, source="not_found"),
+    )
+    monkeypatch.setattr("ms_preprocessing.bootstrap_paths.importlib.util.find_spec", lambda _name: object())
+
+    assert ensure_ms_core_src_on_path(tmp_path) is None
+
+
 def test_find_dnp_src_supports_env_override(monkeypatch, tmp_path):
     dnp_src = tmp_path / "custom-dnp" / "src"
     (dnp_src / "metabolomics").mkdir(parents=True, exist_ok=True)
@@ -132,3 +216,15 @@ def test_find_dnp_main_module_uses_project_root_override(monkeypatch, tmp_path):
     monkeypatch.setenv(DNP_PROJECT_ROOT_ENV, str(dnp_root))
 
     assert find_dnp_main_module(tmp_path) == main_py
+
+
+def test_find_dnp_bridge_module_uses_src_override(monkeypatch, tmp_path):
+    dnp_src = tmp_path / "custom-dnp" / "src"
+    bridge_module = dnp_src / "metabolomics" / "adapters" / "preprocessing_to_dnp.py"
+    bridge_module.parent.mkdir(parents=True, exist_ok=True)
+    bridge_module.write_text("def convert_preprocessing_to_dnp(source, target):\n    return target\n", encoding="utf-8")
+
+    monkeypatch.setenv(DNP_SRC_ENV, str(dnp_src))
+    monkeypatch.delenv(DNP_PROJECT_ROOT_ENV, raising=False)
+
+    assert find_dnp_bridge_module(tmp_path) == bridge_module

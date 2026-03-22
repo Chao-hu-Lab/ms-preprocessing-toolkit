@@ -31,6 +31,8 @@ Status:
 Implemented:
 - Added `bootstrap_paths.find_dnp_src()` / `ensure_dnp_src_on_path()` /
   `find_dnp_main_module()`.
+- Added `find_dnp_bridge_module()` / `ensure_dnp_bridge_on_path()` so export
+  discovery verifies the bridge adapter module, not just the package root.
 - Export and launch now share the same discovery policy.
 - Added env overrides:
   - `MSPTK_DNP_SRC`
@@ -38,10 +40,9 @@ Implemented:
 - Added tests for:
   - "bridge project not found"
   - "bridge path found via override"
+  - "package found but bridge adapter missing"
 
 Remaining:
-- Reconfirm whether DNP bridge import should validate adapter-module presence
-  instead of package-level presence only.
 - Decide whether DNP launch should eventually move to an explicit configured
   project root instead of layout discovery.
 
@@ -61,8 +62,12 @@ Implemented:
 - Added explicit env overrides:
   - `MSPTK_MS_CORE_SRC`
   - `MSPTK_MS_CORE_ROOT`
+- Added `BootstrapResolution` so bootstrap decisions are observable in tests.
+- Added a clearer bootstrap error path when no local `ms-core` checkout is found
+  and `ms_core` is not already importable from the Python environment.
 - Kept current supported layout probes as fallback after explicit overrides.
-- Added tests covering both override paths.
+- Added tests covering override paths, path insertion behavior, duplicate-path
+  avoidance, and the "missing vs preinstalled module" split.
 
 Remaining:
 - Confirm whether import-time path mutation should remain implicit or move to a

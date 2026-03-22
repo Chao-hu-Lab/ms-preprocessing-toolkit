@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Optional, Protocol
 
 import pandas as pd
 
-from ms_preprocessing.bootstrap_paths import ensure_dnp_src_on_path, find_dnp_main_module
+from ms_preprocessing.bootstrap_paths import ensure_dnp_bridge_on_path, find_dnp_main_module
 from ms_preprocessing.config.settings import Settings
 from ms_preprocessing.gui.pipeline_session import PipelineSession
 from ms_preprocessing.gui.styles import COLORS
@@ -376,7 +376,7 @@ class MainWindowEventHandlersMixin:
         self.update_idletasks()
 
         try:
-            dnp_src = ensure_dnp_src_on_path(self._project_root)
+            dnp_src = ensure_dnp_bridge_on_path(self._project_root)
             if dnp_src is None:
                 raise ImportError("Data_Normalization_project_v2 src not found")
             self._log(f"Using DNP bridge source: {dnp_src}")

@@ -297,7 +297,7 @@ def test_export_to_dnp_shows_error_when_dnp_project_not_found(monkeypatch, proje
         window._step_output_paths = {3: step4_xlsx}
         window._pipeline_session = _FakePipelineSession(output_path=base / "ALL_input.xlsx")
 
-        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.ensure_dnp_src_on_path", lambda *_a, **_k: None)
+        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.ensure_dnp_bridge_on_path", lambda *_a, **_k: None)
         monkeypatch.setattr(
             "ms_preprocessing.gui.event_handlers.filedialog.asksaveasfilename",
             lambda **_k: str(base / "dnp.xlsx"),
@@ -311,6 +311,38 @@ def test_export_to_dnp_shows_error_when_dnp_project_not_found(monkeypatch, proje
         monkeypatch.setattr("ms_preprocessing.gui.event_handlers.messagebox.showwarning", lambda *_a, **_k: None)
 
         _clear_metabolomics_modules()
+        window._export_to_dnp()
+
+        assert any("Could not find the DNP adapter module." in msg for msg in shown_errors)
+
+
+def test_export_to_dnp_shows_error_when_bridge_module_missing(monkeypatch, project_temp_dir) -> None:
+    with project_temp_dir() as temp_dir:
+        base = Path(temp_dir)
+        window = _make_window_for_export(base)
+        step4_xlsx = base / "STEP4_input.xlsx"
+        step4_xlsx.write_text("placeholder", encoding="utf-8")
+        window._step_output_paths = {3: step4_xlsx}
+        window._pipeline_session = _FakePipelineSession(output_path=base / "ALL_input.xlsx")
+
+        dnp_src = base / "external-dnp" / "src"
+        (dnp_src / "metabolomics").mkdir(parents=True, exist_ok=True)
+        (dnp_src / "metabolomics" / "__init__.py").write_text("", encoding="utf-8")
+        monkeypatch.setenv("MSPTK_DNP_SRC", str(dnp_src))
+        _clear_metabolomics_modules()
+
+        shown_errors: list[str] = []
+        monkeypatch.setattr(
+            "ms_preprocessing.gui.event_handlers.filedialog.asksaveasfilename",
+            lambda **_k: str(base / "dnp.xlsx"),
+        )
+        monkeypatch.setattr(
+            "ms_preprocessing.gui.event_handlers.messagebox.showerror",
+            lambda title, msg, **_k: shown_errors.append(msg),
+        )
+        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.messagebox.showinfo", lambda *_a, **_k: None)
+        monkeypatch.setattr("ms_preprocessing.gui.event_handlers.messagebox.showwarning", lambda *_a, **_k: None)
+
         window._export_to_dnp()
 
         assert any("Could not find the DNP adapter module." in msg for msg in shown_errors)
