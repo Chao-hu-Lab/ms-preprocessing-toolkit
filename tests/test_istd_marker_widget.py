@@ -1,0 +1,57 @@
+"""Tests for the Step 2 ISTD marker widget."""
+
+from __future__ import annotations
+
+import pandas as pd
+import pytest
+
+from ms_preprocessing.adapters import istd_marker as istd_marker_adapter
+from ms_preprocessing.gui.widgets.istd_marker_widget import ISTDMarkerWidget
+from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
+
+
+@pytest.fixture
+def widget(ctk_root):
+    step2_widget = ISTDMarkerWidget(ctk_root, step_index=1)
+    step2_widget.pack()
+    ctk_root.update_idletasks()
+    try:
+        yield step2_widget
+    finally:
+        step2_widget.destroy()
+
+
+def test_istd_marker_widget_defaults_rt_tolerance_to_1_5(widget) -> None:
+    params = widget.get_parameters()
+
+    assert params["ppm_tolerance"] == pytest.approx(20.0)
+    assert params["rt_tolerance"] == pytest.approx(1.5)
+
+
+def test_istd_marker_widget_run_processing_forwards_rt_tolerance(widget, monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_run_from_df(data, **kwargs):
+        captured.update(kwargs)
+        return ProcessingResult(
+            success=True,
+            step="istd_marker",
+            output_path=None,
+            data=data.copy(),
+            metadata=ProcessingMetadata(),
+            statistics={},
+        )
+
+    monkeypatch.setattr(istd_marker_adapter, "run_from_df", fake_run_from_df)
+    input_df = pd.DataFrame(
+        {
+            "Mz/RT": ["Sample_Type", "100.0/1.0"],
+            "Case1": ["case", 9000],
+            "QC1": ["qc", 9000],
+        }
+    )
+
+    result = widget.run_processing(input_df, **widget.get_parameters())
+
+    assert result.equals(input_df)
+    assert captured["rt_tolerance"] == pytest.approx(1.5)

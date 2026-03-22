@@ -120,7 +120,7 @@ def test_run_all_steps_rebuilds_clean_pipeline_session_from_loaded_source(tmp_pa
                 step="istd_marker",
                 output_path=None,
                 data=data.copy(),
-                metadata=ProcessingMetadata(),
+                metadata=ProcessingMetadata(red_font_rows={7}, protected_rows={7}),
             )
         ),
         _Widget(
@@ -129,7 +129,7 @@ def test_run_all_steps_rebuilds_clean_pipeline_session_from_loaded_source(tmp_pa
                 step="duplicate_remover",
                 output_path=None,
                 data=data.copy(),
-                metadata=ProcessingMetadata(),
+                metadata=ProcessingMetadata(red_font_rows={7}, protected_rows={7}),
             )
         ),
         _Widget(
@@ -138,7 +138,11 @@ def test_run_all_steps_rebuilds_clean_pipeline_session_from_loaded_source(tmp_pa
                 step="feature_filter",
                 output_path=None,
                 data=data.copy(),
-                metadata=ProcessingMetadata(highlight_rows={8}),
+                metadata=ProcessingMetadata(
+                    red_font_rows={7},
+                    protected_rows={7},
+                    highlight_rows={8},
+                ),
             )
         ),
     ]

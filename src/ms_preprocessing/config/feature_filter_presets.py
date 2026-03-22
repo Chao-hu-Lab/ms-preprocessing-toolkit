@@ -3,7 +3,7 @@ Step 4 Feature Filter — Parameter Presets
 
 設計依據：
   - 主場景：2 組（exposure vs control）+ QC，總樣本 85–148，每組約 20–46 人
-  - QC 樣本數量少（7–10 個），統計力不足，qc_ratio_threshold 統一維持 0.00
+  - QC 樣本數量少（7–10 個），因此 preset 採固定通用值：loose=0.00、default=0.25、strict=0.50
   - diff_threshold 代表「最大偵測率組 - 最小偵測率組」，2 組情境下等同直接的組間差異
   - intensity_fc_threshold 代表「各組平均強度 fold-change」，抓偵測率相似但強度差異大的特徵
 
@@ -59,7 +59,7 @@ _DEFAULT: Step4Params = {
     "signal_threshold":                5000.0,
     "background_threshold":            0.33,
     "diff_threshold":                  0.25,
-    "qc_ratio_threshold":              0.00,
+    "qc_ratio_threshold":              0.25,
     "intensity_fc_threshold":          2.0,
     "enable_background_threshold":     True,
     "enable_diff_threshold":           True,
@@ -75,7 +75,7 @@ _STRICT: Step4Params = {
     "signal_threshold":                5000.0,
     "background_threshold":            0.50,
     "diff_threshold":                  0.35,
-    "qc_ratio_threshold":              0.00,
+    "qc_ratio_threshold":              0.50,
     "intensity_fc_threshold":          3.0,
     "enable_background_threshold":     True,
     "enable_diff_threshold":           True,
@@ -92,9 +92,9 @@ STEP4_PRESETS: dict[PresetName, Step4Params] = {
 
 # 各 preset 的人類可讀說明，可用於 GUI tooltip 或測試報告
 PRESET_DESCRIPTIONS: dict[PresetName, str] = {
-    "loose":   "寬鬆：探索型分析，保留較多候選特徵（diff≥0.20，bg≥0.20，fc≥1.5x）",
-    "default": "預設：主力用途，組間 6–9 人偵測率差即保留（diff≥0.25，bg≥0.33，fc≥2.0x）",
-    "strict":  "嚴謹：發表品質，組間 8–12 人偵測率差才保留（diff≥0.35，bg≥0.50，fc≥3.0x）",
+    "loose":   "寬鬆：探索型分析，保留較多候選特徵（diff≥0.20，bg≥0.20，fc≥1.5x，QC_ratio=0 僅移除零值）",
+    "default": "預設：主力用途，平衡保留與 QC 穩定性（diff≥0.25，bg≥0.33，fc≥2.0x，QC_ratio≥0.25）",
+    "strict":  "嚴謹：發表品質，強調高確信與 QC 穩定（diff≥0.35，bg≥0.50，fc≥3.0x，QC_ratio≥0.50）",
 }
 
 

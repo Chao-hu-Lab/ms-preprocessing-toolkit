@@ -97,7 +97,7 @@ def test_gui_parameters_are_collected_in_single_pipeline_session_context(tmp_pat
     assert snapshot["metadata_refs"]["deleted_feature_ref"] == "deleted_feature"
 
 
-def test_update_from_result_merges_metadata_and_tracks_completed_steps(tmp_path) -> None:
+def test_update_from_result_replaces_row_indexed_metadata_and_tracks_completed_steps(tmp_path) -> None:
     from ms_preprocessing.gui.pipeline_session import PipelineSession
     from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
 
@@ -138,16 +138,16 @@ def test_update_from_result_merges_metadata_and_tracks_completed_steps(tmp_path)
     assert session.can_run_step("duplicate_remover") is True
     assert session.can_run_step("feature_filter") is True
     assert session.completed_steps == {"data_organizer", "duplicate_remover"}
-    assert session.metadata.red_font_rows == {1}
-    assert session.metadata.protected_rows == {1, 2}
-    assert session.metadata.blue_font_cells == ["B2", "C3"]
-    assert session.metadata.highlight_rows == {4, 5}
+    assert session.metadata.red_font_rows == set()
+    assert session.metadata.protected_rows == {2}
+    assert session.metadata.blue_font_cells == ["C3"]
+    assert session.metadata.highlight_rows == {5}
     assert session.metadata.sample_info is sample_info
     assert context_alias is session.context
-    assert context_alias["red_font_rows"] == {1}
-    assert context_alias["protected_rows"] == {1, 2}
-    assert context_alias["blue_font_cells"] == ["B2", "C3"]
-    assert context_alias["highlight_rows"] == {4, 5}
+    assert context_alias["red_font_rows"] == set()
+    assert context_alias["protected_rows"] == {2}
+    assert context_alias["blue_font_cells"] == ["C3"]
+    assert context_alias["highlight_rows"] == {5}
     assert session.context["sample_info"] is sample_info
     assert session.step_outputs["data_organizer"].endswith("step1.parquet")
 

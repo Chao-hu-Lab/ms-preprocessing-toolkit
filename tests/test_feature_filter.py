@@ -344,7 +344,7 @@ class TestFeatureFilter:
             result.statistics["cells_imputed_from_nan"] + result.statistics["cells_imputed_from_zero"]
         )
 
-    def test_imputation_replaces_all_zero_group_with_positive_values(self, filter_proc):
+    def test_imputation_keeps_all_zero_group_at_zero(self, filter_proc):
         df = pd.DataFrame(
             {
                 "Mz/RT": ["Sample_Type", "100.0/1.0"],
@@ -363,8 +363,30 @@ class TestFeatureFilter:
         assert result.success
         out = result.data
         assert out is not None
-        assert float(out.loc[1, "Case1"]) > 0
-        assert float(out.loc[1, "Case2"]) > 0
+        assert float(out.loc[1, "Case1"]) == 0.0
+        assert float(out.loc[1, "Case2"]) == 0.0
+
+    def test_imputation_keeps_all_zero_qc_group_at_zero(self, filter_proc):
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.0/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Case2": ["case", 8500],
+                "Control1": ["control", 9000],
+                "Control2": ["control", 9100],
+                "QC1": ["qc", 0],
+                "QC2": ["qc", 0],
+            }
+        )
+
+        result = filter_proc.process(df, qc_ratio_threshold=0.0, enable_qc_ratio_threshold=False)
+
+        assert result.success
+        out = result.data
+        assert out is not None
+        assert float(out.loc[1, "QC1"]) == 0.0
+        assert float(out.loc[1, "QC2"]) == 0.0
 
     def test_imputation_treats_zero_as_missing_for_group_and_qc_columns(self, filter_proc):
         df = pd.DataFrame(

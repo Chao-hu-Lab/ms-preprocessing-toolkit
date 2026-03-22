@@ -120,8 +120,8 @@ class FeatureFilterWidget(BaseProcessingWidget):
             text="組間差異門檻",
             variable=self.diff_enabled_var,
         )
-        self.diff_slider = self._create_threshold_slider(row=3, default_value=0.30, on_change=self._update_diff)
-        self.diff_entry = self._create_threshold_entry(row=3, default_value=0.30, on_apply=self._apply_diff)
+        self.diff_slider = self._create_threshold_slider(row=3, default_value=0.25, on_change=self._update_diff)
+        self.diff_entry = self._create_threshold_entry(row=3, default_value=0.25, on_apply=self._apply_diff)
         self._threshold_controls["diff"] = (
             self.diff_enabled_var,
             self.diff_slider,
@@ -144,12 +144,12 @@ class FeatureFilterWidget(BaseProcessingWidget):
         )
         self.qc_ratio_slider = self._create_threshold_slider(
             row=4,
-            default_value=0.00,
+            default_value=0.25,
             on_change=self._update_qc_ratio,
         )
         self.qc_ratio_entry = self._create_threshold_entry(
             row=4,
-            default_value=0.00,
+            default_value=0.25,
             on_apply=self._apply_qc_ratio,
         )
         self._threshold_controls["qc_ratio"] = (

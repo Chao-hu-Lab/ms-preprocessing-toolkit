@@ -18,7 +18,7 @@ class ISTDConfig:
 
     # Default tolerances for duplicate detection
     default_ppm_tolerance: float = 20.0
-    default_rt_tolerance: float = 1.0
+    default_rt_tolerance: float = 1.5
 
     # Column names
     feature_id_col: str = "Mz/RT"
