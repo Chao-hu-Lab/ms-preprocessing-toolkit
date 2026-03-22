@@ -271,6 +271,7 @@ def test_export_to_dnp_uses_dnp_src_override(monkeypatch, project_temp_dir) -> N
             encoding="utf-8",
         )
         monkeypatch.setenv("MSPTK_DNP_SRC", str(dnp_src))
+        monkeypatch.setattr(sys, "path", list(sys.path))
         _clear_metabolomics_modules()
 
         out_path = base / "dnp.xlsx"
