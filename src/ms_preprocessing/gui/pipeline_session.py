@@ -113,7 +113,7 @@ class PipelineSession:
             return
 
         new_metadata = result.metadata
-        self._merge_formatting_metadata(
+        self._replace_formatting_metadata(
             red_font_rows=set(new_metadata.red_font_rows),
             protected_rows=set(new_metadata.protected_rows),
             blue_font_cells=list(new_metadata.blue_font_cells),
@@ -229,6 +229,26 @@ class PipelineSession:
             )
         if highlight_rows is not None:
             self.metadata.highlight_rows |= set(highlight_rows)
+
+    def _replace_formatting_metadata(
+        self,
+        *,
+        red_font_rows: set[Any] | None = None,
+        protected_rows: set[Any] | None = None,
+        blue_font_cells: list[Any] | None = None,
+        highlight_rows: set[Any] | None = None,
+    ) -> None:
+        """Replace row/cell-indexed formatting metadata with the latest step output."""
+        if red_font_rows is not None:
+            self.metadata.red_font_rows = set(red_font_rows)
+        if protected_rows is not None:
+            self.metadata.protected_rows = set(protected_rows)
+        elif red_font_rows is not None:
+            self.metadata.protected_rows = set(red_font_rows)
+        if blue_font_cells is not None:
+            self.metadata.blue_font_cells = list(blue_font_cells)
+        if highlight_rows is not None:
+            self.metadata.highlight_rows = set(highlight_rows)
 
     @staticmethod
     def _merge_sequence(existing: list[Any], incoming: list[Any]) -> list[Any]:

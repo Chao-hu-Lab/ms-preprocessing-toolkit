@@ -65,11 +65,11 @@ class ISTDMarkerWidget(BaseProcessingWidget):
 
         self.rt_entry = ctk.CTkEntry(
             self.params_frame,
-            placeholder_text="1.0",
+            placeholder_text="1.5",
             width=160,
             font=FONTS["body"],
         )
-        self.rt_entry.insert(0, "1.0")
+        self.rt_entry.insert(0, "1.5")
         self.rt_entry.grid(row=1, column=1, padx=PADDING["small"], pady=PADDING["small"])
 
         # Known ISTD m/z values
@@ -146,7 +146,7 @@ class ISTDMarkerWidget(BaseProcessingWidget):
         """Get current parameter values."""
         params = {
             "ppm_tolerance": float(self.ppm_entry.get() or "20"),
-            "rt_tolerance": float(self.rt_entry.get() or "0.5"),
+            "rt_tolerance": float(self.rt_entry.get() or "1.5"),
             "istd_features": set(),
             "istd_mz_list": self._parse_istd_mz_list(),
         }
@@ -179,7 +179,7 @@ class ISTDMarkerWidget(BaseProcessingWidget):
             istd_record_file=params.get("istd_record_file"),
             istd_record_date=params.get("istd_record_date"),
             ppm_tolerance=params.get("ppm_tolerance", 20),
-            rt_tolerance=params.get("rt_tolerance", 1.0),
+            rt_tolerance=params.get("rt_tolerance", 1.5),
             progress_callback=self.update_progress,
         )
 

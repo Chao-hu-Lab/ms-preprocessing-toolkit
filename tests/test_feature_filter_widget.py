@@ -31,6 +31,8 @@ def test_feature_filter_widget_defaults_all_threshold_toggles_to_enabled(widget)
     assert params["enable_intensity_fc_threshold"] is True
     assert params["enable_diff_threshold"] is True
     assert params["enable_qc_ratio_threshold"] is True
+    assert params["diff_threshold"] == pytest.approx(0.25)
+    assert params["qc_ratio_threshold"] == pytest.approx(0.25)
 
 
 def test_feature_filter_widget_disables_matching_inputs_when_toggle_is_off(widget) -> None:
