@@ -71,6 +71,16 @@ def test_docs_reference_unified_parquet_pipeline_and_zero_missing_behavior() -> 
     assert "troubleshooting checklist" in design.lower()
 
 
+def test_readme_documents_dependency_override_policy() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8", errors="replace")
+
+    assert "MSPTK_MS_CORE_SRC" in readme
+    assert "MSPTK_MS_CORE_ROOT" in readme
+    assert "development-only override" in readme
+    assert "MSPTK_DNP_SRC" in readme
+    assert "MSPTK_DNP_PROJECT_ROOT" in readme
+
+
 def test_docs_include_conservative_io_go_no_go_and_rollback_criteria() -> None:
     rollout = (
         ROOT / "docs" / "plans" / "2026-03-05-unified-parquet-v2-rollout-checklist.md"

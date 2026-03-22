@@ -65,15 +65,16 @@ Implemented:
 - Added `BootstrapResolution` so bootstrap decisions are observable in tests.
 - Added a clearer bootstrap error path when no local `ms-core` checkout is found
   and `ms_core` is not already importable from the Python environment.
-- Kept current supported layout probes as fallback after explicit overrides.
+- Narrowed automatic discovery to the toolkit-local `ms-core` submodule /
+  submodule worktree layout.
+- Treat sibling `ms-core` checkouts as dev-only env-override scenarios instead
+  of an implicit runtime contract.
 - Added tests covering override paths, path insertion behavior, duplicate-path
   avoidance, and the "missing vs preinstalled module" split.
 
 Remaining:
 - Confirm whether import-time path mutation should remain implicit or move to a
   clearer bootstrap step.
-- Verify the fallback layout probes against the actual target machine layouts
-  and trim any unsupported search patterns.
 
 ### 3. Adapter/runtime contract with `ms-core`
 
@@ -121,16 +122,12 @@ Current state:
   submodule pointer, not a shared semantic version number.
 
 Remaining:
-- If any non-submodule deployment flow depends on a sibling `ms-core` checkout,
-  document how compatibility should be validated there.
 - If a release pairing rule is later introduced, add it to release
   instructions and CI notes rather than relying on convention.
 
 ## Suggested Order
 
 1. Recheck import-time bootstrap behavior for `ms-core`
-2. Decide whether non-submodule deployments need a documented compatibility
-   check against sibling `ms-core` checkouts
 
 ## Exit Criteria
 

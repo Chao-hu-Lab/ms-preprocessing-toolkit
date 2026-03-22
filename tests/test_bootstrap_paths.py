@@ -20,21 +20,15 @@ from ms_preprocessing.bootstrap_paths import (
 )
 
 
-def test_find_ms_core_src_prefers_worktree_copy(tmp_path):
-    """Worktree copy with bridge marker should be preferred over main src."""
+def test_find_ms_core_src_prefers_toolkit_submodule_worktree_copy(tmp_path):
+    """Toolkit-local ms-core worktree should be preferred over the submodule src."""
     toolkit_root = tmp_path / "Desktop" / "MS Data process package" / "ms-preprocessing-toolkit"
     toolkit_root.mkdir(parents=True, exist_ok=True)
+    anchor = toolkit_root / "src" / "ms_preprocessing"
+    anchor.mkdir(parents=True, exist_ok=True)
 
-    main_src = tmp_path / "Desktop" / "MS Data process package" / "ms-core" / "src"
-    worktree_src = (
-        tmp_path
-        / "Desktop"
-        / "MS Data process package"
-        / "ms-core"
-        / ".worktrees"
-        / "cross-project-bridge"
-        / "src"
-    )
+    main_src = toolkit_root / "ms-core" / "src"
+    worktree_src = toolkit_root / "ms-core" / ".worktrees" / "cross-project-bridge" / "src"
 
     (main_src / "ms_core" / "utils").mkdir(parents=True, exist_ok=True)
     (worktree_src / "ms_core" / "utils").mkdir(parents=True, exist_ok=True)
@@ -43,8 +37,8 @@ def test_find_ms_core_src_prefers_worktree_copy(tmp_path):
         encoding="utf-8",
     )
 
-    assert find_ms_core_src(toolkit_root) == worktree_src, (
-        f"Expected worktree src at {worktree_src}, got {find_ms_core_src(toolkit_root)}"
+    assert find_ms_core_src(anchor) == worktree_src, (
+        f"Expected worktree src at {worktree_src}, got {find_ms_core_src(anchor)}"
     )
 
 
@@ -131,15 +125,10 @@ def test_find_ms_core_src_finds_submodule_at_toolkit_root(tmp_path):
     assert result == submodule_src, f"Expected submodule src at {submodule_src}, got {result}"
 
 
-def test_find_ms_core_src_submodule_takes_priority_over_sibling(tmp_path):
-    """Submodule (closer in dir tree) should win over sibling repo."""
+def test_find_ms_core_src_ignores_sibling_repo_without_override(tmp_path):
+    """Sibling ms-core checkout is dev-only and should not be auto-discovered."""
     toolkit_root = tmp_path / "MS Data process package" / "ms-preprocessing-toolkit"
 
-    # Submodule inside toolkit
-    submodule_src = toolkit_root / "ms-core" / "src"
-    (submodule_src / "ms_core").mkdir(parents=True, exist_ok=True)
-
-    # Sibling repo (further up the tree)
     sibling_src = tmp_path / "MS Data process package" / "ms-core" / "src"
     (sibling_src / "ms_core").mkdir(parents=True, exist_ok=True)
 
@@ -147,9 +136,7 @@ def test_find_ms_core_src_submodule_takes_priority_over_sibling(tmp_path):
     anchor.mkdir(parents=True, exist_ok=True)
 
     result = find_ms_core_src(anchor)
-    assert result == submodule_src, (
-        f"Submodule should take priority over sibling; got {result}"
-    )
+    assert result is None
 
 
 def test_ensure_ms_core_src_on_path_raises_clear_error_when_missing(monkeypatch, tmp_path):

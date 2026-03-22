@@ -28,19 +28,32 @@ def _resolve_anchor(start_dir: str | Path | None) -> Path:
     return anchor.resolve()
 
 
+def _iter_ancestor_dirs(anchor: Path):
+    current = anchor if anchor.is_dir() else anchor.parent
+    yield current
+    yield from current.parents
+
+
 def _has_package_src(src_dir: Path, package_name: str) -> bool:
     return (src_dir / package_name).exists()
 
 
 def _iter_repo_dirs(anchor: Path, repo_name: str):
     seen: set[Path] = set()
-    for base in (anchor, *anchor.parents):
+    for base in _iter_ancestor_dirs(anchor):
         for repo_dir in (base / repo_name, base / "MS Data process package" / repo_name):
             repo_dir = repo_dir.resolve()
             if repo_dir in seen or not repo_dir.exists():
                 continue
             seen.add(repo_dir)
             yield repo_dir
+
+
+def _find_toolkit_root(anchor: Path) -> Path | None:
+    for base in _iter_ancestor_dirs(anchor):
+        if (base / "src" / "ms_preprocessing").exists():
+            return base
+    return None
 
 
 def resolve_ms_core_src(start_dir: str | Path | None = None) -> BootstrapResolution:
@@ -57,26 +70,28 @@ def resolve_ms_core_src(start_dir: str | Path | None = None) -> BootstrapResolut
             return BootstrapResolution(src_dir=candidate, source="env_root")
 
     anchor = _resolve_anchor(start_dir)
+    toolkit_root = _find_toolkit_root(anchor)
+    if toolkit_root is not None:
+        repo_dir = toolkit_root / MS_CORE_REPO_NAME
+        if repo_dir.exists():
+            worktree_root = repo_dir / ".worktrees"
+            if worktree_root.exists():
+                preferred = sorted(
+                    path
+                    for path in worktree_root.glob("*/src")
+                    if (path / "ms_core" / "utils" / "bridge_workspace.py").exists()
+                )
+                for candidate in preferred:
+                    if _has_package_src(candidate, "ms_core"):
+                        return BootstrapResolution(src_dir=candidate, source="toolkit_worktree_src")
 
-    for repo_dir in _iter_repo_dirs(anchor, MS_CORE_REPO_NAME):
-        worktree_root = repo_dir / ".worktrees"
-        if worktree_root.exists():
-            preferred = sorted(
-                path
-                for path in worktree_root.glob("*/src")
-                if (path / "ms_core" / "utils" / "bridge_workspace.py").exists()
-            )
-            for candidate in preferred:
-                if _has_package_src(candidate, "ms_core"):
-                    return BootstrapResolution(src_dir=candidate, source="worktree_src")
+                for candidate in sorted(worktree_root.glob("*/src")):
+                    if _has_package_src(candidate, "ms_core"):
+                        return BootstrapResolution(src_dir=candidate, source="toolkit_worktree_src")
 
-            for candidate in sorted(worktree_root.glob("*/src")):
-                if _has_package_src(candidate, "ms_core"):
-                    return BootstrapResolution(src_dir=candidate, source="worktree_src")
-
-        src_dir = repo_dir / "src"
-        if _has_package_src(src_dir, "ms_core"):
-            return BootstrapResolution(src_dir=src_dir, source="repo_src")
+            src_dir = repo_dir / "src"
+            if _has_package_src(src_dir, "ms_core"):
+                return BootstrapResolution(src_dir=src_dir, source="toolkit_submodule_src")
 
     return BootstrapResolution(src_dir=None, source="not_found")
 
