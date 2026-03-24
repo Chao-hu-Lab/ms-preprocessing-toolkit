@@ -128,6 +128,20 @@ class DataOrganizerWidget(BaseProcessingWidget):
 
         return params
 
+    def apply_parameters(self, params: dict) -> None:
+        """Apply a pipeline profile to the Step 1 controls."""
+        mode = params.get("mode")
+        if mode in {"normalization", "statistics"}:
+            self.mode_var.set(mode)
+
+        if "auto_detect" in params:
+            self.auto_detect_var.set(bool(params["auto_detect"]))
+
+        method_file = params.get("method_file")
+        if method_file is not None:
+            self.method_entry.delete(0, "end")
+            self.method_entry.insert(0, str(method_file))
+
     def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
         """Run the data organization step."""
         result = data_organizer_adapter.run_from_df(

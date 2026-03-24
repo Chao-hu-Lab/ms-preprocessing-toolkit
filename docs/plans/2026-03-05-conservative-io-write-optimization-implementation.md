@@ -17,8 +17,8 @@
 
 ## Data and Verification Policy
 
-- Fast iteration dataset (subset): `C:/Users/user/Desktop/廖老師樣本/drLiao_HNC_Urine_subset10k.xlsx`
-- Batch-end critical validation dataset (full): `C:/Users/user/Desktop/廖老師樣本/drLiao_HNC_Urine.xlsx`
+- Fast iteration dataset (subset): `C:/path/to/validation-subset.xlsx`
+- Batch-end critical validation dataset (full): `C:/path/to/validation-full.xlsx`
 - Performance go/no-go:
   - Baseline old method: `1497.067s` (~24m57s)
   - Current unified-parquet-v2 run: `1763.8s` (~29m24s)
@@ -352,10 +352,10 @@ Run:
 `pytest C:/Users/user/Desktop/質譜數據工具箱/ms-core/tests -v`
 
 Run (subset):
-`python main.py --no-gui --input "C:/Users/user/Desktop/廖老師樣本/drLiao_HNC_Urine_subset10k.xlsx" --method-file "<method.docx>" --istd-record-file "<record.xlsx>" --mz-tol 20 --rt-tol 1.5 --step all`
+`python main.py --no-gui --input "C:/path/to/validation-subset.xlsx" --method-file "<method.docx>" --istd-record-file "<record.xlsx>" --mz-tol 20 --rt-tol 1.5 --step all`
 
 Run (full):
-`python main.py --no-gui --input "C:/Users/user/Desktop/廖老師樣本/drLiao_HNC_Urine.xlsx" --method-file "<method.docx>" --istd-record-file "<record.xlsx>" --mz-tol 20 --rt-tol 1.5 --step all`
+`python main.py --no-gui --input "C:/path/to/validation-full.xlsx" --method-file "<method.docx>" --istd-record-file "<record.xlsx>" --mz-tol 20 --rt-tol 1.5 --step all`
 
 Expected:
 - All tests PASS.
@@ -393,10 +393,9 @@ Core:
 - `pytest C:/Users/user/Desktop/質譜數據工具箱/ms-core/tests -v`
 
 Full E2E:
-- `python main.py --no-gui --input "C:/Users/user/Desktop/廖老師樣本/drLiao_HNC_Urine.xlsx" --method-file "<method.docx>" --istd-record-file "<record.xlsx>" --mz-tol 20 --rt-tol 1.5 --step all`
+- `python main.py --no-gui --input "C:/path/to/validation-full.xlsx" --method-file "<method.docx>" --istd-record-file "<record.xlsx>" --mz-tol 20 --rt-tol 1.5 --step all`
 
 Acceptance:
 - Core functionality works without requiring parquet intermediates/caches.
 - `OUTPUT` no longer contains machine-only parquet intermediate/cache artifacts.
 - Gate A achieved; otherwise stop rollout and keep previous behavior.
-

@@ -111,7 +111,7 @@ Add/adjust Step 4 tests to cover:
 ### 5.2 Regression case (user-provided dataset)
 
 Input:
-- `OUTPUT/STEP3_VERIFY_STEP1_drLiao_HNC_Urine_recheck_20260303_142706.xlsx`
+- `OUTPUT/STEP3_VERIFY_STEP1_validation_dataset.xlsx`
 - Thresholds: `bg=0.5`, `skew=0.66`, `diff=0.5`, `qc_ratio=0.4`
 
 Expected:
@@ -166,7 +166,7 @@ Implemented outcomes:
   - Step 4: `.xlsx`
 - Parquet cache default is enabled (`SAVE_PARQUET_CACHE = True`).
 
-User dataset verification (`STEP3_VERIFY_STEP1_drLiao_HNC_Urine_recheck_20260303_142706.xlsx`, thresholds `bg=0.5/skew=0.66/diff=0.5/qc=0.4`):
+User dataset verification (`STEP3_VERIFY_STEP1_validation_dataset.xlsx`, thresholds `bg=0.5/skew=0.66/diff=0.5/qc=0.4`):
 - `cells_imputed_from_zero = 1267825`
 - `post_zero_count = 0`
 - `post_nan_count = 0`

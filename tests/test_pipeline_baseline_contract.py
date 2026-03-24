@@ -1,6 +1,7 @@
 """Baseline contract tests for pipeline I/O benchmark."""
 
 import importlib
+import json
 from pathlib import Path
 
 
@@ -20,8 +21,8 @@ def test_baseline_contract_uses_fixed_default_reference_files() -> None:
 
     result = run_benchmark(input_path="dummy.xlsx", dry_run=True)
 
-    assert result["method_file"] == str(DEFAULT_METHOD_FILE)
-    assert result["istd_record_file"] == str(DEFAULT_ISTD_RECORD_FILE)
+    assert result["method_file"] == (str(DEFAULT_METHOD_FILE) if DEFAULT_METHOD_FILE else "")
+    assert result["istd_record_file"] == (str(DEFAULT_ISTD_RECORD_FILE) if DEFAULT_ISTD_RECORD_FILE else "")
 
 
 def test_cli_args_allow_overriding_fixed_reference_files(monkeypatch) -> None:
@@ -65,5 +66,61 @@ def test_benchmark_defaults_follow_pipeline_env_overrides(monkeypatch) -> None:
     finally:
         monkeypatch.delenv("MSPTK_METHOD_FILE", raising=False)
         monkeypatch.delenv("MSPTK_ISTD_RECORD_FILE", raising=False)
+        importlib.reload(defaults)
+        importlib.reload(benchmark)
+
+
+def test_pipeline_defaults_follow_local_reference_config(tmp_path, monkeypatch) -> None:
+    config_path = tmp_path / "local_reference_paths.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "method_file": "local-method.docx",
+                "istd_record_file": "local-istd.xlsx",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("MSPTK_LOCAL_REFERENCE_CONFIG", str(config_path))
+    defaults = importlib.import_module("ms_preprocessing.config.pipeline_defaults")
+    benchmark = importlib.import_module("scripts.benchmark_pipeline_io")
+
+    try:
+        defaults = importlib.reload(defaults)
+        benchmark = importlib.reload(benchmark)
+        result = benchmark.run_benchmark(input_path="dummy.xlsx", dry_run=True)
+
+        assert defaults.DEFAULT_METHOD_FILE == Path("local-method.docx")
+        assert defaults.DEFAULT_ISTD_RECORD_FILE == Path("local-istd.xlsx")
+        assert result["method_file"] == "local-method.docx"
+        assert result["istd_record_file"] == "local-istd.xlsx"
+    finally:
+        monkeypatch.delenv("MSPTK_LOCAL_REFERENCE_CONFIG", raising=False)
+        importlib.reload(defaults)
+        importlib.reload(benchmark)
+
+
+def test_pipeline_defaults_are_empty_without_local_or_env_overrides(tmp_path, monkeypatch) -> None:
+    missing_config_path = tmp_path / "missing-local-reference-paths.json"
+
+    monkeypatch.setenv("MSPTK_LOCAL_REFERENCE_CONFIG", str(missing_config_path))
+    monkeypatch.delenv("MSPTK_METHOD_FILE", raising=False)
+    monkeypatch.delenv("MSPTK_ISTD_RECORD_FILE", raising=False)
+
+    defaults = importlib.import_module("ms_preprocessing.config.pipeline_defaults")
+    benchmark = importlib.import_module("scripts.benchmark_pipeline_io")
+
+    try:
+        defaults = importlib.reload(defaults)
+        benchmark = importlib.reload(benchmark)
+        result = benchmark.run_benchmark(input_path="dummy.xlsx", dry_run=True)
+
+        assert defaults.DEFAULT_METHOD_FILE is None
+        assert defaults.DEFAULT_ISTD_RECORD_FILE is None
+        assert result["method_file"] == ""
+        assert result["istd_record_file"] == ""
+    finally:
+        monkeypatch.delenv("MSPTK_LOCAL_REFERENCE_CONFIG", raising=False)
         importlib.reload(defaults)
         importlib.reload(benchmark)

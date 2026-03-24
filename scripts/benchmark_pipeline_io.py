@@ -51,6 +51,10 @@ def _default_output_path(input_path: Path) -> Path:
     return output_dir / f"BENCH_{input_path.stem}.xlsx"
 
 
+def _stringify_reference_path(path_value: Path | None) -> str:
+    return "" if path_value is None else str(path_value)
+
+
 def run_benchmark(
     input_path: str | Path,
     output_path: str | Path | None = None,
@@ -72,8 +76,8 @@ def run_benchmark(
         return {
             "input_path": str(input_path),
             "output_path": str(output_path) if output_path else "",
-            "method_file": str(method_file_obj),
-            "istd_record_file": str(istd_record_file_obj),
+            "method_file": _stringify_reference_path(method_file_obj),
+            "istd_record_file": _stringify_reference_path(istd_record_file_obj),
             "load_s": 0.0,
             "step_times": _empty_step_times(),
             "save_s": 0.0,
@@ -162,8 +166,8 @@ def run_benchmark(
     return {
         "input_path": str(input_path),
         "output_path": str(output_path_obj),
-        "method_file": str(method_file_obj),
-        "istd_record_file": str(istd_record_file_obj),
+        "method_file": _stringify_reference_path(method_file_obj),
+        "istd_record_file": _stringify_reference_path(istd_record_file_obj),
         "mz_tol": float(mz_tol),
         "rt_tol": float(rt_tol),
         "load_s": float(load_s),
@@ -191,13 +195,13 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--output", help="Optional benchmark output path (.xlsx).")
     parser.add_argument(
         "--method-file",
-        default=str(DEFAULT_METHOD_FILE),
-        help="Method file path (.docx). Defaults to the fixed benchmark reference file.",
+        default=_stringify_reference_path(DEFAULT_METHOD_FILE),
+        help="Method file path (.docx). Defaults to the local pipeline reference when configured.",
     )
     parser.add_argument(
         "--istd-record-file",
-        default=str(DEFAULT_ISTD_RECORD_FILE),
-        help="ISTD record file path (.xlsx). Defaults to the fixed benchmark reference file.",
+        default=_stringify_reference_path(DEFAULT_ISTD_RECORD_FILE),
+        help="ISTD record file path (.xlsx). Defaults to the local pipeline reference when configured.",
     )
     parser.add_argument("--mz-tol", type=float, default=20.0, help="m/z tolerance (ppm).")
     parser.add_argument("--rt-tol", type=float, default=1.5, help="RT tolerance (minutes).")

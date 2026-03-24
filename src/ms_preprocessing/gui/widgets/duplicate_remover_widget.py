@@ -113,6 +113,24 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
 
         return params
 
+    def apply_parameters(self, params: dict) -> None:
+        """Apply a pipeline profile to the Step 3 controls."""
+        if "mz_tolerance_ppm" in params:
+            self.mz_entry.delete(0, "end")
+            self.mz_entry.insert(0, str(params["mz_tolerance_ppm"]))
+
+        if "rt_tolerance" in params:
+            self.rt_entry.delete(0, "end")
+            self.rt_entry.insert(0, str(params["rt_tolerance"]))
+
+        top_n = params.get("top_n")
+        self.topn_entry.delete(0, "end")
+        if top_n is not None:
+            self.topn_entry.insert(0, str(top_n))
+
+        if "preserve_red_font" in params:
+            self.preserve_red_var.set(bool(params["preserve_red_font"]))
+
     def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
         """Run the duplicate removal step."""
         protected_rows = set()

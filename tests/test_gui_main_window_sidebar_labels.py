@@ -45,3 +45,18 @@ def test_main_window_sidebar_uses_expected_workflow_labels(ctk_root) -> None:
         ]
     finally:
         app.destroy()
+
+
+def test_main_window_sidebar_exposes_run_all_profile_selector(ctk_root) -> None:
+    app = _SidebarHarness(ctk_root)
+    app.pack()
+    ctk_root.update_idletasks()
+    try:
+        assert app.pipeline_preset_label.cget("text") == "Run All Preset"
+        assert app.run_all_profile_var.get() == "default"
+        assert app.run_all_profile_menu.cget("values") == ["loose", "default", "strict"]
+        assert app.run_all_btn.cget("text") == "Run All"
+        assert app.open_output_folder_btn.cget("fg_color") == "#16213e"
+        assert app.open_output_folder_btn.cget("border_width") == 1
+    finally:
+        app.destroy()
