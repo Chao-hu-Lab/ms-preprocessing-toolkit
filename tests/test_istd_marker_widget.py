@@ -66,5 +66,9 @@ def test_istd_marker_widget_apply_parameters_populates_profile_defaults(widget) 
     assert params["ppm_tolerance"] == pytest.approx(STEP2_PARAMS["ppm_tolerance"])
     assert params["rt_tolerance"] == pytest.approx(STEP2_PARAMS["rt_tolerance"])
     assert params["istd_mz_list"] == STEP2_PARAMS["istd_mz_list"]
-    assert params["istd_record_file"] == STEP2_PARAMS["istd_record_file"]
-    assert params["istd_record_date"] == STEP2_PARAMS["istd_record_date"]
+    if STEP2_PARAMS["istd_record_file"]:
+        assert params["istd_record_file"] == STEP2_PARAMS["istd_record_file"]
+        assert params["istd_record_date"] == STEP2_PARAMS["istd_record_date"]
+    else:
+        assert "istd_record_file" not in params
+        assert "istd_record_date" not in params
