@@ -548,6 +548,186 @@ class TestFeatureFilter:
         assert "unique_diff_kept" in stats
         assert "unique_intensity_fc_kept" in stats
 
+    # ── Low-prevalence imputation gate tests ────────────────────────────
+
+    def test_imputation_skips_group_with_low_prevalence(self, filter_proc):
+        """Group detection rate < 40% → missing values stay 0, not imputed.
+
+        Case group: 1/3 samples above signal_threshold → ratio=0.33 < 0.40.
+        Control group: 3/3 above threshold → ratio=1.0, all kept.
+        The feature survives filtering (diff=0.67 > 0.30) but Case cells
+        must NOT be imputed.
+        """
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.0/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],   # above threshold
+                "Case2": ["case", 0],      # missing
+                "Case3": ["case", 0],      # missing
+                "Control1": ["control", 9000],
+                "Control2": ["control", 9500],
+                "Control3": ["control", 10000],
+                "QC1": ["qc", 7000],
+            }
+        )
+
+        result = filter_proc.process(df, qc_ratio_threshold=0.0)
+
+        assert result.success
+        out = result.data
+        # Case ratio = 1/3 ≈ 0.33 < 0.40 → no imputation
+        assert float(out.loc[1, "Case2"]) == 0.0
+        assert float(out.loc[1, "Case3"]) == 0.0
+        # Case1 was already above threshold — untouched
+        assert float(out.loc[1, "Case1"]) == 8000.0
+
+    def test_imputation_fills_group_at_40pct_prevalence(self, filter_proc):
+        """Group detection rate == 40% → missing values ARE imputed.
+
+        Case group: 2/5 samples above signal_threshold → ratio=0.40 >= 0.40.
+        """
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.0/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Case2": ["case", 10000],
+                "Case3": ["case", 0],
+                "Case4": ["case", 0],
+                "Case5": ["case", 0],
+                "Control1": ["control", 9000],
+                "Control2": ["control", 9500],
+                "QC1": ["qc", 7000],
+            }
+        )
+
+        result = filter_proc.process(df, qc_ratio_threshold=0.0)
+
+        assert result.success
+        out = result.data
+        # Case ratio = 2/5 = 0.40 >= 0.40 → imputation triggered
+        assert float(out.loc[1, "Case3"]) > 0
+        assert float(out.loc[1, "Case4"]) > 0
+        assert float(out.loc[1, "Case5"]) > 0
+
+    def test_imputation_uses_min_divided_by_five(self, filter_proc):
+        """Fill value should be group_min_positive / 5, not / 2.
+
+        Case group: 2/2 above threshold, min positive = 8000.
+        Fill value = 8000 / 5 = 1600.
+        """
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.0/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 0],       # missing → should be filled
+                "Case2": ["case", 8000],
+                "Case3": ["case", 12000],
+                "Control1": ["control", 9000],
+                "Control2": ["control", 9500],
+                "Control3": ["control", 10000],
+                "QC1": ["qc", 7000],
+            }
+        )
+
+        result = filter_proc.process(df, qc_ratio_threshold=0.0)
+
+        assert result.success
+        out = result.data
+        # Case ratio = 2/3 ≈ 0.67 >= 0.40 → imputed
+        # min positive in Case = 8000, fill = 8000 / 5 = 1600
+        assert float(out.loc[1, "Case1"]) == pytest.approx(1600.0)
+
+    def test_imputation_skips_qc_with_low_prevalence(self, filter_proc):
+        """QC detection rate < 40% → QC missing values stay 0.
+
+        QC group: 1/3 samples above signal_threshold → ratio=0.33 < 0.40.
+        """
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.0/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Case2": ["case", 9000],
+                "Control1": ["control", 9000],
+                "Control2": ["control", 9500],
+                "QC1": ["qc", 6000],   # above threshold
+                "QC2": ["qc", 0],      # missing
+                "QC3": ["qc", 0],      # missing
+            }
+        )
+
+        result = filter_proc.process(
+            df, qc_ratio_threshold=0.0, enable_qc_ratio_threshold=False,
+        )
+
+        assert result.success
+        out = result.data
+        # QC ratio = 1/3 ≈ 0.33 < 0.40 → no imputation
+        assert float(out.loc[1, "QC2"]) == 0.0
+        assert float(out.loc[1, "QC3"]) == 0.0
+
+    def test_cells_skipped_low_prevalence_stat(self, filter_proc):
+        """cells_skipped_low_prevalence counts cells NOT imputed due to
+        the 40% prevalence gate (excludes all-zero groups).
+
+        Case: 1/3 detected → 2 missing cells skipped.
+        Control: 3/3 detected → 0 skipped.
+        """
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.0/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Case2": ["case", 0],
+                "Case3": ["case", 0],
+                "Control1": ["control", 9000],
+                "Control2": ["control", 9500],
+                "Control3": ["control", 10000],
+                "QC1": ["qc", 7000],
+            }
+        )
+
+        result = filter_proc.process(df, qc_ratio_threshold=0.0)
+
+        assert result.success
+        assert result.statistics["cells_skipped_low_prevalence"] == 2
+
+    def test_imputation_low_prevalence_mixed_features(self, filter_proc):
+        """Two features: one with high prevalence, one with low.
+
+        Feature 1 (100.0/1.0): Case 2/3 detected → imputed with min/5.
+        Feature 2 (200.0/2.0): Case 1/3 detected → NOT imputed.
+        Both features survive filtering due to high diff vs Control.
+        """
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.0/1.0", "200.0/2.0"],
+                "Tolerance": ["na", "na", "na"],
+                "Case1": ["case", 8000, 7000],
+                "Case2": ["case", 10000, 0],
+                "Case3": ["case", 0, 0],
+                "Control1": ["control", 0, 0],
+                "Control2": ["control", 0, 0],
+                "Control3": ["control", 0, 0],
+                "QC1": ["qc", 7000, 6000],
+            }
+        )
+
+        result = filter_proc.process(df, qc_ratio_threshold=0.0)
+
+        assert result.success
+        out = result.data
+        # Feature 1: Case ratio = 2/3 ≈ 0.67 → imputed
+        row1 = out[out["Mz/RT"] == "100.0/1.0"].iloc[0]
+        assert float(row1["Case3"]) == pytest.approx(8000 / 5)
+
+        # Feature 2: Case ratio = 1/3 ≈ 0.33 → NOT imputed
+        row2 = out[out["Mz/RT"] == "200.0/2.0"].iloc[0]
+        assert float(row2["Case2"]) == 0.0
+        assert float(row2["Case3"]) == 0.0
+
     def test_deprecated_skew_parameter_warns(self, filter_proc):
         """Passing removed skew_threshold should emit a DeprecationWarning."""
         import warnings
