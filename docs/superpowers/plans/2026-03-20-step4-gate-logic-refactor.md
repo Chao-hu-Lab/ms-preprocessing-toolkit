@@ -12,7 +12,7 @@
 
 ## 背景與動機
 
-### 資料分析結果（NTU cancer dataset: 823 features, 3 groups）
+### 資料分析結果（internal validation dataset: 823 features, 3 groups）
 
 | 指標 | 數值 |
 |------|------|

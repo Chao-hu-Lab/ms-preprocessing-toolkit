@@ -14,6 +14,11 @@ from ms_preprocessing.config.pipeline_defaults import (
     STEP2_PARAMS,
     STEP3_PARAMS,
 )
+from ms_preprocessing.config.pipeline_profiles import (
+    PipelineProfile,
+    PipelineProfileName,
+    get_pipeline_profile,
+)
 
 __all__ = [
     "Settings",
@@ -28,4 +33,8 @@ __all__ = [
     "STEP3_PARAMS",
     "DEFAULT_METHOD_FILE",
     "DEFAULT_ISTD_RECORD_FILE",
+    # Integrated Step 1-4 profiles
+    "PipelineProfile",
+    "PipelineProfileName",
+    "get_pipeline_profile",
 ]

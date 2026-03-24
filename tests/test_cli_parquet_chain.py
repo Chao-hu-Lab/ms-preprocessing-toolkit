@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 
+from ms_preprocessing.config.pipeline_profiles import get_pipeline_profile
 from ms_preprocessing.main import run_cli
 from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
 
@@ -37,17 +38,18 @@ def _make_cli_args(input_path: Path, output_path: Path | None, step: str) -> Sim
     return SimpleNamespace(
         input=str(input_path),
         output=str(output_path) if output_path else None,
+        profile="default",
         method_file=None,
         step=step,
-        mz_tol=20.0,
+        mz_tol=None,
         istd_mz=None,
         istd_record_file=None,
         istd_record_date=None,
-        rt_tol=1.0,
-        bg_threshold=0.33,
-        intensity_fc_threshold=2.0,
-        diff_threshold=0.30,
-        qc_ratio_threshold=0.0,
+        rt_tol=None,
+        bg_threshold=None,
+        intensity_fc_threshold=None,
+        diff_threshold=None,
+        qc_ratio_threshold=None,
         persist_intermediate=False,
         no_gui=True,
         version=False,
@@ -200,3 +202,116 @@ def test_cli_single_step_filter_accepts_parquet_input(monkeypatch, project_temp_
         save_suffixes = [suffix for op, suffix, _ in fake_handler.calls if op == "save"]
         assert load_suffixes[0] == ".parquet"
         assert save_suffixes[-1] == ".xlsx"
+
+
+def test_cli_default_profile_uses_integrated_step_parameters(monkeypatch, project_temp_dir) -> None:
+    with project_temp_dir() as temp_dir:
+        base = Path(temp_dir)
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.1/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 1000],
+                "Control1": ["control", 1200],
+                "QC1": ["qc", 1100],
+            }
+        )
+        input_path = base / "input.csv"
+        df.to_csv(input_path, index=False)
+        output_path = base / "final.xlsx"
+
+        fake_handler = _FakeFileHandler(input_df=df)
+        _patch_cli_dependencies(monkeypatch, fake_handler)
+
+        import ms_preprocessing.adapters.data_organizer as organizer_module
+        import ms_preprocessing.adapters.istd_marker as istd_module
+        import ms_preprocessing.adapters.duplicate_remover as duplicate_module
+        import ms_preprocessing.adapters.feature_filter as filter_module
+
+        captured: dict[str, dict] = {}
+
+        monkeypatch.setattr(
+            organizer_module,
+            "run_from_df",
+            lambda data, **kwargs: (
+                captured.setdefault("step1", dict(kwargs)),
+                ProcessingResult(
+                    success=True,
+                    step="data_organizer",
+                    output_path=None,
+                    data=data.copy(),
+                    metadata=ProcessingMetadata(sample_info=None),
+                ),
+            )[1],
+        )
+        monkeypatch.setattr(
+            istd_module,
+            "run_from_df",
+            lambda data, **kwargs: (
+                captured.setdefault("step2", dict(kwargs)),
+                ProcessingResult(
+                    success=True,
+                    step="istd_marker",
+                    output_path=None,
+                    data=data.copy(),
+                    metadata=ProcessingMetadata(red_font_rows=set(), protected_rows=set()),
+                ),
+            )[1],
+        )
+        monkeypatch.setattr(
+            duplicate_module,
+            "run_from_df",
+            lambda data, **kwargs: (
+                captured.setdefault("step3", dict(kwargs)),
+                ProcessingResult(
+                    success=True,
+                    step="duplicate_remover",
+                    output_path=None,
+                    data=data.copy(),
+                    metadata=ProcessingMetadata(red_font_rows=set(), protected_rows=set()),
+                ),
+            )[1],
+        )
+        monkeypatch.setattr(
+            filter_module,
+            "run_from_df",
+            lambda data, **kwargs: (
+                captured.setdefault("step4", dict(kwargs)),
+                ProcessingResult(
+                    success=True,
+                    step="feature_filter",
+                    output_path=None,
+                    data=data.copy(),
+                    metadata=ProcessingMetadata(
+                        red_font_rows=set(),
+                        protected_rows=set(),
+                        blue_font_cells=[],
+                        deleted_feature_df=None,
+                    ),
+                ),
+            )[1],
+        )
+
+        rc = run_cli(_make_cli_args(input_path=input_path, output_path=output_path, step="all"))
+        profile = get_pipeline_profile("default")
+
+        assert rc == 0
+        assert captured["step1"]["method_file"] == profile["step1"]["method_file"]
+        assert captured["step2"]["ppm_tolerance"] == 20.0
+        assert captured["step2"]["rt_tolerance"] == 1.5
+        assert (
+            str(captured["step2"]["istd_record_file"])
+            if captured["step2"]["istd_record_file"]
+            else ""
+        ) == profile["step2"]["istd_record_file"]
+        assert captured["step2"]["istd_record_date"] == "20260106"
+        assert captured["step3"]["mz_tolerance_ppm"] == 20.0
+        assert captured["step3"]["rt_tolerance"] == 1.0
+        assert captured["step4"]["background_threshold"] == 0.33
+        assert captured["step4"]["diff_threshold"] == 0.25
+        assert captured["step4"]["qc_ratio_threshold"] == 0.25
+        assert captured["step4"]["intensity_fc_threshold"] == 2.0
+        assert captured["step4"]["enable_background_threshold"] is True
+        assert captured["step4"]["enable_diff_threshold"] is True
+        assert captured["step4"]["enable_qc_ratio_threshold"] is True
+        assert captured["step4"]["enable_intensity_fc_threshold"] is True

@@ -2,12 +2,27 @@
 
 from __future__ import annotations
 
+import threading
+import time
+
 import pandas as pd
 import pytest
 
 from ms_preprocessing.adapters import feature_filter as feature_filter_adapter
+from ms_preprocessing.config.feature_filter_presets import get_step4_preset
 from ms_preprocessing.gui.widgets.feature_filter_widget import FeatureFilterWidget
 from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
+
+
+def _spin_until(ctk_root, predicate, timeout: float = 1.5) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        ctk_root.update()
+        if predicate():
+            return True
+        time.sleep(0.01)
+    ctk_root.update()
+    return predicate()
 
 @pytest.fixture
 def widget(ctk_root):
@@ -87,3 +102,84 @@ def test_feature_filter_widget_run_processing_passes_toggle_flags(widget, monkey
     assert captured["enable_intensity_fc_threshold"] is False
     assert captured["enable_diff_threshold"] is True
     assert captured["enable_qc_ratio_threshold"] is False
+
+
+def test_feature_filter_widget_apply_parameters_updates_visible_controls(widget) -> None:
+    widget.apply_parameters(get_step4_preset("strict"))
+
+    params = widget.get_parameters()
+
+    assert params["signal_threshold"] == pytest.approx(5000.0)
+    assert params["background_threshold"] == pytest.approx(0.50)
+    assert params["diff_threshold"] == pytest.approx(0.35)
+    assert params["qc_ratio_threshold"] == pytest.approx(0.50)
+    assert params["intensity_fc_threshold"] == pytest.approx(3.0)
+    assert params["enable_background_threshold"] is True
+    assert params["enable_diff_threshold"] is True
+    assert params["enable_qc_ratio_threshold"] is True
+    assert params["enable_intensity_fc_threshold"] is True
+
+
+def test_feature_filter_widget_runs_processing_in_background_without_duplicate_runs(
+    widget,
+    ctk_root,
+    monkeypatch,
+) -> None:
+    call_started = threading.Event()
+    release_worker = threading.Event()
+    progress_updates: list[tuple[float, str]] = []
+    completions: list[pd.DataFrame] = []
+    logs: list[str] = []
+    call_count = 0
+
+    def fake_run_from_df(data, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        call_started.set()
+        kwargs["progress_callback"](25, "Worker started")
+        release_worker.wait(timeout=1.0)
+        return ProcessingResult(
+            success=True,
+            step="feature_filter",
+            output_path=None,
+            data=data.copy(),
+            metadata=ProcessingMetadata(),
+            statistics={},
+        )
+
+    def on_complete(result: pd.DataFrame, metadata=None) -> None:
+        _ = metadata
+        completions.append(result.copy())
+
+    monkeypatch.setattr(feature_filter_adapter, "run_from_df", fake_run_from_df)
+    widget._on_progress = lambda value, status: progress_updates.append((value, status))
+    widget.on_complete = on_complete
+    widget.on_log = logs.append
+    input_df = pd.DataFrame(
+        {
+            "Mz/RT": ["Sample_Type", "100.0/1.0"],
+            "Tolerance": ["na", "na"],
+            "Case1": ["case", 9000],
+            "Control1": ["control", 9000],
+            "QC1": ["qc", 9000],
+        }
+    )
+    widget.set_data(input_df)
+
+    started_at = time.monotonic()
+    widget._on_run_clicked()
+    elapsed = time.monotonic() - started_at
+
+    assert elapsed < 0.1
+    assert call_started.wait(timeout=0.2)
+    assert widget.is_processing() is True
+
+    widget._on_run_clicked()
+    release_worker.set()
+
+    assert _spin_until(ctk_root, lambda: not widget.is_processing())
+    assert call_count == 1
+    assert completions and completions[0].equals(input_df)
+    assert any(status == "Worker started" for _, status in progress_updates)
+    assert any(status == "Complete!" for _, status in progress_updates)
+    assert any("already in progress" in message for message in logs)

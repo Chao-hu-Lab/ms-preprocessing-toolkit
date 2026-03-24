@@ -140,21 +140,66 @@ class MainWindowLayoutMixin:
             anchor="w",
         ).pack(fill="x", padx=PADDING["medium"], pady=(0, PADDING["small"]))
 
+        self.pipeline_preset_label = ctk.CTkLabel(
+            self.sidebar,
+            text="Run All Preset",
+            font=FONTS["small"],
+            text_color=COLORS["text_secondary"],
+            anchor="w",
+        )
+        self.pipeline_preset_label.pack(fill="x", padx=PADDING["medium"], pady=(0, 2))
+
+        self.run_all_profile_var = ctk.StringVar(value="default")
+        self.run_all_profile_menu = ctk.CTkOptionMenu(
+            self.sidebar,
+            values=["loose", "default", "strict"],
+            variable=self.run_all_profile_var,
+            command=lambda value: getattr(self, "_on_pipeline_profile_selected", lambda *_args: None)(value),
+            font=FONTS["small"],
+            dropdown_font=FONTS["small"],
+            anchor="w",
+        )
+        self.run_all_profile_menu.pack(fill="x", padx=PADDING["medium"], pady=(0, 2))
+
+        self.run_all_btn = ctk.CTkButton(
+            self.sidebar,
+            text="Run All",
+            command=self._run_all_steps,
+            height=32,
+            fg_color=COLORS["accent"],
+            font=FONTS["small"],
+            anchor="w",
+        )
+        self.run_all_btn.pack(fill="x", padx=PADDING["medium"], pady=(0, PADDING["small"]))
+
         action_buttons = [
-            ("Export Results", self._export_results, COLORS["secondary"]),
-            ("Open Output Folder", self._open_output_folder, "transparent"),
-            ("Run All Steps", self._run_all_steps, COLORS["accent"]),
+            {
+                "attr_name": "export_results_btn",
+                "text": "Export Results",
+                "command": self._export_results,
+                "fg_color": COLORS["secondary"],
+            },
+            {
+                "attr_name": "open_output_folder_btn",
+                "text": "Open Output Folder",
+                "command": self._open_output_folder,
+                "fg_color": COLORS["surface"],
+                "hover_color": "#1d2d4a",
+                "border_width": 1,
+                "border_color": "#2a3f5a",
+            },
         ]
-        for label, command, color in action_buttons:
-            ctk.CTkButton(
+        for button_config in action_buttons:
+            attr_name = button_config.pop("attr_name")
+            button = ctk.CTkButton(
                 self.sidebar,
-                text=label,
-                command=command,
                 height=32,
-                fg_color=color,
                 font=FONTS["small"],
                 anchor="w",
-            ).pack(fill="x", padx=PADDING["medium"], pady=2)
+                **button_config,
+            )
+            button.pack(fill="x", padx=PADDING["medium"], pady=2)
+            setattr(self, attr_name, button)
 
         self.export_dnp_btn = ctk.CTkButton(
             self.sidebar,

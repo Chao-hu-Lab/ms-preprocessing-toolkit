@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import queue
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -44,8 +46,14 @@ class MainWindow(MainWindowEventHandlersMixin, MainWindowLayoutMixin, ctk.CTk):
         self._context = self._pipeline_session.context
         self._source_context_snapshot: dict[str, object] | None = None
         self._last_materialized_export_path: Optional[Path] = None
+        self._ui_thread_id = threading.get_ident()
+        self._ui_queue = queue.SimpleQueue()
+        self._ui_queue_after_id: Optional[str] = None
+        self._pipeline_worker_thread = None
+        self._pipeline_is_processing = False
 
         self._create_layout()
+        self._apply_pipeline_profile_to_widgets("default", log=False)
         self._bind_shortcuts()
 
 

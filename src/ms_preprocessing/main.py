@@ -11,6 +11,63 @@ from pathlib import Path
 from datetime import datetime
 
 
+def _resolve_cli_step_parameters(args):
+    """Resolve CLI step parameters from the selected profile plus explicit overrides."""
+    from ms_preprocessing.config import get_pipeline_profile
+
+    profile = get_pipeline_profile(args.profile)
+    step1 = dict(profile["step1"])
+    step2 = dict(profile["step2"])
+    step3 = dict(profile["step3"])
+    step4 = dict(profile["step4"])
+
+    return {
+        "step1": {
+            "method_file": args.method_file if args.method_file is not None else step1.get("method_file"),
+        },
+        "step2": {
+            "istd_mz_list": (
+                [float(x.strip()) for x in args.istd_mz.split(",") if x.strip()]
+                if args.istd_mz
+                else step2.get("istd_mz_list")
+            ),
+            "istd_record_file": (
+                args.istd_record_file if args.istd_record_file is not None else step2.get("istd_record_file")
+            ),
+            "istd_record_date": (
+                args.istd_record_date if args.istd_record_date is not None else step2.get("istd_record_date")
+            ),
+            "ppm_tolerance": args.mz_tol if args.mz_tol is not None else step2.get("ppm_tolerance"),
+            "rt_tolerance": args.rt_tol if args.rt_tol is not None else step2.get("rt_tolerance"),
+        },
+        "step3": {
+            "mz_tolerance_ppm": args.mz_tol if args.mz_tol is not None else step3.get("mz_tolerance_ppm"),
+            "rt_tolerance": args.rt_tol if args.rt_tol is not None else step3.get("rt_tolerance"),
+            "preserve_red_font": step3.get("preserve_red_font"),
+            "top_n": step3.get("top_n"),
+        },
+        "step4": {
+            "signal_threshold": step4.get("signal_threshold"),
+            "background_threshold": (
+                args.bg_threshold if args.bg_threshold is not None else step4.get("background_threshold")
+            ),
+            "diff_threshold": args.diff_threshold if args.diff_threshold is not None else step4.get("diff_threshold"),
+            "intensity_fc_threshold": (
+                args.intensity_fc_threshold
+                if args.intensity_fc_threshold is not None
+                else step4.get("intensity_fc_threshold")
+            ),
+            "qc_ratio_threshold": (
+                args.qc_ratio_threshold if args.qc_ratio_threshold is not None else step4.get("qc_ratio_threshold")
+            ),
+            "enable_background_threshold": step4.get("enable_background_threshold", True),
+            "enable_diff_threshold": step4.get("enable_diff_threshold", True),
+            "enable_qc_ratio_threshold": step4.get("enable_qc_ratio_threshold", True),
+            "enable_intensity_fc_threshold": step4.get("enable_intensity_fc_threshold", True),
+        },
+    }
+
+
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
@@ -56,10 +113,18 @@ Examples:
     )
 
     parser.add_argument(
+        "--profile",
+        type=str,
+        choices=["loose", "default", "strict"],
+        default="default",
+        help="Integrated Step 1-4 parameter profile (default: default)",
+    )
+
+    parser.add_argument(
         "--mz-tol",
         type=float,
-        default=20.0,
-        help="m/z tolerance in ppm (default: 20)",
+        default=None,
+        help="m/z tolerance in ppm (overrides Step 2/3 profile values)",
     )
 
     parser.add_argument(
@@ -83,36 +148,36 @@ Examples:
     parser.add_argument(
         "--rt-tol",
         type=float,
-        default=1.0,
-        help="RT tolerance in minutes (default: 1.0)",
+        default=None,
+        help="RT tolerance in minutes (overrides Step 2/3 profile values)",
     )
 
     parser.add_argument(
         "--bg-threshold",
         type=float,
-        default=0.33,
-        help="Background threshold for feature filtering (default: 0.33)",
+        default=None,
+        help="Background threshold for feature filtering (overrides profile value)",
     )
 
     parser.add_argument(
         "--intensity-fc-threshold",
         type=float,
-        default=2.0,
-        help="Intensity fold-change threshold for feature filtering (default: 2.0)",
+        default=None,
+        help="Intensity fold-change threshold for feature filtering (overrides profile value)",
     )
 
     parser.add_argument(
         "--diff-threshold",
         type=float,
-        default=0.30,
-        help="Difference threshold for feature filtering (default: 0.30)",
+        default=None,
+        help="Difference threshold for feature filtering (overrides profile value)",
     )
 
     parser.add_argument(
         "--qc-ratio-threshold",
         type=float,
-        default=0.0,
-        help="Minimum QC_ratio to keep a feature (default: 0.0, legacy mode)",
+        default=None,
+        help="Minimum QC_ratio to keep a feature (overrides profile value)",
     )
 
     parser.add_argument(
@@ -197,6 +262,8 @@ def run_cli(args):
         return compact
 
     try:
+        resolved = _resolve_cli_step_parameters(args)
+
         # Load data
         print(f"Loading: {input_path}")
         handler = FileHandler()
@@ -276,8 +343,8 @@ def run_cli(args):
         if step in ["organize", "all"]:
             print("Step 1: Data Organization...")
             perf_start = take_snapshot()
-            session.record_step_parameters(0, {"method_file": args.method_file})
-            result = _adapter_do.run_from_df(df, method_file=args.method_file)
+            session.record_step_parameters(0, dict(resolved["step1"]))
+            result = _adapter_do.run_from_df(df, **resolved["step1"])
             if result.success:
                 df = result.data
                 session.update_from_result(result)
@@ -292,32 +359,23 @@ def run_cli(args):
         if step in ["istd", "all"]:
             print("Step 2: ISTD Marking...")
             perf_start = take_snapshot()
-            istd_mz_list = None
             if args.istd_mz:
                 try:
-                    istd_mz_list = [float(x.strip()) for x in args.istd_mz.split(",") if x.strip()]
+                    resolved["step2"]["istd_mz_list"] = [
+                        float(x.strip()) for x in args.istd_mz.split(",") if x.strip()
+                    ]
                 except ValueError:
                     print("  Error: Invalid --istd-mz format")
                     return 1
 
             session.record_step_parameters(
                 1,
-                {
-                    "istd_mz_list": istd_mz_list,
-                    "istd_record_file": args.istd_record_file,
-                    "istd_record_date": args.istd_record_date,
-                    "ppm_tolerance": args.mz_tol,
-                    "rt_tolerance": args.rt_tol,
-                },
+                dict(resolved["step2"]),
             )
-            result = _adapter_istd.run_from_df(
-                df,
-                istd_mz_list=istd_mz_list,
-                istd_record_file=Path(args.istd_record_file) if args.istd_record_file else None,
-                istd_record_date=args.istd_record_date,
-                ppm_tolerance=args.mz_tol,
-                rt_tolerance=args.rt_tol,
-            )
+            step2_kwargs = dict(resolved["step2"])
+            if step2_kwargs.get("istd_record_file"):
+                step2_kwargs["istd_record_file"] = Path(step2_kwargs["istd_record_file"])
+            result = _adapter_istd.run_from_df(df, **step2_kwargs)
             if result.success:
                 df = result.data
                 session.update_from_result(result)
@@ -332,20 +390,10 @@ def run_cli(args):
         if step in ["duplicate-removal", "all"]:
             print("Step 3: Duplicate Removal...")
             perf_start = take_snapshot()
-            session.record_step_parameters(
-                2,
-                {
-                    "mz_tolerance_ppm": args.mz_tol,
-                    "rt_tolerance": args.rt_tol,
-                    "protected_rows": set(session.metadata.protected_rows),
-                },
-            )
-            result = _adapter_dr.run_from_df(
-                df,
-                mz_tolerance_ppm=args.mz_tol,
-                rt_tolerance=args.rt_tol,
-                protected_rows=session.metadata.protected_rows,
-            )
+            step3_params = dict(resolved["step3"])
+            step3_params["protected_rows"] = set(session.metadata.protected_rows)
+            session.record_step_parameters(2, dict(step3_params))
+            result = _adapter_dr.run_from_df(df, **step3_params)
             if result.success:
                 df = result.data
                 session.update_from_result(result)
@@ -360,24 +408,10 @@ def run_cli(args):
         if step in ["filter", "all"]:
             print("Step 4: Feature Filtering...")
             perf_start = take_snapshot()
-            session.record_step_parameters(
-                3,
-                {
-                    "background_threshold": args.bg_threshold,
-                    "diff_threshold": args.diff_threshold,
-                    "intensity_fc_threshold": args.intensity_fc_threshold,
-                    "qc_ratio_threshold": args.qc_ratio_threshold,
-                    "protected_rows": set(session.metadata.protected_rows),
-                },
-            )
-            result = _adapter_ff.run_from_df(
-                df,
-                background_threshold=args.bg_threshold,
-                diff_threshold=args.diff_threshold,
-                intensity_fc_threshold=args.intensity_fc_threshold,
-                qc_ratio_threshold=args.qc_ratio_threshold,
-                protected_rows=session.metadata.protected_rows,
-            )
+            step4_params = dict(resolved["step4"])
+            step4_params["protected_rows"] = set(session.metadata.protected_rows)
+            session.record_step_parameters(3, dict(step4_params))
+            result = _adapter_ff.run_from_df(df, **step4_params)
             if result.success:
                 df = result.data
                 session.update_from_result(result)

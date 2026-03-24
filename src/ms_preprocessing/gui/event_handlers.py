@@ -5,8 +5,10 @@ from __future__ import annotations
 import copy
 import os
 import platform
+import queue
 import subprocess
 import sys
+import threading
 from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox
@@ -15,6 +17,7 @@ from typing import TYPE_CHECKING, Any, Optional, Protocol
 import pandas as pd
 
 from ms_preprocessing.bootstrap_paths import ensure_dnp_bridge_on_path, find_dnp_main_module
+from ms_preprocessing.config import get_pipeline_profile
 from ms_preprocessing.config.settings import Settings
 from ms_preprocessing.gui.pipeline_session import PipelineSession
 from ms_preprocessing.gui.styles import COLORS
@@ -44,6 +47,7 @@ if TYPE_CHECKING:
         _step_status_labels: list[Any]
         export_dnp_btn: Any
         log_text: Any
+        run_all_profile_var: Any
 
         def _show_step(self, step_index: int) -> None: ...
         def update_idletasks(self) -> None: ...
@@ -59,6 +63,166 @@ class MainWindowEventHandlersMixin:
 
     def _new_pipeline_session(self: "_MainWindowEventHost", source_file: Path | None) -> PipelineSession:
         return PipelineSession(output_dir=self._output_dir, source_file=source_file)
+
+    def _on_pipeline_profile_selected(self: "_MainWindowEventHost", profile_name: str) -> None:
+        self._apply_pipeline_profile_to_widgets(profile_name)
+
+    def _ensure_async_state(self: "_MainWindowEventHost") -> None:
+        if "_ui_thread_id" not in self.__dict__:
+            self._ui_thread_id = threading.get_ident()
+        if "_ui_queue" not in self.__dict__:
+            self._ui_queue = queue.SimpleQueue()
+        if "_ui_queue_after_id" not in self.__dict__:
+            self._ui_queue_after_id = None
+        if "_pipeline_worker_thread" not in self.__dict__:
+            self._pipeline_worker_thread = None
+        if "_pipeline_is_processing" not in self.__dict__:
+            self._pipeline_is_processing = False
+
+    def _can_schedule_ui_callbacks(self: "_MainWindowEventHost") -> bool:
+        after = getattr(self, "after", None)
+        winfo_exists = getattr(self, "winfo_exists", None)
+        return "tk" in self.__dict__ and callable(after) and callable(winfo_exists)
+
+    def _dispatch_to_ui(
+        self: "_MainWindowEventHost",
+        callback: Any,
+        *args: Any,
+    ) -> None:
+        self._ensure_async_state()
+        if threading.get_ident() == self._ui_thread_id or not self._can_schedule_ui_callbacks():
+            callback(*args)
+            return
+        self._ui_queue.put((callback, args))
+
+    def _schedule_ui_queue_drain(self: "_MainWindowEventHost") -> None:
+        self._ensure_async_state()
+        if not self._can_schedule_ui_callbacks():
+            return
+        if self._ui_queue_after_id is not None:
+            return
+        try:
+            if not self.winfo_exists():
+                return
+        except Exception:
+            return
+        self._ui_queue_after_id = self.after(16, self._drain_ui_queue)
+
+    def _drain_ui_queue(self: "_MainWindowEventHost") -> None:
+        self._ui_queue_after_id = None
+        if not self._can_schedule_ui_callbacks():
+            return
+        try:
+            if not self.winfo_exists():
+                return
+        except Exception:
+            return
+
+        while True:
+            try:
+                callback, args = self._ui_queue.get_nowait()
+            except queue.Empty:
+                break
+            callback(*args)
+
+        worker_alive = self._pipeline_worker_thread is not None and self._pipeline_worker_thread.is_alive()
+        if worker_alive or not self._ui_queue.empty():
+            self._schedule_ui_queue_drain()
+
+    def _iter_pipeline_controls(self: "_MainWindowEventHost") -> list[Any]:
+        controls: list[Any] = []
+        for attr_name in (
+            "run_step_btn",
+            "reset_step_btn",
+            "export_results_btn",
+            "open_output_folder_btn",
+            "run_all_btn",
+            "export_dnp_btn",
+            "run_all_profile_menu",
+        ):
+            control = self.__dict__.get(attr_name)
+            if control is not None and control not in controls:
+                controls.append(control)
+
+        for button in self.__dict__.get("step_buttons", []):
+            if button not in controls:
+                controls.append(button)
+
+        return controls
+
+    def _set_pipeline_busy_state(self: "_MainWindowEventHost", processing: bool) -> None:
+        self._ensure_async_state()
+        self._pipeline_is_processing = processing
+        state = "disabled" if processing else "normal"
+        for control in self._iter_pipeline_controls():
+            try:
+                control.configure(state=state)
+            except Exception:
+                continue
+        try:
+            self.configure(cursor="wait" if processing else "")
+        except Exception:
+            pass
+
+    def _safe_update_action_bar_progress(
+        self: "_MainWindowEventHost",
+        value: float,
+        status: str = "",
+    ) -> None:
+        try:
+            self._update_action_bar_progress(value, status)
+        except Exception:
+            pass
+
+    def _apply_pipeline_profile_to_widgets(
+        self: "_MainWindowEventHost",
+        profile_name: str,
+        *,
+        log: bool = True,
+    ) -> None:
+        profile = get_pipeline_profile(profile_name)
+        for index, step_key in enumerate(("step1", "step2", "step3", "step4")):
+            if index >= len(self.__dict__.get("step_widgets", [])):
+                break
+            apply_parameters = getattr(self.step_widgets[index], "apply_parameters", None)
+            if callable(apply_parameters):
+                apply_parameters(dict(profile[step_key]))
+
+        profile_var = self.__dict__.get("run_all_profile_var")
+        if profile_var is not None:
+            profile_var.set(profile_name)
+
+        if log:
+            self._log(f"Applied Run All preset: {profile_name}")
+
+    def _has_active_processing(self: "_MainWindowEventHost") -> bool:
+        self._ensure_async_state()
+        if self._pipeline_is_processing:
+            return True
+        for widget in self.__dict__.get("step_widgets", []):
+            state_getter = getattr(type(widget), "is_processing", None)
+            if callable(state_getter):
+                try:
+                    if bool(widget.is_processing()):
+                        return True
+                except Exception:
+                    continue
+                continue
+
+            explicit_state = getattr(widget, "_is_processing", False)
+            if isinstance(explicit_state, bool) and explicit_state:
+                return True
+
+        return False
+
+    def _auto_export_final_results(self: "_MainWindowEventHost") -> Optional[Path]:
+        final_step_index = len(self.__dict__.get("step_widgets", [])) - 1
+        if final_step_index < 0:
+            return None
+        if self._last_completed_step is None or self._last_completed_step < final_step_index:
+            return None
+        self._log("Final step complete. Auto-exporting results...")
+        return self._export_results()
 
     def _attach_pipeline_session(self: "_MainWindowEventHost", session: PipelineSession) -> None:
         self._pipeline_session = session
@@ -92,6 +256,10 @@ class MainWindowEventHandlersMixin:
         step_index: int,
         path: Optional[Path] = None,
     ) -> None:
+        if self._has_active_processing():
+            self._log("Busy: wait for the current step to finish before loading another file.")
+            return
+
         filetypes = [
             ("Excel files", "*.xlsx *.xls"),
             ("Parquet files", "*.parquet"),
@@ -173,6 +341,9 @@ class MainWindowEventHandlersMixin:
     def _switch_step(self: "_MainWindowEventHost", step_index: int) -> None:
         if step_index < 0 or step_index >= len(self.step_widgets):
             return
+        if self._has_active_processing() and step_index != self._current_step:
+            self._log("Busy: cannot switch steps while processing is still running.")
+            return
 
         self._current_step = step_index
         self._show_step(step_index)
@@ -193,10 +364,16 @@ class MainWindowEventHandlersMixin:
 
     def _run_current_step(self: "_MainWindowEventHost") -> None:
         if 0 <= self._current_step < len(self.step_widgets):
+            if getattr(self.step_widgets[self._current_step], "is_processing", lambda: False)():
+                self._log("Busy: the current step is already processing.")
+                return
             self.step_widgets[self._current_step]._on_run_clicked()
 
     def _reset_current_step(self: "_MainWindowEventHost") -> None:
         if 0 <= self._current_step < len(self.step_widgets):
+            if getattr(self.step_widgets[self._current_step], "is_processing", lambda: False)():
+                self._log("Busy: wait for processing to finish before resetting the current step.")
+                return
             self.step_widgets[self._current_step]._on_reset_clicked()
 
     def _on_step_complete(
@@ -239,7 +416,13 @@ class MainWindowEventHandlersMixin:
                 self.step_widgets[next_step].set_input_file(str(output_path))
             self._log(f"Data passed to Step {next_step + 1}")
 
+        self._auto_export_final_results()
+
     def _run_all_steps(self: "_MainWindowEventHost") -> None:
+        if self._has_active_processing():
+            self._log("Busy: wait for the current step to finish before running the full pipeline.")
+            return
+
         if self._current_data is None or self._original_data is None:
             self._log("Error: Please load a file first")
             return
@@ -247,6 +430,35 @@ class MainWindowEventHandlersMixin:
         original_step = self._current_step
         try:
             data = self._original_data.copy()
+            params_by_step = [dict(widget.get_parameters()) for widget in self.step_widgets]
+        except Exception as exc:
+            self._log(f"Error preparing Run All: {exc}")
+            return
+
+        self._set_pipeline_busy_state(True)
+        self._safe_update_action_bar_progress(0, "Running all steps...")
+
+        if self._can_schedule_ui_callbacks():
+            self._schedule_ui_queue_drain()
+            self._pipeline_worker_thread = threading.Thread(
+                target=self._run_all_steps_worker,
+                args=(original_step, data, params_by_step),
+                daemon=True,
+                name="run-all-worker",
+            )
+            self._pipeline_worker_thread.start()
+            return
+
+        self._run_all_steps_worker(original_step, data, params_by_step)
+
+    def _run_all_steps_worker(
+        self: "_MainWindowEventHost",
+        original_step: int,
+        data: pd.DataFrame,
+        params_by_step: list[dict[str, Any]],
+    ) -> None:
+        success = False
+        try:
             self._reset_pipeline_for_run_all()
 
             for index, widget in enumerate(self.step_widgets):
@@ -255,15 +467,26 @@ class MainWindowEventHandlersMixin:
                     raise RuntimeError(
                         f"Cannot run Step {index + 1} ({step_name}) before its prerequisites are complete."
                     )
+
                 self._current_step = index
+                self._dispatch_to_ui(
+                    self._safe_update_action_bar_progress,
+                    0,
+                    f"Running Step {index + 1}/{len(self.step_widgets)}...",
+                )
                 self._log(f"Running Step {index + 1}...")
-                widget.set_data(data)
+
+                params = dict(params_by_step[index])
+                widget._data = data
+                widget._last_parameters = dict(params)
+                widget._last_metadata = {}
+                widget._processing_result = None
+                widget._result = None
                 widget.set_context(self._context)
-
-                params = widget.get_parameters()
-                self._pipeline_session.record_step_parameters(index, params)
                 data = widget.run_processing(data, **params)
+                widget._result = data
 
+                self._pipeline_session.record_step_parameters(index, params)
                 processing_result = widget.get_processing_result()
                 if processing_result is not None:
                     self._pipeline_session.update_from_result(processing_result)
@@ -277,21 +500,41 @@ class MainWindowEventHandlersMixin:
                 output_path = self._save_step_output(index, data)
                 if output_path:
                     self._step_output_paths[index] = output_path
-                    widget.set_input_file(str(output_path))
-                    if index + 1 < len(self.step_widgets):
-                        self.step_widgets[index + 1].set_input_file(str(output_path))
                 self._log(f"Step {index + 1} completed")
-                self.update_idletasks()
 
             self._last_run_all = True
-            self._update_export_dnp_btn()
+            self._dispatch_to_ui(self._safe_update_action_bar_progress, 100, "All steps complete!")
             self._log("All steps completed successfully!")
+            success = True
         except Exception as exc:
+            self._last_run_all = False
+            self._dispatch_to_ui(self._safe_update_action_bar_progress, 0, f"Pipeline error: {exc}")
             self._log(f"Pipeline error: {exc}")
         finally:
-            self._switch_step(min(original_step, len(self.step_widgets) - 1))
+            self._dispatch_to_ui(self._finish_run_all_steps, original_step, success)
+
+    def _finish_run_all_steps(
+        self: "_MainWindowEventHost",
+        original_step: int,
+        success: bool,
+    ) -> None:
+        self._pipeline_worker_thread = None
+        self._set_pipeline_busy_state(False)
+        try:
+            self._update_export_dnp_btn()
+        except Exception:
+            pass
+        if not success:
+            self._safe_update_action_bar_progress(0, "Run All failed")
+        else:
+            self._auto_export_final_results()
+        self._switch_step(min(original_step, len(self.step_widgets) - 1))
 
     def _export_results(self: "_MainWindowEventHost") -> Optional[Path]:
+        if self._has_active_processing():
+            self._log("Busy: wait for processing to finish before exporting results.")
+            return None
+
         if self._current_data is None:
             materialized = self._materialize_final_xlsx_from_latest_step()
             if materialized is None:
@@ -349,6 +592,10 @@ class MainWindowEventHandlersMixin:
             )
 
     def _export_to_dnp(self: "_MainWindowEventHost") -> None:
+        if self._has_active_processing():
+            self._log("Busy: wait for processing to finish before exporting to DNP.")
+            return
+
         if self._last_completed_step is None or self._last_completed_step < 3:
             messagebox.showwarning(
                 "Not Ready",
@@ -539,6 +786,9 @@ class MainWindowEventHandlersMixin:
             self._log(f"Open output folder error: {exc}")
 
     def _log(self: "_MainWindowEventHost", message: str) -> None:
+        self._dispatch_to_ui(self._append_log_entry, message)
+
+    def _append_log_entry(self: "_MainWindowEventHost", message: str) -> None:
         timestamp = datetime.now().strftime("%H:%M:%S")
         self.log_text.insert("end", f"[{timestamp}] {message}\n")
         self.log_text.see("end")

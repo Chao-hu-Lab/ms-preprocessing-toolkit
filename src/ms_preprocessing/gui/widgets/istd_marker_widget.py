@@ -160,6 +160,29 @@ class ISTDMarkerWidget(BaseProcessingWidget):
 
         return params
 
+    def apply_parameters(self, params: dict) -> None:
+        """Apply a pipeline profile to the Step 2 controls."""
+        if "ppm_tolerance" in params:
+            self.ppm_entry.delete(0, "end")
+            self.ppm_entry.insert(0, str(params["ppm_tolerance"]))
+
+        if "rt_tolerance" in params:
+            self.rt_entry.delete(0, "end")
+            self.rt_entry.insert(0, str(params["rt_tolerance"]))
+
+        if "istd_mz_list" in params:
+            mz_list = params.get("istd_mz_list") or []
+            self.istd_entry.delete(0, "end")
+            self.istd_entry.insert(0, ", ".join(str(value) for value in mz_list))
+
+        if "istd_record_file" in params:
+            self.record_entry.delete(0, "end")
+            self.record_entry.insert(0, str(params["istd_record_file"]))
+
+        if "istd_record_date" in params:
+            self.date_entry.delete(0, "end")
+            self.date_entry.insert(0, str(params["istd_record_date"]))
+
     def _parse_istd_mz_list(self) -> List[float]:
         """Parse ISTD m/z list from entry, fallback to default."""
         istd_text = self.istd_entry.get().strip()

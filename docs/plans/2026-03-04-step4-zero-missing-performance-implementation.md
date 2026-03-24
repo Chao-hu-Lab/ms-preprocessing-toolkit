@@ -258,7 +258,7 @@ Include:
 **Step 2: Run benchmark on provided dataset**
 
 Run:
-`python scripts/benchmark_step4_io.py --input OUTPUT/STEP3_VERIFY_STEP1_drLiao_HNC_Urine_recheck_20260303_142706.xlsx --bg 0.5 --skew 0.66 --diff 0.5 --qc 0.4`
+`python scripts/benchmark_step4_io.py --input OUTPUT/STEP3_VERIFY_STEP1_validation_dataset.xlsx --bg 0.5 --skew 0.66 --diff 0.5 --qc 0.4`
 
 Expected:
 - `cells_imputed_from_zero > 0`
@@ -310,4 +310,3 @@ Expected:
 - All tests pass.
 - User dataset verification confirms zeros are imputed in Step 4 target columns.
 - Runtime improvement observed for repeated runs due default cache/intermediate parquet flow.
-

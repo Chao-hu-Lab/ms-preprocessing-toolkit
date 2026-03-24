@@ -28,7 +28,7 @@ skew_score = max(group_ratios) / mean(all_group_ratios)
 
 **數學推導**：當某組的 ratio 遠高於其他組（即 skew 高），必然意味著 `max(ratio) - min(ratio)` 也很大，因此 Diff gate 已涵蓋這類情境。反之，若 Diff gate 未觸發（各組 ratio 相近），Skew 也不會觸發。
 
-**實測驗證**（NTU cancer dataset，823 features × 3 groups）：
+**實測驗證**（internal validation dataset，823 features × 3 groups）：
 
 | 指標 | 數值 |
 |------|------|

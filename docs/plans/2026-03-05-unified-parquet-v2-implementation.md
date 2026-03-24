@@ -433,7 +433,7 @@ Run:
 `pytest tests/test_feature_filter.py tests/test_regressions.py tests/test_smoke_guardrails.py -v`
 
 Run:
-`python scripts/benchmark_pipeline_io.py --input "C:/Users/user/Desktop/廖老師樣本/drLiao_HNC_Urine.xlsx" --method-file "C:/Users/user/Desktop/廖老師樣本/20250804 廖老師食道癌樣本_中研院分析.docx" --istd-record-file "C:/Users/user/Desktop/NTU cancer/2025台大乳癌組織數據for Jia/20260105中研院台大Breast cancer tissue/20260106 ISDTs record.xlsx" --mz-tol 20 --rt-tol 1.5`
+`python scripts/benchmark_pipeline_io.py --input "C:/path/to/input.xlsx" --method-file "C:/path/to/method-file.docx" --istd-record-file "C:/path/to/istd-record.xlsx" --mz-tol 20 --rt-tol 1.5`
 
 Expected:
 - Tests PASS.
@@ -520,10 +520,9 @@ Core:
 - `pytest C:/Users/user/Desktop/質譜數據工具箱/ms-core/tests -v`
 
 End-to-end sample:
-- `python main.py --no-gui --input "C:/Users/user/Desktop/廖老師樣本/drLiao_HNC_Urine.xlsx" --method-file "C:/Users/user/Desktop/廖老師樣本/20250804 廖老師食道癌樣本_中研院分析.docx" --istd-record-file "C:/Users/user/Desktop/NTU cancer/2025台大乳癌組織數據for Jia/20260105中研院台大Breast cancer tissue/20260106 ISDTs record.xlsx" --mz-tol 20 --rt-tol 1.5 --step all`
+- `python main.py --no-gui --input "C:/path/to/input.xlsx" --method-file "C:/path/to/method-file.docx" --istd-record-file "C:/path/to/istd-record.xlsx" --mz-tol 20 --rt-tol 1.5 --step all`
 
 Required acceptance:
 - No regression in output schema and downstream DNP path.
 - Step4 confirms zero-as-missing behavior via stats.
 - Total runtime improves meaningfully with warm intermediate path.
-

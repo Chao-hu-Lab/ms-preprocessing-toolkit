@@ -330,6 +330,41 @@ class FeatureFilterWidget(BaseProcessingWidget):
             "enable_intensity_fc_threshold": bool(self.intensity_fc_enabled_var.get()),
         }
 
+    def apply_parameters(self, params: dict) -> None:
+        """Apply a named Step 4 preset to the visible controls."""
+        if "signal_threshold" in params:
+            self.signal_entry.delete(0, "end")
+            self.signal_entry.insert(0, str(params["signal_threshold"]))
+
+        self._apply_threshold_value("background", params, "background_threshold", "enable_background_threshold")
+        self._apply_threshold_value("diff", params, "diff_threshold", "enable_diff_threshold")
+        self._apply_threshold_value("qc_ratio", params, "qc_ratio_threshold", "enable_qc_ratio_threshold")
+        self._apply_threshold_value(
+            "intensity_fc",
+            params,
+            "intensity_fc_threshold",
+            "enable_intensity_fc_threshold",
+        )
+        self._sync_threshold_control_states()
+
+    def _apply_threshold_value(
+        self,
+        control_key: str,
+        params: dict,
+        value_key: str,
+        enabled_key: str,
+    ) -> None:
+        variable, slider, entry = self._threshold_controls[control_key]
+
+        if enabled_key in params:
+            variable.set(bool(params[enabled_key]))
+
+        if value_key in params:
+            parsed = self._clamp_to_slider(float(params[value_key]), slider)
+            slider.set(parsed)
+            entry.delete(0, "end")
+            entry.insert(0, f"{parsed:.3f}")
+
     def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
         """Run the feature filtering step."""
         result = feature_filter_adapter.run_from_df(
