@@ -120,6 +120,34 @@ def test_feature_filter_widget_apply_parameters_updates_visible_controls(widget)
     assert params["enable_intensity_fc_threshold"] is True
 
 
+def test_feature_filter_widget_uses_consistent_form_alignment(widget) -> None:
+    assert widget.params_frame.grid_columnconfigure(0)["minsize"] == 180
+    assert widget.signal_entry.grid_info()["column"] == 1
+    assert widget.bg_slider.grid_info()["column"] == 1
+    assert widget.intensity_fc_slider.grid_info()["column"] == 1
+    assert widget.diff_slider.grid_info()["column"] == 1
+    assert widget.qc_ratio_slider.grid_info()["column"] == 1
+    assert widget.signal_entry.cget("justify") == "center"
+    assert widget.bg_entry.cget("justify") == "center"
+    assert widget.intensity_fc_entry.cget("justify") == "center"
+    assert widget.diff_entry.cget("justify") == "center"
+    assert widget.qc_ratio_entry.cget("justify") == "center"
+    assert hasattr(widget, "criteria_textbox")
+
+
+def test_feature_filter_widget_explains_rules_in_plainer_lab_language(widget) -> None:
+    criteria_text = widget.criteria_textbox.get("1.0", "end")
+
+    assert "前 3 條是正向保留條件，採 OR 判斷" in criteria_text
+    assert "QC_ratio 則是負向覆寫條件" in criteria_text
+    assert "至少 2 組的 ratio 都大於等於背景比例門檻" in criteria_text
+    assert "fold-change = 最大組平均強度 / 最小組平均強度" in criteria_text
+    assert "只有保留下來的 feature 才會進入後續缺失值補值流程" in criteria_text
+    assert "把 0 與缺失值一起視為待補值" in criteria_text
+    assert "高於訊號門檻的樣本比例 < 40%" in criteria_text
+    assert "最小正值的 1/5 進行保守補值" in criteria_text
+
+
 def test_feature_filter_widget_runs_processing_in_background_without_duplicate_runs(
     widget,
     ctk_root,

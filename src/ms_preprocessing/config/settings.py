@@ -106,7 +106,7 @@ class Settings:
     for the MS Preprocessing Toolkit.
     """
 
-    # Supported file formats (canonical source ??used by FileHandler too)
+    # Supported file formats (canonical source used by FileHandler too)
     SUPPORTED_FORMATS = frozenset({".xlsx", ".xls", ".csv", ".tsv", ".txt", ".parquet"})
     # Enable parquet intermediates by default for Step1-4 chaining performance.
     SAVE_PARQUET_CACHE = True

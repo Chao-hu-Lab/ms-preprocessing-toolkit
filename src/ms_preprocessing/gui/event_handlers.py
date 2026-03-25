@@ -582,14 +582,16 @@ class MainWindowEventHandlersMixin:
             self.export_dnp_btn.configure(
                 state="normal",
                 text="Export DNP",
-                fg_color="#1a73e8",
             )
+            if hasattr(self, "_apply_action_button_theme"):
+                self._apply_action_button_theme(self.export_dnp_btn, "secondary")
         else:
             self.export_dnp_btn.configure(
                 state="disabled",
                 text="Export DNP",
-                fg_color="#6b7280",
             )
+            if hasattr(self, "_apply_action_button_theme"):
+                self._apply_action_button_theme(self.export_dnp_btn, "disabled")
 
     def _export_to_dnp(self: "_MainWindowEventHost") -> None:
         if self._has_active_processing():
@@ -638,10 +640,10 @@ class MainWindowEventHandlersMixin:
             message = (
                 "請在 SampleInfo 工作表補齊 Batch 與 DNA_mg/20uL 欄位後，再手動啟動 DNP。"
                 if needs_completion
-                else "Bridge 檔案已就緒，請手動啟動 DNP。"
+                else "Bridge 檔案已可直接匯入 DNP。"
             )
             messagebox.showinfo(
-                "匯出成功",
+                "匯出完成",
                 f"DNP bridge 檔案已匯出：\n{result}\n\n{message}",
             )
         except ImportError:

@@ -2,14 +2,15 @@
 Data Organizer Widget - GUI for Step 1.
 """
 
-from typing import Optional, Callable
+from typing import Callable, Optional
 from tkinter import filedialog
+
 import customtkinter as ctk
 import pandas as pd
 
 from ms_preprocessing.adapters import data_organizer as data_organizer_adapter
+from ms_preprocessing.gui.styles import FONTS, PADDING
 from ms_preprocessing.gui.widgets.base_widget import BaseProcessingWidget
-from ms_preprocessing.gui.styles import PADDING, FONTS
 
 
 class DataOrganizerWidget(BaseProcessingWidget):
@@ -27,9 +28,7 @@ class DataOrganizerWidget(BaseProcessingWidget):
         super().__init__(
             parent,
             title="Step 1: 資料整理 (Data Organization)",
-            description=(
-                "整理資料欄位與樣本資訊；可讀取分析方法文件並依上機順序排序。"
-            ),
+            description="整理原始表格欄位與樣本資訊，建立後續正規化或統計分析可直接使用的輸入格式。",
             step_index=step_index,
             on_load_file=on_load_file,
             on_complete=on_complete,
@@ -39,13 +38,11 @@ class DataOrganizerWidget(BaseProcessingWidget):
 
     def _create_parameters(self) -> None:
         """Create parameter inputs."""
-        # Conversion mode
-        mode_label = ctk.CTkLabel(
-            self.params_frame,
-            text="轉換模式",
-            font=FONTS["body"],
-        )
-        mode_label.grid(row=0, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        self._configure_form_grid()
+
+        mode_label = ctk.CTkLabel(self.params_frame, text="轉換模式", font=FONTS["body"])
+        self._style_form_label(mode_label)
+        mode_label.grid(row=0, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
 
         self.mode_var = ctk.StringVar(value="normalization")
         self.mode_selector = ctk.CTkSegmentedButton(
@@ -63,52 +60,30 @@ class DataOrganizerWidget(BaseProcessingWidget):
             sticky="w",
         )
 
-        # Sample type detection patterns
-        pattern_label = ctk.CTkLabel(
-            self.params_frame,
-            text="Sample Type 偵測模式",
-            font=FONTS["body"],
-        )
-        pattern_label.grid(row=1, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
-
-        self.auto_detect_var = ctk.BooleanVar(value=True)
-        auto_detect_cb = ctk.CTkCheckBox(
-            self.params_frame,
-            text="自動偵測 Sample Type",
-            variable=self.auto_detect_var,
-            font=FONTS["body"],
-        )
-        auto_detect_cb.grid(row=1, column=1, padx=PADDING["small"], pady=PADDING["small"])
-
-        # Method file selection (optional)
-        method_label = ctk.CTkLabel(
-            self.params_frame,
-            text="分析方法文件 (.docx)",
-            font=FONTS["body"],
-        )
-        method_label.grid(row=2, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        method_label = ctk.CTkLabel(self.params_frame, text="方法檔案 (.docx)", font=FONTS["body"])
+        self._style_form_label(method_label)
+        method_label.grid(row=1, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
 
         self.method_entry = ctk.CTkEntry(
             self.params_frame,
-            placeholder_text="選擇分析方法文件 (.docx)",
-            width=160,
+            placeholder_text="選填方法檔案 (.docx)",
             font=FONTS["body"],
         )
-        self.method_entry.grid(row=2, column=1, padx=PADDING["small"], pady=PADDING["small"])
+        self.method_entry.grid(row=1, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="ew")
 
         self.method_btn = ctk.CTkButton(
             self.params_frame,
-            text="選擇檔案",
+            text="瀏覽",
             command=self._browse_method_file,
             width=90,
             font=FONTS["body"],
         )
-        self.method_btn.grid(row=2, column=2, padx=PADDING["small"], pady=PADDING["small"])
+        self.method_btn.grid(row=1, column=2, padx=PADDING["small"], pady=PADDING["small"])
 
     def _browse_method_file(self) -> None:
         """Open file dialog to select method file."""
         filepath = filedialog.askopenfilename(
-            title="選擇分析方法文件",
+            title="選擇方法檔案",
             filetypes=[("Word files", "*.docx *.doc"), ("All files", "*.*")],
         )
         if filepath:
@@ -119,7 +94,7 @@ class DataOrganizerWidget(BaseProcessingWidget):
         """Get current parameter values."""
         params = {
             "mode": self.mode_var.get(),
-            "auto_detect": self.auto_detect_var.get(),
+            "auto_detect": True,
         }
 
         method_file = self.method_entry.get().strip()
@@ -134,9 +109,6 @@ class DataOrganizerWidget(BaseProcessingWidget):
         if mode in {"normalization", "statistics"}:
             self.mode_var.set(mode)
 
-        if "auto_detect" in params:
-            self.auto_detect_var.set(bool(params["auto_detect"]))
-
         method_file = params.get("method_file")
         if method_file is not None:
             self.method_entry.delete(0, "end")
@@ -148,7 +120,7 @@ class DataOrganizerWidget(BaseProcessingWidget):
             data,
             mode=params.get("mode", "normalization"),
             sample_type_mapping=params.get("sample_type_mapping"),
-            auto_detect=params.get("auto_detect", True),
+            auto_detect=True,
             method_file=params.get("method_file"),
             progress_callback=self.update_progress,
         )

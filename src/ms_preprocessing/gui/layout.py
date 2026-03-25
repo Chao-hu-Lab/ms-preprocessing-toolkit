@@ -5,7 +5,7 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from ms_preprocessing.config.settings import Settings
-from ms_preprocessing.gui.styles import COLORS, FONTS, PADDING, DIMENSIONS
+from ms_preprocessing.gui.styles import COLORS, DIMENSIONS, FONTS, PADDING
 from ms_preprocessing.gui.widgets.data_organizer_widget import DataOrganizerWidget
 from ms_preprocessing.gui.widgets.duplicate_remover_widget import DuplicateRemoverWidget
 from ms_preprocessing.gui.widgets.feature_filter_widget import FeatureFilterWidget
@@ -18,10 +18,8 @@ class MainWindowLayoutMixin:
     def _create_layout(self) -> None:
         self.grid_columnconfigure(0, weight=0)
         self.grid_columnconfigure(1, weight=1)
-        self.grid_rowconfigure(0, weight=0)
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
 
-        self._create_pipeline_nav()
         self._create_sidebar()
         self._create_content_area()
 
@@ -30,57 +28,64 @@ class MainWindowLayoutMixin:
         if status:
             self.status_label.configure(text=status)
 
-    def _create_pipeline_nav(self) -> None:
-        nav_frame = ctk.CTkFrame(self, height=36, fg_color="#0d1b2a")
-        nav_frame.grid(row=0, column=0, columnspan=2, sticky="ew")
-        nav_frame.grid_propagate(False)
+    def _get_action_button_theme(self, variant: str) -> dict[str, object]:
+        if variant == "primary":
+            return {
+                "fg_color": COLORS["action_primary"],
+                "hover": True,
+                "hover_color": COLORS["action_primary_hover"],
+                "border_width": 1,
+                "border_color": COLORS["action_primary_border"],
+                "text_color": COLORS["text"],
+                "text_color_disabled": COLORS["action_disabled_text"],
+            }
+        if variant == "disabled":
+            return {
+                "fg_color": "transparent",
+                "hover": False,
+                "border_width": 1,
+                "border_color": COLORS["action_disabled_border"],
+                "text_color": COLORS["action_disabled_text"],
+                "text_color_disabled": COLORS["action_disabled_text"],
+            }
+        return {
+            "fg_color": COLORS["action_secondary"],
+            "hover": True,
+            "hover_color": COLORS["action_secondary_hover"],
+            "border_width": 1,
+            "border_color": COLORS["action_secondary_border"],
+            "text_color": "#E0E0E0",
+            "text_color_disabled": COLORS["action_disabled_text"],
+        }
 
-        inner = ctk.CTkFrame(nav_frame, fg_color="transparent")
-        inner.place(relx=0.5, rely=0.5, anchor="center")
-
-        steps = [
-            ("Step 1: Preprocessing", True),
-            ("Step 2: Normalization", False),
-            ("Step 3: Statistical Analysis", False),
-        ]
-
-        for index, (label, is_current) in enumerate(steps):
-            if index > 0:
-                ctk.CTkLabel(
-                    inner,
-                    text="  ->  ",
-                    font=("Consolas", 14),
-                    text_color="#4a6fa5",
-                ).pack(side="left")
-
-            fg_color = "#1f538d" if is_current else "transparent"
-            text_color = "#e0e0e0" if is_current else "#5a6a7a"
-            font = (FONTS["body"][0], FONTS["body"][1], "bold") if is_current else FONTS["small"]
-            ctk.CTkLabel(
-                inner,
-                text=label,
-                font=font,
-                text_color=text_color,
-                fg_color=fg_color,
-                corner_radius=4,
-                padx=10,
-                pady=2,
-            ).pack(side="left")
+    def _apply_action_button_theme(self, button: ctk.CTkButton, variant: str) -> None:
+        button.configure(**self._get_action_button_theme(variant))
 
     def _create_sidebar(self) -> None:
-        self.sidebar = ctk.CTkFrame(self, width=DIMENSIONS["sidebar_width"])
-        self.sidebar.grid(row=1, column=0, rowspan=1, sticky="nsw")
+        self.sidebar = ctk.CTkFrame(
+            self,
+            width=DIMENSIONS["sidebar_width"],
+            fg_color=COLORS["sidebar_bg"],
+            corner_radius=0,
+        )
+        self.sidebar.grid(row=0, column=0, sticky="nsw")
         self.sidebar.grid_propagate(False)
 
-        ctk.CTkLabel(
+        self.sidebar_title_label = ctk.CTkLabel(
             self.sidebar,
-            text="MS Preprocessing\nToolkit",
+            text="MS Preprocessing Toolkit",
             font=FONTS["heading"],
             justify="left",
             anchor="w",
-        ).pack(fill="x", padx=PADDING["medium"], pady=(PADDING["large"], PADDING["small"]))
+            wraplength=0,
+        )
+        self.sidebar_title_label.pack(
+            fill="x",
+            padx=PADDING["medium"],
+            pady=(PADDING["large"], PADDING["small"]),
+        )
 
-        ctk.CTkFrame(self.sidebar, height=1, fg_color="#2a3f5a").pack(
+        ctk.CTkFrame(self.sidebar, height=1, fg_color=COLORS["sidebar_divider"]).pack(
             fill="x",
             padx=PADDING["medium"],
             pady=(0, PADDING["small"]),
@@ -119,6 +124,7 @@ class MainWindowLayoutMixin:
                 anchor="w",
                 height=32,
                 fg_color=COLORS["primary"] if index == 0 else "transparent",
+                hover_color="#1d2d4a" if index == 0 else COLORS["action_secondary"],
                 border_width=0,
                 font=FONTS["body"],
             )
@@ -126,7 +132,7 @@ class MainWindowLayoutMixin:
             self.step_buttons.append(button)
 
         ctk.CTkFrame(self.sidebar, fg_color="transparent").pack(fill="both", expand=True)
-        ctk.CTkFrame(self.sidebar, height=1, fg_color="#2a3f5a").pack(
+        ctk.CTkFrame(self.sidebar, height=1, fg_color=COLORS["sidebar_divider"]).pack(
             fill="x",
             padx=PADDING["medium"],
             pady=(0, PADDING["small"]),
@@ -159,17 +165,17 @@ class MainWindowLayoutMixin:
             dropdown_font=FONTS["small"],
             anchor="w",
         )
-        self.run_all_profile_menu.pack(fill="x", padx=PADDING["medium"], pady=(0, 2))
+        self.run_all_profile_menu.pack(fill="x", padx=PADDING["medium"], pady=(0, 8))
 
         self.run_all_btn = ctk.CTkButton(
             self.sidebar,
             text="Run All",
             command=self._run_all_steps,
-            height=32,
-            fg_color=COLORS["accent"],
+            height=34,
             font=FONTS["small"],
             anchor="w",
         )
+        self._apply_action_button_theme(self.run_all_btn, "primary")
         self.run_all_btn.pack(fill="x", padx=PADDING["medium"], pady=(0, PADDING["small"]))
 
         action_buttons = [
@@ -177,27 +183,24 @@ class MainWindowLayoutMixin:
                 "attr_name": "export_results_btn",
                 "text": "Export Results",
                 "command": self._export_results,
-                "fg_color": COLORS["secondary"],
             },
             {
                 "attr_name": "open_output_folder_btn",
                 "text": "Open Output Folder",
                 "command": self._open_output_folder,
-                "fg_color": COLORS["surface"],
-                "hover_color": "#1d2d4a",
-                "border_width": 1,
-                "border_color": "#2a3f5a",
             },
         ]
         for button_config in action_buttons:
-            attr_name = button_config.pop("attr_name")
+            config = dict(button_config)
+            attr_name = config.pop("attr_name")
             button = ctk.CTkButton(
                 self.sidebar,
-                height=32,
+                height=34,
                 font=FONTS["small"],
                 anchor="w",
-                **button_config,
+                **config,
             )
+            self._apply_action_button_theme(button, "secondary")
             button.pack(fill="x", padx=PADDING["medium"], pady=2)
             setattr(self, attr_name, button)
 
@@ -205,12 +208,12 @@ class MainWindowLayoutMixin:
             self.sidebar,
             text="Export DNP",
             command=self._export_to_dnp,
-            height=32,
-            fg_color="#6b7280",
+            height=34,
             font=FONTS["small"],
             anchor="w",
             state="disabled",
         )
+        self._apply_action_button_theme(self.export_dnp_btn, "disabled")
         self.export_dnp_btn.pack(
             fill="x",
             padx=PADDING["medium"],
@@ -219,14 +222,20 @@ class MainWindowLayoutMixin:
 
     def _create_content_area(self) -> None:
         self.content_frame = ctk.CTkFrame(self)
-        self.content_frame.grid(row=1, column=1, sticky="nsew")
+        self.content_frame.grid(row=0, column=1, sticky="nsew")
         self.content_frame.grid_columnconfigure(0, weight=1)
         self.content_frame.grid_rowconfigure(0, weight=0)
         self.content_frame.grid_rowconfigure(1, weight=1)
 
         self.main_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
-        self.main_frame.grid(row=0, column=0, sticky="ew")
+        self.main_frame.grid(
+            row=0,
+            column=0,
+            sticky="ew",
+            pady=(DIMENSIONS["content_top_offset"], 0),
+        )
         self.main_frame.grid_columnconfigure(0, weight=1)
+        self.main_frame.grid_rowconfigure(0, weight=1)
 
         self.step_widgets = [
             DataOrganizerWidget(
@@ -342,7 +351,11 @@ class MainWindowLayoutMixin:
             border_width=1,
         ).pack(side="right")
 
-        self.log_text = ctk.CTkTextbox(self.bottom_frame, font=FONTS["mono"])
+        self.log_text = ctk.CTkTextbox(
+            self.bottom_frame,
+            font=FONTS["mono"],
+            height=DIMENSIONS["log_height"],
+        )
         self.log_text.grid(
             row=3,
             column=0,
@@ -365,7 +378,7 @@ class MainWindowLayoutMixin:
         self.step_widgets[step_index].grid(
             row=0,
             column=0,
-            sticky="ew",
+            sticky="nsew",
             padx=0,
             pady=0,
         )

@@ -72,3 +72,14 @@ def test_istd_marker_widget_apply_parameters_populates_profile_defaults(widget) 
     else:
         assert "istd_record_file" not in params
         assert "istd_record_date" not in params
+
+
+def test_istd_marker_widget_uses_aligned_form_columns(widget) -> None:
+    assert widget.params_frame.grid_columnconfigure(0)["minsize"] == 180
+    assert widget.ppm_entry.grid_info()["column"] == 1
+    assert widget.rt_entry.grid_info()["column"] == 1
+    assert widget.istd_entry.grid_info()["column"] == 1
+    assert widget.record_entry.grid_info()["column"] == 1
+    assert widget.date_entry.grid_info()["column"] == 1
+    assert widget.ppm_entry.cget("justify") == "center"
+    assert widget.rt_entry.cget("justify") == "center"
