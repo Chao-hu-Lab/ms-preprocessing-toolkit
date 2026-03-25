@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ms-preprocessing-toolkit"
-version = "1.2.0"
+version = "1.2.1"
 description = "Mass Spectrometry Data Preprocessing Toolkit - An integrated GUI tool for MS data preprocessing workflow"
 readme = "README.md"
 license = {text = "MIT"}
