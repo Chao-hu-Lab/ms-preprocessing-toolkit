@@ -12,6 +12,7 @@ Requirements:
 import sys
 from pathlib import Path
 import customtkinter
+from PyInstaller.building.osx import BUNDLE
 
 block_cipher = None
 
@@ -78,3 +79,11 @@ exe = EXE(
     entitlements_file=None,
     icon=None,
 )
+
+if sys.platform == "darwin":
+    app = BUNDLE(
+        exe,
+        name="ms-preprocessing.app",
+        icon=None,
+        bundle_identifier="com.ms.preprocessing.toolkit",
+    )

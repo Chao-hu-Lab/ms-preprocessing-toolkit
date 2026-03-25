@@ -61,6 +61,20 @@ def test_output_directory_contains_only_user_deliverables_after_run_all(
     assert final_path.parent == (base / "OUTPUT")
 
 
+def test_pipeline_session_creates_output_directory_only_when_final_export_path_is_requested(tmp_path) -> None:
+    from ms_preprocessing.gui.pipeline_session import PipelineSession
+
+    output_dir = tmp_path / "OUTPUT"
+    session = PipelineSession(output_dir=output_dir, source_file=tmp_path / "input.xlsx")
+
+    assert output_dir.exists() is False
+
+    final_path = session.build_final_export_path(last_completed_step=3, last_run_all=True)
+
+    assert output_dir.exists() is True
+    assert final_path.parent == output_dir
+
+
 def test_gui_parameters_are_collected_in_single_pipeline_session_context(tmp_path) -> None:
     from ms_preprocessing.gui.pipeline_session import PipelineSession
 
