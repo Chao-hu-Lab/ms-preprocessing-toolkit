@@ -2,6 +2,10 @@
 GUI styles and theme configuration for MS Preprocessing Toolkit.
 """
 
+from __future__ import annotations
+
+import platform
+
 # Color scheme
 COLORS = {
     "primary": "#1f538d",
@@ -27,14 +31,37 @@ COLORS = {
     "text_secondary": "#a0a0a0",
 }
 
+def _font_families_for_platform(system_name: str | None = None) -> dict[str, str]:
+    system = system_name or platform.system()
+    if system == "Darwin":
+        return {
+            "ui": "PingFang TC",
+            "mono": "Menlo",
+        }
+    if system == "Windows":
+        return {
+            "ui": "Microsoft JhengHei UI",
+            "mono": "Consolas",
+        }
+    return {
+        "ui": "Noto Sans CJK TC",
+        "mono": "DejaVu Sans Mono",
+    }
+
+
+def build_font_theme(system_name: str | None = None) -> dict[str, tuple]:
+    families = _font_families_for_platform(system_name)
+    return {
+        "title": (families["ui"], 20, "bold"),
+        "heading": (families["ui"], 16, "bold"),
+        "body": (families["ui"], 15),
+        "small": (families["ui"], 13),
+        "mono": (families["mono"], 13),
+    }
+
+
 # Font settings
-FONTS = {
-    "title": ("Microsoft JhengHei UI", 20, "bold"),
-    "heading": ("Microsoft JhengHei UI", 16, "bold"),
-    "body": ("Microsoft JhengHei UI", 15),
-    "small": ("Microsoft JhengHei UI", 13),
-    "mono": ("Consolas", 13),
-}
+FONTS = build_font_theme()
 
 # Padding and spacing
 PADDING = {
