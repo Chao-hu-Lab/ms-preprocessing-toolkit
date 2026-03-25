@@ -69,6 +69,16 @@ git worktree add .worktrees/<branch-name> -b <type>/<branch-name>
 - When touching behavior, also touch verification
 - When a past mistake repeats, encode the fix into repo instructions instead of relying on memory
 
+## Text And UI Copy Rules
+
+- Treat all repository text files as UTF-8 by default, especially `.py`, `.md`, `.yml`, `.yaml`, `.json`, `.toml`, `.txt`, and any file containing localized UI text.
+- Preserve Chinese and other non-ASCII user-facing text as UTF-8 source-of-truth. Do not save localized text files in ANSI, Big5, or editor-default legacy encodings.
+- Keep UI copy cleanup isolated from layout, styling, and behavior changes unless the task explicitly requires them together.
+- Before editing localized strings, confirm the file reads correctly as UTF-8. If the file is already mojibake, repair the encoding or file readability first; do not patch new wording into corrupted text.
+- For visible GUI text, update the source-of-truth layer first, then align downstream copies. Typical order is: shared base widgets, config/constants, event-handler messages, step widgets, tests.
+- Do not rewrite scientific or workflow rule descriptions from memory when a report, design note, or commit history exists. Trace the current wording back to the latest authoritative source before updating the GUI copy.
+- On Windows and CustomTkinter surfaces, default to plain-text button labels. Introduce icons, emoji, or special glyphs only after confirming stable rendering on the target platform and font stack.
+
 ## Verification Rules
 
 Do not claim completion without fresh evidence.
@@ -80,6 +90,13 @@ PYTHONPATH=ms-core/src pytest tests/ -v --tb=short -x
 ```
 
 For smaller tasks, run the narrowest sufficient check first, then expand if risk justifies it.
+
+If you touched localized or user-visible text:
+
+- Inspect the edited files as explicit UTF-8 text before finishing; terminal rendering alone is not sufficient evidence.
+- Scan the touched files for obvious mojibake markers such as replacement characters or suspicious placeholder `??` around localized text.
+- Run the narrowest relevant GUI/text regression tests so string fixes do not silently drift from the UI.
+- If the change touches shared GUI layers such as `layout.py`, `base_widget.py`, `event_handlers.py`, shared style/config modules, or workflow labels, run a minimal GUI smoke check that covers startup, step switching, action-button visibility, and primary step titles/descriptions.
 
 Useful local checks:
 
