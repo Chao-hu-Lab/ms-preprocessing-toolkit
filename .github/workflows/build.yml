@@ -103,6 +103,8 @@ jobs:
 
           New-Item -ItemType Directory -Path $stageDir | Out-Null
           Copy-Item "dist\ms-preprocessing.exe" (Join-Path $stageDir "$artifactStem.exe")
+          Copy-Item "docs\release\README.md" (Join-Path $stageDir "README.md")
+          Copy-Item "LICENSE" (Join-Path $stageDir "LICENSE")
           Compress-Archive -Path $stageDir -DestinationPath $archivePath -Force
 
       - name: Package macOS zip
@@ -116,6 +118,8 @@ jobs:
           rm -rf "$stage_dir" "$archive_path"
           mkdir -p "$stage_dir"
           cp -R "dist/ms-preprocessing.app" "$stage_dir/${artifact_stem}.app"
+          cp "docs/release/README.md" "$stage_dir/README.md"
+          cp "LICENSE" "$stage_dir/LICENSE"
           ditto -c -k --sequesterRsrc --keepParent "$stage_dir" "$archive_path"
 
       - name: Upload artifact
