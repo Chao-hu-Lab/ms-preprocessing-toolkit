@@ -6,6 +6,19 @@
 - **src/ms_preprocessing/** — toolkit GUI, CLI, and wrappers
 - **tests/** — pytest test suite (run with `PYTHONPATH=ms-core/src`)
 
+## Text And UI Copy Rules
+
+- Treat all repository text files as UTF-8 by default, especially Python source, Markdown, config files, and any file that contains localized UI text.
+- Preserve Chinese and other non-ASCII user-facing text as UTF-8 source-of-truth. Do not save localized text files in ANSI, Big5, or editor-default legacy encodings.
+- Keep UI copy cleanup isolated from layout, styling, and behavior changes unless the task explicitly requires them together.
+- Before editing localized strings, confirm the file reads correctly as UTF-8. If the file is already mojibake, repair the encoding or file readability first; do not patch new wording into corrupted text.
+- For visible GUI text, update the source-of-truth layer first, then align downstream copies. Typical order is: shared base widgets, config/constants, event-handler messages, step widgets, tests.
+- Do not rewrite scientific or workflow rule descriptions from memory when a report, design note, or commit history exists. Trace the current wording back to the latest authoritative source before updating the GUI copy.
+- On Windows and CustomTkinter surfaces, default to plain-text button labels. Introduce icons, emoji, or special glyphs only after confirming stable rendering on the target platform and font stack.
+- After touching localized or user-visible text, inspect the edited files as explicit UTF-8 text; terminal rendering alone is not sufficient evidence.
+- After touching localized or user-visible text, scan the edited files for replacement characters or suspicious `??` placeholders, then run the narrowest relevant GUI/text regression tests.
+- If the change touches shared GUI layers such as `layout.py`, `base_widget.py`, `event_handlers.py`, shared style/config modules, or workflow labels, run a minimal GUI smoke check that covers startup, step switching, action-button visibility, and primary step titles/descriptions.
+
 ## Development Workflow
 
 ### 0. Pre-flight Check (MANDATORY)

@@ -52,11 +52,33 @@ def test_main_window_sidebar_exposes_run_all_profile_selector(ctk_root) -> None:
     app.pack()
     ctk_root.update_idletasks()
     try:
+        assert app.sidebar_title_label.cget("text") == "MS Preprocessing Toolkit"
+        assert "\n" not in app.sidebar_title_label.cget("text")
+        assert app.sidebar.cget("fg_color") == "#1E1E1E"
         assert app.pipeline_preset_label.cget("text") == "Run All Preset"
         assert app.run_all_profile_var.get() == "default"
         assert app.run_all_profile_menu.cget("values") == ["loose", "default", "strict"]
         assert app.run_all_btn.cget("text") == "Run All"
-        assert app.open_output_folder_btn.cget("fg_color") == "#16213e"
+        assert app.run_all_btn.cget("fg_color") == "#2E8B57"
+        assert app.export_results_btn.cget("text") == "Export Results"
+        assert app.open_output_folder_btn.cget("text") == "Open Output Folder"
+        assert app.open_output_folder_btn.cget("fg_color") == "#333333"
         assert app.open_output_folder_btn.cget("border_width") == 1
+        assert app.export_dnp_btn.cget("state") == "disabled"
+        assert app.export_dnp_btn.cget("fg_color") == "transparent"
+    finally:
+        app.destroy()
+
+
+def test_action_button_theme_restores_hover_after_disabled_state(ctk_root) -> None:
+    app = _SidebarHarness(ctk_root)
+    app.pack()
+    ctk_root.update_idletasks()
+    try:
+        app._apply_action_button_theme(app.export_dnp_btn, "disabled")
+        assert app.export_dnp_btn.cget("hover") is False
+
+        app._apply_action_button_theme(app.export_dnp_btn, "secondary")
+        assert app.export_dnp_btn.cget("hover") is True
     finally:
         app.destroy()

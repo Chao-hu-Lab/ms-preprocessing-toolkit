@@ -2,14 +2,15 @@
 ISTD Marker Widget - GUI for Step 2.
 """
 
-from typing import Optional, Callable, Set, List
+from typing import Callable, List, Optional, Set
 from tkinter import filedialog
+
 import customtkinter as ctk
 import pandas as pd
 
 from ms_preprocessing.adapters import istd_marker as istd_marker_adapter
+from ms_preprocessing.gui.styles import FONTS, PADDING
 from ms_preprocessing.gui.widgets.base_widget import BaseProcessingWidget
-from ms_preprocessing.gui.styles import PADDING, FONTS
 
 
 class ISTDMarkerWidget(BaseProcessingWidget):
@@ -28,7 +29,7 @@ class ISTDMarkerWidget(BaseProcessingWidget):
         super().__init__(
             parent,
             title="Step 2: ISTD 標記 (ISTD Marking)",
-            description="標記內標(ISTD)、依 m/z 排序、偵測並標記重複訊號",
+            description="依據 m/z 與 RT 容差比對內標特徵，可搭配 ISTD 記錄檔與日期資訊補強辨識結果。",
             step_index=step_index,
             on_load_file=on_load_file,
             on_complete=on_complete,
@@ -38,104 +39,89 @@ class ISTDMarkerWidget(BaseProcessingWidget):
 
     def _create_parameters(self) -> None:
         """Create parameter inputs."""
-        # PPM tolerance
-        ppm_label = ctk.CTkLabel(
-            self.params_frame,
-            text="m/z 容差 (ppm)：",
-            font=FONTS["body"],
-        )
-        ppm_label.grid(row=0, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        self._configure_form_grid()
+
+        ppm_label = ctk.CTkLabel(self.params_frame, text="m/z 容差 (ppm)", font=FONTS["body"])
+        self._style_form_label(ppm_label)
+        ppm_label.grid(row=0, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
 
         self.ppm_entry = ctk.CTkEntry(
             self.params_frame,
             placeholder_text="20",
-            width=160,
             font=FONTS["body"],
         )
+        self._style_numeric_entry(self.ppm_entry)
         self.ppm_entry.insert(0, "20")
-        self.ppm_entry.grid(row=0, column=1, padx=PADDING["small"], pady=PADDING["small"])
+        self.ppm_entry.grid(row=0, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
 
-        # RT tolerance
-        rt_label = ctk.CTkLabel(
-            self.params_frame,
-            text="RT 容差 (min)：",
-            font=FONTS["body"],
-        )
-        rt_label.grid(row=1, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        rt_label = ctk.CTkLabel(self.params_frame, text="RT 容差 (min)", font=FONTS["body"])
+        self._style_form_label(rt_label)
+        rt_label.grid(row=1, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
 
         self.rt_entry = ctk.CTkEntry(
             self.params_frame,
             placeholder_text="1.5",
-            width=160,
             font=FONTS["body"],
         )
+        self._style_numeric_entry(self.rt_entry)
         self.rt_entry.insert(0, "1.5")
-        self.rt_entry.grid(row=1, column=1, padx=PADDING["small"], pady=PADDING["small"])
+        self.rt_entry.grid(row=1, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
 
-        # Known ISTD m/z values
-        istd_label = ctk.CTkLabel(
-            self.params_frame,
-            text="已知 ISTD m/z：",
-            font=FONTS["body"],
-        )
-        istd_label.grid(row=2, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        istd_label = ctk.CTkLabel(self.params_frame, text="預設 ISTD m/z", font=FONTS["body"])
+        self._style_form_label(istd_label)
+        istd_label.grid(row=2, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
 
         self.istd_entry = ctk.CTkEntry(
             self.params_frame,
-            placeholder_text="例: 261.1273, 245.1324",
+            placeholder_text="例如 261.1273, 245.1324",
             width=160,
             font=FONTS["body"],
         )
-        # Pre-fill default ISTD list
         default_list = ", ".join(f"{mz:.4f}" for mz in istd_marker_adapter.get_default_istd_mz())
         self.istd_entry.insert(0, default_list)
-        self.istd_entry.grid(row=2, column=1, padx=PADDING["small"], pady=PADDING["small"])
+        self.istd_entry.grid(row=2, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="ew")
 
-        # ISTD record file (optional)
-        record_label = ctk.CTkLabel(
-            self.params_frame,
-            text="ISTD 記錄表 (可選)：",
-            font=FONTS["body"],
-        )
-        record_label.grid(row=3, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        record_label = ctk.CTkLabel(self.params_frame, text="ISTD 記錄檔 (.xlsx)", font=FONTS["body"])
+        self._style_form_label(record_label)
+        record_label.grid(row=3, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
 
         self.record_entry = ctk.CTkEntry(
             self.params_frame,
-            placeholder_text="選擇 ISTD 記錄表 (.xlsx)",
+            placeholder_text="選擇 ISTD 記錄檔 (.xlsx)",
             width=160,
             font=FONTS["body"],
         )
-        self.record_entry.grid(row=3, column=1, padx=PADDING["small"], pady=PADDING["small"])
+        self.record_entry.grid(row=3, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="ew")
 
         self.record_btn = ctk.CTkButton(
             self.params_frame,
-            text="選擇檔案",
+            text="瀏覽",
             command=self._browse_record_file,
             width=120,
             font=FONTS["body"],
         )
         self.record_btn.grid(row=3, column=2, padx=PADDING["small"], pady=PADDING["small"])
 
-        # ISTD record date
         date_label = ctk.CTkLabel(
             self.params_frame,
-            text="ISTD 日期(YYYYMMDD)：",
+            text="ISTD 日期 (YYYYMMDD)",
             font=FONTS["body"],
         )
-        date_label.grid(row=4, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        self._style_form_label(date_label)
+        date_label.grid(row=4, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
 
         self.date_entry = ctk.CTkEntry(
             self.params_frame,
-            placeholder_text="例: 20260106",
-            width=160,
+            placeholder_text="例如 20260106",
             font=FONTS["body"],
         )
+        self._style_numeric_entry(self.date_entry)
         self.date_entry.grid(row=4, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
 
     def _browse_record_file(self) -> None:
         """Open file dialog to select ISTD record file."""
         filepath = filedialog.askopenfilename(
-            title="選擇 ISTD 記錄表",
+            title="選擇 ISTD 記錄檔",
             filetypes=[("Excel files", "*.xlsx *.xls"), ("All files", "*.*")],
         )
         if filepath:

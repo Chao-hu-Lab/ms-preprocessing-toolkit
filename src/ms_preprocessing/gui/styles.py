@@ -12,6 +12,17 @@ COLORS = {
     "success": "#52b788",
     "background": "#1a1a2e",
     "surface": "#16213e",
+    "sidebar_bg": "#1E1E1E",
+    "sidebar_divider": "#2A2A2A",
+    "action_primary": "#2E8B57",
+    "action_primary_hover": "#3CB371",
+    "action_primary_border": "#3CB371",
+    "action_secondary": "#333333",
+    "action_secondary_hover": "#404040",
+    "action_secondary_border": "#555555",
+    "action_secondary_border_hover": "#777777",
+    "action_disabled_border": "#444444",
+    "action_disabled_text": "#666666",
     "text": "#ffffff",
     "text_secondary": "#a0a0a0",
 }
@@ -36,8 +47,13 @@ PADDING = {
 DIMENSIONS = {
     "button_width": 120,
     "entry_width": 200,
-    "sidebar_width": 180,     # 縮小（原 220）
-    "log_height": 150,        # 微調
-    "action_bar_height": 52,  # 新增
-    "left_panel_width": 420,  # 新增：雙欄左欄固定寬度
+    "sidebar_width": 240,
+    "log_height": 220,
+    "action_bar_height": 52,
+    "left_panel_width": 420,
+    "content_top_offset": 48,
+    "form_label_width": 180,
+    "form_switch_width": 220,
+    "form_value_width": 160,
+    "numeric_input_width": 130,
 }

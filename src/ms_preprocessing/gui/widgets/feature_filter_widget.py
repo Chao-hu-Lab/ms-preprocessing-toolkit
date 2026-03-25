@@ -28,8 +28,8 @@ class FeatureFilterWidget(BaseProcessingWidget):
         self._threshold_controls: dict[str, tuple[tk.BooleanVar, ctk.CTkSlider, ctk.CTkEntry]] = {}
         super().__init__(
             parent,
-            title="Step 4: 特徵篩選與缺失值填補",
-            description="",
+            title="Step 4: 特徵篩選與缺失值補值 (Feature Filtering)",
+            description="依訊號強度、背景比例、組間差異與 QC 表現篩選特徵，並對保留下來的 feature 進行保守補值。",
             step_index=step_index,
             on_load_file=on_load_file,
             on_complete=on_complete,
@@ -39,31 +39,20 @@ class FeatureFilterWidget(BaseProcessingWidget):
 
     def _create_parameters(self) -> None:
         """Create parameter inputs."""
-        self.params_frame.grid_columnconfigure(1, weight=1)
+        self._configure_form_grid()
 
-        signal_label = ctk.CTkLabel(
-            self.params_frame,
-            text="訊號門檻值",
-            font=FONTS["body"],
-        )
-        signal_label.grid(row=0, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        signal_label = ctk.CTkLabel(self.params_frame, text="訊號門檻值", font=FONTS["body"])
+        self._style_form_label(signal_label)
+        signal_label.grid(row=0, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
 
         self.signal_entry = ctk.CTkEntry(
             self.params_frame,
             placeholder_text="5000",
-            width=160,
             font=FONTS["body"],
         )
+        self._style_numeric_entry(self.signal_entry)
         self.signal_entry.insert(0, "5000")
-        self.signal_entry.grid(row=0, column=1, padx=PADDING["small"], pady=PADDING["small"])
-
-        ctk.CTkLabel(
-            self.params_frame,
-            text="ratio = 組內高於訊號門檻的樣本數 / 組內總樣本數",
-            font=FONTS["small"],
-            text_color=COLORS["text_secondary"],
-            anchor="w",
-        ).grid(row=0, column=3, padx=(PADDING["medium"], PADDING["small"]), sticky="w")
+        self.signal_entry.grid(row=0, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
 
         self.bg_enabled_var = tk.BooleanVar(value=True)
         self.bg_enabled_switch = self._create_threshold_switch(
@@ -79,14 +68,6 @@ class FeatureFilterWidget(BaseProcessingWidget):
             self.bg_entry,
         )
 
-        ctk.CTkLabel(
-            self.params_frame,
-            text="啟用時：至少 2 組的 ratio >= 這個門檻才算穩定型",
-            font=FONTS["small"],
-            text_color=COLORS["text_secondary"],
-            anchor="w",
-        ).grid(row=1, column=3, padx=(PADDING["medium"], PADDING["small"]), sticky="w")
-
         self.intensity_fc_enabled_var = tk.BooleanVar(value=True)
         self.intensity_fc_enabled_switch = self._create_threshold_switch(
             row=2,
@@ -94,25 +75,22 @@ class FeatureFilterWidget(BaseProcessingWidget):
             variable=self.intensity_fc_enabled_var,
         )
         self.intensity_fc_slider = self._create_threshold_slider(
-            row=2, default_value=2.0, on_change=self._update_intensity_fc,
-            from_=1.0, to=10.0,
+            row=2,
+            default_value=2.0,
+            on_change=self._update_intensity_fc,
+            from_=1.0,
+            to=10.0,
         )
         self.intensity_fc_entry = self._create_threshold_entry(
-            row=2, default_value=2.0, on_apply=self._apply_intensity_fc,
+            row=2,
+            default_value=2.0,
+            on_apply=self._apply_intensity_fc,
         )
         self._threshold_controls["intensity_fc"] = (
             self.intensity_fc_enabled_var,
             self.intensity_fc_slider,
             self.intensity_fc_entry,
         )
-
-        ctk.CTkLabel(
-            self.params_frame,
-            text="啟用時：任兩組平均強度 fold-change >= 門檻才算強度差異型",
-            font=FONTS["small"],
-            text_color=COLORS["text_secondary"],
-            anchor="w",
-        ).grid(row=2, column=3, padx=(PADDING["medium"], PADDING["small"]), sticky="w")
 
         self.diff_enabled_var = tk.BooleanVar(value=True)
         self.diff_enabled_switch = self._create_threshold_switch(
@@ -127,14 +105,6 @@ class FeatureFilterWidget(BaseProcessingWidget):
             self.diff_slider,
             self.diff_entry,
         )
-
-        ctk.CTkLabel(
-            self.params_frame,
-            text="啟用時：最大 ratio - 最小 ratio >= 這個門檻才算差異型",
-            font=FONTS["small"],
-            text_color=COLORS["text_secondary"],
-            anchor="w",
-        ).grid(row=3, column=3, padx=(PADDING["medium"], PADDING["small"]), sticky="w")
 
         self.qc_ratio_enabled_var = tk.BooleanVar(value=True)
         self.qc_ratio_enabled_switch = self._create_threshold_switch(
@@ -158,30 +128,14 @@ class FeatureFilterWidget(BaseProcessingWidget):
             self.qc_ratio_entry,
         )
 
-        ctk.CTkLabel(
-            self.params_frame,
-            text="啟用時：QC_ratio = 0 或低於輸入值的 feature 會被移除",
-            font=FONTS["small"],
-            text_color=COLORS["text_secondary"],
-            anchor="w",
-        ).grid(row=4, column=3, padx=(PADDING["medium"], PADDING["small"]), sticky="w")
-
-        # criteria + switch 放在 params_frame 外層的 _content_frame，避免被截斷
-        criteria_text = (
-            "目前規則：\n"
-            "  1. 背景比例門檻開啟時，至少 2 組 ratio >= 背景比例門檻\n"
-            "  2. 強度倍率門檻開啟時，任兩組平均強度 fold-change >= 強度倍率門檻\n"
-            "  3. 組間差異門檻開啟時，最大 ratio - 最小 ratio >= 組間差異門檻\n"
-            "  4. QC_ratio 門檻開啟時，QC_ratio = 0 或低於設定值的 feature 會被移除"
-        )
-        ctk.CTkLabel(
+        self.criteria_textbox = ctk.CTkTextbox(
             self._content_frame,
-            text=criteria_text,
+            height=180,
             font=FONTS["small"],
-            text_color=COLORS["text_secondary"],
-            justify="left",
-            anchor="w",
-        ).pack(fill="x", padx=PADDING["large"], pady=(PADDING["small"], 0))
+            wrap="word",
+        )
+        self.criteria_textbox.pack(fill="x", padx=PADDING["large"], pady=(PADDING["small"], 0))
+        self._populate_criteria_textbox()
 
         ctk.CTkFrame(
             self._content_frame,
@@ -201,6 +155,61 @@ class FeatureFilterWidget(BaseProcessingWidget):
 
         self._sync_threshold_control_states()
 
+    def _populate_criteria_textbox(self) -> None:
+        """Render the filtering rules in clearer lab-facing language."""
+        content = (
+            "篩選規則說明\n\n"
+            "整體邏輯\n"
+            "前 3 條是正向保留條件，採 OR 判斷；只要符合其中一條，feature 就可以先保留下來。\n"
+            "QC_ratio 則是負向覆寫條件，用來排除在 QC 中完全不穩定或幾乎沒有檢出的 feature。\n\n"
+            "1. 訊號門檻值\n"
+            "   先確認這個 feature 本身有沒有足夠訊號。\n"
+            "   後續的 ratio、diff ratio 與 QC_ratio，都是以高於訊號門檻的樣本數為基礎計算。\n\n"
+            "2. 背景比例門檻（Stable gate）\n"
+            "   ratio = 組內高於訊號門檻的樣本數 / 組內總樣本數\n"
+            "   若至少 2 組的 ratio 都大於等於背景比例門檻，代表這個 feature 在多個實驗組都能穩定檢出，可先保留。\n\n"
+            "3. 強度倍率門檻（Intensity FC gate）\n"
+            "   這一條看的是不同組別之間的平均強度差異。\n"
+            "   fold-change = 最大組平均強度 / 最小組平均強度\n"
+            "   若 fold-change 大於等於強度倍率門檻，代表至少有一組顯著高於另一組，可視為具生物差異訊號。\n\n"
+            "4. 組間差異門檻（Diff gate）\n"
+            "   diff ratio = 最大 ratio - 最小 ratio\n"
+            "   若 diff ratio 大於等於組間差異門檻，代表各組檢出比例差異夠大，可保留作後續分析。\n\n"
+            "5. QC_ratio 門檻（QC gate）\n"
+            "   QC_ratio = QC 中高於訊號門檻的樣本數 / QC 總樣本數\n"
+            "   若 QC_ratio = 0，或低於你設定的 QC_ratio 門檻，代表這個 feature 在 QC 中表現不穩定，會被移除。\n\n"
+            "6. 缺失值補值流程\n"
+            "   只有保留下來的 feature 才會進入後續缺失值補值流程。\n"
+            "   補值時會把 0 與缺失值一起視為待補值。\n"
+            "   如果某一組高於訊號門檻的樣本比例 < 40%，表示該組檢出率太低，會跳過補值並維持 0。\n"
+            "   只有檢出率 >= 40% 的組別，才會以該組最小正值的 1/5 進行保守補值。\n"
+            "   QC 樣本也套用相同的 40% 規則。"
+        )
+        self.criteria_textbox.insert("1.0", content)
+        inner_text = getattr(self.criteria_textbox, "_textbox", None)
+        if inner_text is not None:
+            heading_font = (FONTS["small"][0], FONTS["small"][1], "bold")
+            inner_text.tag_configure("heading", foreground=COLORS["text"], font=heading_font)
+            for marker in [
+                "篩選規則說明",
+                "整體邏輯",
+                "1. 訊號門檻值",
+                "2. 背景比例門檻（Stable gate）",
+                "3. 強度倍率門檻（Intensity FC gate）",
+                "4. 組間差異門檻（Diff gate）",
+                "5. QC_ratio 門檻（QC gate）",
+                "6. 缺失值補值流程",
+            ]:
+                start = "1.0"
+                while True:
+                    pos = inner_text.search(marker, start, stopindex="end")
+                    if not pos:
+                        break
+                    end = f"{pos}+{len(marker)}c"
+                    inner_text.tag_add("heading", pos, end)
+                    start = end
+        self.criteria_textbox.configure(state="disabled")
+
     def _create_threshold_switch(
         self,
         row: int,
@@ -216,7 +225,8 @@ class FeatureFilterWidget(BaseProcessingWidget):
             command=self._sync_threshold_control_states,
             font=FONTS["body"],
         )
-        switch.grid(row=row, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        self._style_form_switch(switch)
+        switch.grid(row=row, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
         return switch
 
     def _create_threshold_slider(
@@ -246,12 +256,11 @@ class FeatureFilterWidget(BaseProcessingWidget):
     ) -> ctk.CTkEntry:
         entry = ctk.CTkEntry(
             self.params_frame,
-            width=80,
             font=FONTS["small"],
-            justify="center",
         )
+        self._style_numeric_entry(entry)
         entry.insert(0, f"{default_value:.3f}")
-        entry.grid(row=row, column=2, padx=PADDING["small"], pady=PADDING["small"])
+        entry.grid(row=row, column=2, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
         entry.bind("<Return>", lambda _: on_apply())
         entry.bind("<KP_Enter>", lambda _: on_apply())
         entry.bind("<FocusOut>", lambda _: on_apply())
@@ -263,6 +272,10 @@ class FeatureFilterWidget(BaseProcessingWidget):
             state = "normal" if variable.get() else "disabled"
             slider.configure(state=state)
             entry.configure(state=state)
+
+    @staticmethod
+    def _clamp_threshold(value: float) -> float:
+        return max(0.0, float(value))
 
     def _sync_entry_from_slider(self, value: float, entry: ctk.CTkEntry) -> None:
         value = self._clamp_threshold(value)
