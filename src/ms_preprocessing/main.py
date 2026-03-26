@@ -193,6 +193,12 @@ Examples:
     )
 
     parser.add_argument(
+        "--export-deleted-feature",
+        action="store_true",
+        help="Include deleted_feature worksheet in final Excel export",
+    )
+
+    parser.add_argument(
         "--version", "-v",
         action="store_true",
         help="Show version information",
@@ -462,7 +468,11 @@ def run_cli(args):
             extra_sheets.update(preserved_sheets)
         if session.metadata.sample_info is not None:
             extra_sheets["SampleInfo"] = session.metadata.sample_info
-        if session.metadata.deleted_feature_df is not None and not session.metadata.deleted_feature_df.empty:
+        if (
+            args.export_deleted_feature
+            and session.metadata.deleted_feature_df is not None
+            and not session.metadata.deleted_feature_df.empty
+        ):
             extra_sheets["deleted_feature"] = session.metadata.deleted_feature_df
 
         print(f"Saving to: {output_path}")

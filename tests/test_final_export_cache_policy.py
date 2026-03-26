@@ -46,6 +46,7 @@ def _make_cli_args(input_path: Path, output_path: Path) -> SimpleNamespace:
         diff_threshold=None,
         qc_ratio_threshold=None,
         persist_intermediate=False,
+        export_deleted_feature=False,
         no_gui=True,
         version=False,
     )
@@ -132,6 +133,99 @@ def test_cli_final_xlsx_save_does_not_request_parquet_cache_by_default(monkeypat
         assert rc == 0
         last_save = [call for call in fake_handler.calls if call[1].suffix.lower() == ".xlsx"][-1]
         assert last_save[2].get("save_parquet_cache") is False
+
+
+def test_cli_final_export_omits_deleted_feature_sheet_by_default(monkeypatch, project_temp_dir) -> None:
+    with project_temp_dir() as temp_dir:
+        base = Path(temp_dir)
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.1/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 1000],
+                "Control1": ["control", 1200],
+                "QC1": ["qc", 1100],
+            }
+        )
+        input_path = base / "input.csv"
+        df.to_csv(input_path, index=False)
+        output_path = base / "final.xlsx"
+        fake_handler = _FakeFileHandler(input_df=df)
+
+        import ms_preprocessing.adapters.feature_filter as filter_module
+
+        _patch_cli_dependencies(monkeypatch, fake_handler)
+        monkeypatch.setattr(
+            filter_module,
+            "run_from_df",
+            lambda data, **kwargs: ProcessingResult(
+                success=True,
+                step="feature_filter",
+                output_path=None,
+                data=data.copy(),
+                metadata=ProcessingMetadata(
+                    red_font_rows=set(),
+                    protected_rows=set(),
+                    blue_font_cells=[],
+                    deleted_feature_df=pd.DataFrame({"Feature": ["F1"]}),
+                ),
+            ),
+        )
+
+        rc = run_cli(_make_cli_args(input_path=input_path, output_path=output_path))
+
+        assert rc == 0
+        last_save = [call for call in fake_handler.calls if call[1].suffix.lower() == ".xlsx"][-1]
+        extra_sheets = last_save[2].get("extra_sheets") or {}
+        assert "deleted_feature" not in extra_sheets
+
+
+def test_cli_final_export_includes_deleted_feature_sheet_when_requested(monkeypatch, project_temp_dir) -> None:
+    with project_temp_dir() as temp_dir:
+        base = Path(temp_dir)
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.1/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 1000],
+                "Control1": ["control", 1200],
+                "QC1": ["qc", 1100],
+            }
+        )
+        input_path = base / "input.csv"
+        df.to_csv(input_path, index=False)
+        output_path = base / "final.xlsx"
+        fake_handler = _FakeFileHandler(input_df=df)
+        deleted_feature = pd.DataFrame({"Feature": ["F1"]})
+
+        import ms_preprocessing.adapters.feature_filter as filter_module
+
+        _patch_cli_dependencies(monkeypatch, fake_handler)
+        monkeypatch.setattr(
+            filter_module,
+            "run_from_df",
+            lambda data, **kwargs: ProcessingResult(
+                success=True,
+                step="feature_filter",
+                output_path=None,
+                data=data.copy(),
+                metadata=ProcessingMetadata(
+                    red_font_rows=set(),
+                    protected_rows=set(),
+                    blue_font_cells=[],
+                    deleted_feature_df=deleted_feature,
+                ),
+            ),
+        )
+
+        args = _make_cli_args(input_path=input_path, output_path=output_path)
+        args.export_deleted_feature = True
+        rc = run_cli(args)
+
+        assert rc == 0
+        last_save = [call for call in fake_handler.calls if call[1].suffix.lower() == ".xlsx"][-1]
+        extra_sheets = last_save[2].get("extra_sheets") or {}
+        assert extra_sheets["deleted_feature"] is deleted_feature
 
 
 def test_gui_final_export_does_not_request_parquet_cache_by_default(project_temp_dir) -> None:
