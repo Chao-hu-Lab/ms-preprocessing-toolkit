@@ -14,7 +14,7 @@ from ms_preprocessing.gui.widgets.base_widget import BaseProcessingWidget
 
 
 class FeatureFilterWidget(BaseProcessingWidget):
-    """Widget for the Step 4 feature filter and imputation workflow."""
+    """Widget for the Step 4 feature filter workflow."""
 
     def __init__(
         self,
@@ -28,8 +28,8 @@ class FeatureFilterWidget(BaseProcessingWidget):
         self._threshold_controls: dict[str, tuple[tk.BooleanVar, ctk.CTkSlider, ctk.CTkEntry]] = {}
         super().__init__(
             parent,
-            title="Step 4: 特徵篩選與缺失值補值 (Feature Filtering)",
-            description="依訊號強度、背景比例、組間差異與 QC 表現篩選特徵，並對保留下來的 feature 進行保守補值。",
+            title="Step 4: 特徵篩選 (Feature Filtering)",
+            description="依訊號強度、背景比例、組間差異與 QC 表現篩選特徵。",
             step_index=step_index,
             on_load_file=on_load_file,
             on_complete=on_complete,
@@ -177,13 +177,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
             "   若 diff ratio 大於等於組間差異門檻，代表各組檢出比例差異夠大，可保留作後續分析。\n\n"
             "5. QC_ratio 門檻（QC gate）\n"
             "   QC_ratio = QC 中高於訊號門檻的樣本數 / QC 總樣本數\n"
-            "   若 QC_ratio = 0，或低於你設定的 QC_ratio 門檻，代表這個 feature 在 QC 中表現不穩定，會被移除。\n\n"
-            "6. 缺失值補值流程\n"
-            "   只有保留下來的 feature 才會進入後續缺失值補值流程。\n"
-            "   補值時會把 0 與缺失值一起視為待補值。\n"
-            "   如果某一組高於訊號門檻的樣本比例 < 40%，表示該組檢出率太低，會跳過補值並維持 0。\n"
-            "   只有檢出率 >= 40% 的組別，才會以該組最小正值的 1/5 進行保守補值。\n"
-            "   QC 樣本也套用相同的 40% 規則。"
+            "   若 QC_ratio = 0，或低於你設定的 QC_ratio 門檻，代表這個 feature 在 QC 中表現不穩定，會被移除。"
         )
         self.criteria_textbox.insert("1.0", content)
         inner_text = getattr(self.criteria_textbox, "_textbox", None)
@@ -198,7 +192,6 @@ class FeatureFilterWidget(BaseProcessingWidget):
                 "3. 強度倍率門檻（Intensity FC gate）",
                 "4. 組間差異門檻（Diff gate）",
                 "5. QC_ratio 門檻（QC gate）",
-                "6. 缺失值補值流程",
             ]:
                 start = "1.0"
                 while True:
@@ -407,11 +400,6 @@ class FeatureFilterWidget(BaseProcessingWidget):
             **result.metadata.as_context_dict(),
             "statistics": dict(result.statistics),
             "step_parameters": dict(params),
-            "imputation_stats": {
-                "cells_imputed": result.statistics.get("cells_imputed", 0),
-                "cells_imputed_from_nan": result.statistics.get("cells_imputed_from_nan", 0),
-                "cells_imputed_from_zero": result.statistics.get("cells_imputed_from_zero", 0),
-            },
         }
         if result.data is None:
             raise Exception("Adapter returned no data")

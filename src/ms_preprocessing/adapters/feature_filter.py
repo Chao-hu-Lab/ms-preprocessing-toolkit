@@ -60,7 +60,6 @@ def _build_metadata(raw_meta: dict[str, Any]) -> ProcessingMetadata:
     return ProcessingMetadata(
         red_font_rows=red_font_rows,
         protected_rows=protected_rows,
-        blue_font_cells=list(raw_meta.get("blue_font_cells", [])),
         highlight_rows=set(raw_meta.get("highlight_rows", [])),
         deleted_feature_df=_deleted_features_to_dataframe(raw_meta),
     )

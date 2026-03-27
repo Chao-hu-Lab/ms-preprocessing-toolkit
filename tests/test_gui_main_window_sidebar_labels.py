@@ -41,7 +41,7 @@ def test_main_window_sidebar_uses_expected_workflow_labels(ctk_root) -> None:
             "1. 資料整理",
             "2. ISTD 標記",
             "3. 重複訊號刪除",
-            "4. 篩選與缺失值填補",
+            "4. 特徵篩選",
         ]
     finally:
         app.destroy()

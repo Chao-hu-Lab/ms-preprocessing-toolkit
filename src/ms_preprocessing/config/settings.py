@@ -124,7 +124,7 @@ class Settings:
         ("data_organizer", "資料整理", "Data Organization"),
         ("istd_marker", "ISTD 標記", "ISTD Marking"),
         ("duplicate_remover", "重複訊號刪除", "Duplicate Removal"),
-        ("feature_filter", "篩選與缺失值填補", "Feature Filtering"),
+        ("feature_filter", "特徵篩選", "Feature Filtering"),
     ]
 
     def __init__(self, config: Optional[ProcessingConfig] = None):

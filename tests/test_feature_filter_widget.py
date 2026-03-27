@@ -142,10 +142,6 @@ def test_feature_filter_widget_explains_rules_in_plainer_lab_language(widget) ->
     assert "QC_ratio 則是負向覆寫條件" in criteria_text
     assert "至少 2 組的 ratio 都大於等於背景比例門檻" in criteria_text
     assert "fold-change = 最大組平均強度 / 最小組平均強度" in criteria_text
-    assert "只有保留下來的 feature 才會進入後續缺失值補值流程" in criteria_text
-    assert "把 0 與缺失值一起視為待補值" in criteria_text
-    assert "高於訊號門檻的樣本比例 < 40%" in criteria_text
-    assert "最小正值的 1/5 進行保守補值" in criteria_text
 
 
 def test_feature_filter_widget_runs_processing_in_background_without_duplicate_runs(
