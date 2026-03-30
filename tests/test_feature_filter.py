@@ -187,6 +187,66 @@ class TestFeatureFilter:
         assert "100.000/1.0" in result.data["Mz/RT"].tolist()
         assert result.statistics.get("mnar_kept", 0) >= 1
 
+    def test_mnar_feature_overrides_qc_zero_gate_only_for_presence_absence_marker(self, filter_proc):
+        """MNAR markers should survive QC_ratio==0, while non-MNAR features should still be deleted."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0", "200.000/2.0"],
+                "Tolerance": ["na", "na", "na"],
+                "Case1": ["case", 8000, 8000],
+                "Case2": ["case", 9000, 9000],
+                "Control1": ["control", 100, 8200],
+                "Control2": ["control", 200, 9100],
+                "QC1": ["qc", 100, 100],
+                "QC2": ["qc", 200, 200],
+            }
+        )
+
+        result = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            high_det_thresh=0.8,
+            low_det_thresh=0.2,
+            qc_ratio_threshold=0.0,
+            enable_intensity_fc_threshold=False,
+        )
+
+        assert result.success
+        assert result.data is not None
+        assert "100.000/1.0" in result.data["Mz/RT"].tolist()
+        assert "200.000/2.0" not in result.data["Mz/RT"].tolist()
+        assert result.statistics.get("qc_zero_deleted", 0) == 1
+
+    def test_mnar_feature_overrides_low_qc_ratio_gate_only_for_presence_absence_marker(self, filter_proc):
+        """MNAR markers should survive low non-zero QC_ratio, while non-MNAR features should still be deleted."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0", "200.000/2.0"],
+                "Tolerance": ["na", "na", "na"],
+                "Case1": ["case", 8000, 8000],
+                "Case2": ["case", 9000, 9000],
+                "Control1": ["control", 100, 8200],
+                "Control2": ["control", 200, 9100],
+                "QC1": ["qc", 8000, 8000],
+                "QC2": ["qc", 100, 100],
+            }
+        )
+
+        result = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            high_det_thresh=0.8,
+            low_det_thresh=0.2,
+            qc_ratio_threshold=0.75,
+            enable_intensity_fc_threshold=False,
+        )
+
+        assert result.success
+        assert result.data is not None
+        assert "100.000/1.0" in result.data["Mz/RT"].tolist()
+        assert "200.000/2.0" not in result.data["Mz/RT"].tolist()
+        assert result.statistics.get("qc_low_deleted", 0) == 1
+
     def test_disabling_qc_rule_keeps_feature_even_when_qc_ratio_is_zero(self, filter_proc):
         df = pd.DataFrame(
             {
@@ -267,6 +327,7 @@ class TestFeatureFilter:
             df,
             intensity_fc_threshold=2.0,
             enable_background_threshold=False,
+            enable_intensity_fc_threshold=True,
         )
 
         assert result.success
@@ -291,6 +352,7 @@ class TestFeatureFilter:
             df,
             intensity_fc_threshold=2.0,
             enable_background_threshold=False,
+            enable_intensity_fc_threshold=True,
         )
 
         assert result.success
@@ -320,6 +382,7 @@ class TestFeatureFilter:
             df,
             background_threshold=0.33,
             intensity_fc_threshold=2.0,
+            enable_intensity_fc_threshold=True,
         )
         disabled = filter_proc.process(
             df,
@@ -332,6 +395,29 @@ class TestFeatureFilter:
         assert disabled.success
         assert "100.000/1.0" in enabled.data["Mz/RT"].tolist()
         assert "100.000/1.0" not in disabled.data["Mz/RT"].tolist()
+
+    def test_intensity_fc_rule_is_disabled_by_default(self, filter_proc):
+        """High fold-change alone should not keep a feature unless the FC gate is explicitly enabled."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 50000],
+                "Case2": ["case", 100],
+                "Control1": ["control", 100],
+                "Control2": ["control", 100],
+                "QC1": ["qc", 8000],
+            }
+        )
+
+        result = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            intensity_fc_threshold=2.0,
+        )
+
+        assert result.success
+        assert "100.000/1.0" not in result.data["Mz/RT"].tolist()
 
     def test_unique_stats_marginal_contribution(self, filter_proc):
         """Unique stats should reflect marginal contribution of each gate."""
@@ -351,6 +437,7 @@ class TestFeatureFilter:
             df,
             background_threshold=0.33,
             intensity_fc_threshold=2.0,
+            enable_intensity_fc_threshold=True,
         )
 
         assert result.success
