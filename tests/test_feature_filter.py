@@ -62,7 +62,6 @@ class TestFeatureFilter:
         result = filter_proc.process(
             sample_data,
             background_threshold=0.33,
-            diff_threshold=0.30,
         )
 
         assert result.success
@@ -92,7 +91,6 @@ class TestFeatureFilter:
         result = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.30,
             qc_ratio_threshold=0.60,
         )
 
@@ -118,7 +116,6 @@ class TestFeatureFilter:
         result = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.30,
             qc_ratio_threshold=0.0,
         )
 
@@ -143,14 +140,12 @@ class TestFeatureFilter:
         enabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.30,
             qc_ratio_threshold=0.0,
             enable_intensity_fc_threshold=False,
         )
         disabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.30,
             qc_ratio_threshold=0.0,
             enable_background_threshold=False,
             enable_intensity_fc_threshold=False,
@@ -161,39 +156,36 @@ class TestFeatureFilter:
         assert "100.000/1.0" in enabled.data["Mz/RT"].tolist()
         assert "100.000/1.0" not in disabled.data["Mz/RT"].tolist()
 
-    def test_disabling_diff_rule_removes_feature_kept_only_by_diff_ratio(self, filter_proc):
+    def test_mnar_gate_keeps_presence_absence_feature(self, filter_proc):
+        """MNAR gate should keep a feature where case is fully detected, control is absent."""
+        # case_ratio = 1.0 (both samples above 5000) → ≥ 0.8 → high
+        # control_ratio = 0.0 (both samples below 5000) → ≤ 0.2 → low
+        # → MNAR gate passes; stable gate fails (only 1 group ≥ 0.33)
         df = pd.DataFrame(
             {
                 "Mz/RT": ["Sample_Type", "100.000/1.0"],
                 "Tolerance": ["na", "na"],
                 "Case1": ["case", 8000],
-                "Case2": ["case", 100],
+                "Case2": ["case", 9000],
                 "Control1": ["control", 100],
-                "Control2": ["control", 100],
+                "Control2": ["control", 200],
                 "QC1": ["qc", 8000],
             }
         )
 
-        enabled = filter_proc.process(
+        result = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.30,
+            high_det_thresh=0.8,
+            low_det_thresh=0.2,
             qc_ratio_threshold=0.0,
-            enable_intensity_fc_threshold=False,
-        )
-        disabled = filter_proc.process(
-            df,
-            background_threshold=0.33,
-            diff_threshold=0.30,
-            qc_ratio_threshold=0.0,
-            enable_diff_threshold=False,
+            enable_background_threshold=False,
             enable_intensity_fc_threshold=False,
         )
 
-        assert enabled.success
-        assert disabled.success
-        assert "100.000/1.0" in enabled.data["Mz/RT"].tolist()
-        assert "100.000/1.0" not in disabled.data["Mz/RT"].tolist()
+        assert result.success
+        assert "100.000/1.0" in result.data["Mz/RT"].tolist()
+        assert result.statistics.get("mnar_kept", 0) >= 1
 
     def test_disabling_qc_rule_keeps_feature_even_when_qc_ratio_is_zero(self, filter_proc):
         df = pd.DataFrame(
@@ -211,13 +203,11 @@ class TestFeatureFilter:
         enabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.30,
             qc_ratio_threshold=0.0,
         )
         disabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.30,
             qc_ratio_threshold=0.0,
             enable_qc_ratio_threshold=False,
         )
@@ -245,13 +235,11 @@ class TestFeatureFilter:
         enabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.30,
             qc_ratio_threshold=0.75,
         )
         disabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.30,
             qc_ratio_threshold=0.75,
             enable_qc_ratio_threshold=False,
         )
@@ -279,7 +267,6 @@ class TestFeatureFilter:
             df,
             intensity_fc_threshold=2.0,
             enable_background_threshold=False,
-            enable_diff_threshold=False,
         )
 
         assert result.success
@@ -304,7 +291,6 @@ class TestFeatureFilter:
             df,
             intensity_fc_threshold=2.0,
             enable_background_threshold=False,
-            enable_diff_threshold=False,
         )
 
         assert result.success
@@ -315,7 +301,7 @@ class TestFeatureFilter:
 
         Data design: Case ratio=0.5 (1/2 above 5000), Control ratio=0 (0/2 above 5000).
         - Stable gate: only 1 group >= 0.33 → FAIL (needs >=2)
-        - Diff gate: 0.5 - 0.0 = 0.5 < 0.60 → FAIL with high threshold
+        - MNAR gate: case_ratio=0.5 < 0.8 → FAIL (does not reach high threshold)
         - Intensity FC: Case mean=25050, Control mean=100 → FC=250.5 → PASS
         """
         df = pd.DataFrame(
@@ -333,13 +319,11 @@ class TestFeatureFilter:
         enabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.60,
             intensity_fc_threshold=2.0,
         )
         disabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.60,
             intensity_fc_threshold=2.0,
             enable_intensity_fc_threshold=False,
         )
@@ -366,14 +350,13 @@ class TestFeatureFilter:
         result = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.30,
             intensity_fc_threshold=2.0,
         )
 
         assert result.success
         stats = result.statistics
         assert "unique_stable_kept" in stats
-        assert "unique_diff_kept" in stats
+        assert "unique_mnar_kept" in stats
         assert "unique_intensity_fc_kept" in stats
 
     def test_deprecated_skew_parameter_warns(self, filter_proc):
@@ -398,3 +381,100 @@ class TestFeatureFilter:
             assert "skew_threshold" in str(deprecation_warnings[0].message)
 
         assert result.success
+
+    def test_deprecated_diff_threshold_warns(self, filter_proc):
+        """Passing removed diff_threshold should emit a DeprecationWarning."""
+        import warnings
+
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Control1": ["control", 8000],
+                "QC1": ["qc", 8000],
+            }
+        )
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = filter_proc.process(df, diff_threshold=0.30)
+            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+            assert len(deprecation_warnings) >= 1
+            assert "diff_threshold" in str(deprecation_warnings[0].message)
+
+        assert result.success
+
+    def test_output_contains_is_presence_absence_marker_column(self, filter_proc):
+        """Output DataFrame must have is_Presence_Absence_Marker column."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0", "200.000/2.0"],
+                "Tolerance": ["na", "na", "na"],
+                "Case1": ["case", 8000, 8000],
+                "Case2": ["case", 9000, 8500],
+                "Control1": ["control", 100, 8000],
+                "Control2": ["control", 200, 8500],
+                "QC1": ["qc", 8000, 8000],
+            }
+        )
+
+        result = filter_proc.process(df, background_threshold=0.33, qc_ratio_threshold=0.0)
+
+        assert result.success
+        assert "is_Presence_Absence_Marker" in result.data.columns
+
+    def test_mnar_feature_is_marked_true_in_output(self, filter_proc):
+        """A feature that passes the MNAR 80/20 rule must have is_Presence_Absence_Marker=True."""
+        # case_ratio = 1.0 (both above 5000), control_ratio = 0.0 (both below 5000)
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Case2": ["case", 9000],
+                "Control1": ["control", 100],
+                "Control2": ["control", 200],
+                "QC1": ["qc", 8000],
+            }
+        )
+
+        result = filter_proc.process(
+            df,
+            high_det_thresh=0.8,
+            low_det_thresh=0.2,
+            qc_ratio_threshold=0.0,
+        )
+
+        assert result.success
+        feature_rows = result.data[result.data["Mz/RT"] == "100.000/1.0"]
+        assert not feature_rows.empty
+        assert feature_rows["is_Presence_Absence_Marker"].iloc[0] is True
+
+    def test_symmetric_feature_is_marked_false_in_output(self, filter_proc):
+        """A feature with symmetric detection in both groups must have is_Presence_Absence_Marker=False."""
+        # case_ratio = 1.0, control_ratio = 1.0 → no low group → MNAR=False
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Case2": ["case", 9000],
+                "Control1": ["control", 8000],
+                "Control2": ["control", 9000],
+                "QC1": ["qc", 8000],
+            }
+        )
+
+        result = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            high_det_thresh=0.8,
+            low_det_thresh=0.2,
+            qc_ratio_threshold=0.0,
+        )
+
+        assert result.success
+        feature_rows = result.data[result.data["Mz/RT"] == "100.000/1.0"]
+        assert not feature_rows.empty
+        assert feature_rows["is_Presence_Absence_Marker"].iloc[0] is False

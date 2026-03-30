@@ -51,7 +51,12 @@ def _resolve_cli_step_parameters(args):
             "background_threshold": (
                 args.bg_threshold if args.bg_threshold is not None else step4.get("background_threshold")
             ),
-            "diff_threshold": args.diff_threshold if args.diff_threshold is not None else step4.get("diff_threshold"),
+            "high_det_thresh": (
+                args.high_det_thresh if args.high_det_thresh is not None else step4.get("high_det_thresh")
+            ),
+            "low_det_thresh": (
+                args.low_det_thresh if args.low_det_thresh is not None else step4.get("low_det_thresh")
+            ),
             "intensity_fc_threshold": (
                 args.intensity_fc_threshold
                 if args.intensity_fc_threshold is not None
@@ -61,7 +66,6 @@ def _resolve_cli_step_parameters(args):
                 args.qc_ratio_threshold if args.qc_ratio_threshold is not None else step4.get("qc_ratio_threshold")
             ),
             "enable_background_threshold": step4.get("enable_background_threshold", True),
-            "enable_diff_threshold": step4.get("enable_diff_threshold", True),
             "enable_qc_ratio_threshold": step4.get("enable_qc_ratio_threshold", True),
             "enable_intensity_fc_threshold": step4.get("enable_intensity_fc_threshold", True),
         },
@@ -167,10 +171,17 @@ Examples:
     )
 
     parser.add_argument(
-        "--diff-threshold",
+        "--high-det-thresh",
         type=float,
         default=None,
-        help="Difference threshold for feature filtering (overrides profile value)",
+        help="MNAR high detection rate threshold (0-1, overrides profile value, default 0.8)",
+    )
+
+    parser.add_argument(
+        "--low-det-thresh",
+        type=float,
+        default=None,
+        help="MNAR low detection rate threshold (0-1, overrides profile value, default 0.2)",
     )
 
     parser.add_argument(

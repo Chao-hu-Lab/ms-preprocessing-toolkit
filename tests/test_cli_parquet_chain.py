@@ -48,9 +48,11 @@ def _make_cli_args(input_path: Path, output_path: Path | None, step: str) -> Sim
         rt_tol=None,
         bg_threshold=None,
         intensity_fc_threshold=None,
-        diff_threshold=None,
+        high_det_thresh=None,
+        low_det_thresh=None,
         qc_ratio_threshold=None,
         persist_intermediate=False,
+        export_deleted_feature=False,
         no_gui=True,
         version=False,
     )
@@ -308,10 +310,10 @@ def test_cli_default_profile_uses_integrated_step_parameters(monkeypatch, projec
         assert captured["step3"]["mz_tolerance_ppm"] == 20.0
         assert captured["step3"]["rt_tolerance"] == 1.0
         assert captured["step4"]["background_threshold"] == 0.33
-        assert captured["step4"]["diff_threshold"] == 0.25
+        assert captured["step4"]["high_det_thresh"] == 0.8
+        assert captured["step4"]["low_det_thresh"] == 0.2
         assert captured["step4"]["qc_ratio_threshold"] == 0.25
         assert captured["step4"]["intensity_fc_threshold"] == 2.0
         assert captured["step4"]["enable_background_threshold"] is True
-        assert captured["step4"]["enable_diff_threshold"] is True
         assert captured["step4"]["enable_qc_ratio_threshold"] is True
         assert captured["step4"]["enable_intensity_fc_threshold"] is True

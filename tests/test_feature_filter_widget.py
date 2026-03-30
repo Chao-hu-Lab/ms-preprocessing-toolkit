@@ -40,13 +40,12 @@ def test_feature_filter_widget_defaults_all_threshold_toggles_to_enabled(widget)
 
     assert widget.bg_enabled_switch.get() == 1
     assert widget.intensity_fc_enabled_switch.get() == 1
-    assert widget.diff_enabled_switch.get() == 1
     assert widget.qc_ratio_enabled_switch.get() == 1
     assert params["enable_background_threshold"] is True
     assert params["enable_intensity_fc_threshold"] is True
-    assert params["enable_diff_threshold"] is True
     assert params["enable_qc_ratio_threshold"] is True
-    assert params["diff_threshold"] == pytest.approx(0.25)
+    assert params["high_det_thresh"] == pytest.approx(0.8)
+    assert params["low_det_thresh"] == pytest.approx(0.2)
     assert params["qc_ratio_threshold"] == pytest.approx(0.25)
 
 
@@ -89,18 +88,17 @@ def test_feature_filter_widget_run_processing_passes_toggle_flags(widget, monkey
         signal_threshold=5000,
         background_threshold=0.33,
         intensity_fc_threshold=2.0,
-        diff_threshold=0.30,
+        high_det_thresh=0.8,
+        low_det_thresh=0.2,
         qc_ratio_threshold=0.25,
         enable_background_threshold=True,
         enable_intensity_fc_threshold=False,
-        enable_diff_threshold=True,
         enable_qc_ratio_threshold=False,
     )
 
     assert result.equals(input_df)
     assert captured["enable_background_threshold"] is True
     assert captured["enable_intensity_fc_threshold"] is False
-    assert captured["enable_diff_threshold"] is True
     assert captured["enable_qc_ratio_threshold"] is False
 
 
@@ -111,11 +109,11 @@ def test_feature_filter_widget_apply_parameters_updates_visible_controls(widget)
 
     assert params["signal_threshold"] == pytest.approx(5000.0)
     assert params["background_threshold"] == pytest.approx(0.50)
-    assert params["diff_threshold"] == pytest.approx(0.35)
+    assert params["high_det_thresh"] == pytest.approx(0.8)
+    assert params["low_det_thresh"] == pytest.approx(0.2)
     assert params["qc_ratio_threshold"] == pytest.approx(0.50)
     assert params["intensity_fc_threshold"] == pytest.approx(3.0)
     assert params["enable_background_threshold"] is True
-    assert params["enable_diff_threshold"] is True
     assert params["enable_qc_ratio_threshold"] is True
     assert params["enable_intensity_fc_threshold"] is True
 
@@ -125,12 +123,14 @@ def test_feature_filter_widget_uses_consistent_form_alignment(widget) -> None:
     assert widget.signal_entry.grid_info()["column"] == 1
     assert widget.bg_slider.grid_info()["column"] == 1
     assert widget.intensity_fc_slider.grid_info()["column"] == 1
-    assert widget.diff_slider.grid_info()["column"] == 1
+    assert widget.high_det_slider.grid_info()["column"] == 1
+    assert widget.low_det_slider.grid_info()["column"] == 1
     assert widget.qc_ratio_slider.grid_info()["column"] == 1
     assert widget.signal_entry.cget("justify") == "center"
     assert widget.bg_entry.cget("justify") == "center"
     assert widget.intensity_fc_entry.cget("justify") == "center"
-    assert widget.diff_entry.cget("justify") == "center"
+    assert widget.high_det_entry.cget("justify") == "center"
+    assert widget.low_det_entry.cget("justify") == "center"
     assert widget.qc_ratio_entry.cget("justify") == "center"
     assert hasattr(widget, "criteria_textbox")
 
