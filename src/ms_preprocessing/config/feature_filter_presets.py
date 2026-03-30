@@ -47,7 +47,7 @@ _LOOSE: Step4Params = {
     "intensity_fc_threshold":          1.5,
     "enable_background_threshold":     True,
     "enable_qc_ratio_threshold":       True,
-    "enable_intensity_fc_threshold":   True,
+    "enable_intensity_fc_threshold":   False,
 }
 
 # ── 預設 ──────────────────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ _DEFAULT: Step4Params = {
     "intensity_fc_threshold":          2.0,
     "enable_background_threshold":     True,
     "enable_qc_ratio_threshold":       True,
-    "enable_intensity_fc_threshold":   True,
+    "enable_intensity_fc_threshold":   False,
 }
 
 # ── 嚴謹 ──────────────────────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ _STRICT: Step4Params = {
     "intensity_fc_threshold":          3.0,
     "enable_background_threshold":     True,
     "enable_qc_ratio_threshold":       True,
-    "enable_intensity_fc_threshold":   True,
+    "enable_intensity_fc_threshold":   False,
 }
 
 

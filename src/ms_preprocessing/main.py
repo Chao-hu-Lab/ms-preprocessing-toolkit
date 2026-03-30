@@ -67,7 +67,7 @@ def _resolve_cli_step_parameters(args):
             ),
             "enable_background_threshold": step4.get("enable_background_threshold", True),
             "enable_qc_ratio_threshold": step4.get("enable_qc_ratio_threshold", True),
-            "enable_intensity_fc_threshold": step4.get("enable_intensity_fc_threshold", True),
+            "enable_intensity_fc_threshold": step4.get("enable_intensity_fc_threshold", False),
         },
     }
 

@@ -32,6 +32,7 @@ def test_pipeline_profiles_bundle_fixed_step1_to_step3_with_named_step4(
     assert profile["step4"]["low_det_thresh"] == pytest.approx(0.2)
     assert profile["step4"]["background_threshold"] == pytest.approx(expected_bg)
     assert profile["step4"]["intensity_fc_threshold"] == pytest.approx(expected_fc)
+    assert profile["step4"]["enable_intensity_fc_threshold"] is False
 
 
 def test_pipeline_profiles_return_copies_of_mutable_step_dicts() -> None:

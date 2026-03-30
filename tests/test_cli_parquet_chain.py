@@ -316,4 +316,4 @@ def test_cli_default_profile_uses_integrated_step_parameters(monkeypatch, projec
         assert captured["step4"]["intensity_fc_threshold"] == 2.0
         assert captured["step4"]["enable_background_threshold"] is True
         assert captured["step4"]["enable_qc_ratio_threshold"] is True
-        assert captured["step4"]["enable_intensity_fc_threshold"] is True
+        assert captured["step4"]["enable_intensity_fc_threshold"] is False
