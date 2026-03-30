@@ -80,4 +80,10 @@ STEP3_PARAMS: dict = {
     "rt_tolerance": 1.0,
     "preserve_red_font": True,
     "top_n": None,
+    "enable_degeneracy_annotation": False,
+    "degeneracy_ppm_tolerance": 20.0,
+    "degeneracy_rt_tolerance": 0.05,
+    "degeneracy_correlation_threshold": 0.8,
+    "degeneracy_min_correlation_points": 3,
+    "degeneracy_adduct_table_file": "",
 }

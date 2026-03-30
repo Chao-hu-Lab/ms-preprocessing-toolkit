@@ -27,6 +27,12 @@ def test_pipeline_profiles_bundle_fixed_step1_to_step3_with_named_step4(
     assert profile["step1"] == STEP1_PARAMS
     assert profile["step2"] == STEP2_PARAMS
     assert profile["step3"] == STEP3_PARAMS
+    assert profile["step3"]["enable_degeneracy_annotation"] is False
+    assert profile["step3"]["degeneracy_ppm_tolerance"] == pytest.approx(20.0)
+    assert profile["step3"]["degeneracy_rt_tolerance"] == pytest.approx(0.05)
+    assert profile["step3"]["degeneracy_correlation_threshold"] == pytest.approx(0.8)
+    assert profile["step3"]["degeneracy_min_correlation_points"] == 3
+    assert profile["step3"]["degeneracy_adduct_table_file"] == ""
     assert profile["step4"]["qc_ratio_threshold"] == pytest.approx(expected_qc_ratio)
     assert profile["step4"]["high_det_thresh"] == pytest.approx(0.8)
     assert profile["step4"]["low_det_thresh"] == pytest.approx(0.2)
