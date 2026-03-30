@@ -32,6 +32,37 @@ class _SidebarHarness(MainWindowLayoutMixin, ctk.CTkFrame):
         return None
 
 
+class _ContentAreaHarness(MainWindowLayoutMixin, ctk.CTkFrame):
+    def __init__(self, master) -> None:
+        super().__init__(master)
+        self._current_step = 0
+        self._completed_steps = set()
+        self._step_output_paths = {}
+        self._context = {}
+        self._create_content_area()
+
+    def _load_file_for_step(self, step_index: int) -> None:
+        self._current_step = step_index
+
+    def _on_step_complete(self, *_args, **_kwargs) -> None:
+        return None
+
+    def _log(self, _message: str) -> None:
+        return None
+
+    def _update_action_bar_progress(self, _value: float, _status: str = "") -> None:
+        return None
+
+    def _run_current_step(self) -> None:
+        return None
+
+    def _reset_current_step(self) -> None:
+        return None
+
+    def _clear_log(self) -> None:
+        return None
+
+
 def test_main_window_sidebar_uses_expected_workflow_labels(ctk_root) -> None:
     app = _SidebarHarness(ctk_root)
     app.pack()
@@ -66,6 +97,18 @@ def test_main_window_sidebar_exposes_run_all_profile_selector(ctk_root) -> None:
         assert app.open_output_folder_btn.cget("border_width") == 1
         assert app.export_dnp_btn.cget("state") == "disabled"
         assert app.export_dnp_btn.cget("fg_color") == "transparent"
+    finally:
+        app.destroy()
+
+
+def test_content_area_prioritizes_step_panel_height_over_bottom_log(ctk_root) -> None:
+    app = _ContentAreaHarness(ctk_root)
+    app.pack(fill="both", expand=True)
+    ctk_root.update_idletasks()
+    try:
+        assert app.content_frame.grid_rowconfigure(0)["weight"] == 1
+        assert app.content_frame.grid_rowconfigure(1)["weight"] == 0
+        assert app.main_frame.grid_info()["sticky"] == "nesw"
     finally:
         app.destroy()
 

@@ -35,15 +35,19 @@ class FeatureFilterWidget(BaseProcessingWidget):
             on_complete=on_complete,
             on_log=on_log,
             on_progress=on_progress,
+            scrollable_content=True,
         )
 
     def _create_parameters(self) -> None:
         """Create parameter inputs."""
-        self._configure_form_grid()
+        self.params_frame.grid_columnconfigure(0, minsize=44)
+        self.params_frame.grid_columnconfigure(1, minsize=180)
+        self.params_frame.grid_columnconfigure(2, minsize=160, weight=1)
+        self.params_frame.grid_columnconfigure(3, minsize=110)
 
         signal_label = ctk.CTkLabel(self.params_frame, text="訊號門檻值", font=FONTS["body"])
         self._style_form_label(signal_label)
-        signal_label.grid(row=0, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
+        signal_label.grid(row=0, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
 
         self.signal_entry = ctk.CTkEntry(
             self.params_frame,
@@ -52,7 +56,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
         )
         self._style_numeric_entry(self.signal_entry)
         self.signal_entry.insert(0, "5000")
-        self.signal_entry.grid(row=0, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        self.signal_entry.grid(row=0, column=2, columnspan=2, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
 
         self.bg_enabled_var = tk.BooleanVar(value=True)
         self.bg_enabled_switch = self._create_threshold_switch(
@@ -68,7 +72,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
             self.bg_entry,
         )
 
-        self.intensity_fc_enabled_var = tk.BooleanVar(value=True)
+        self.intensity_fc_enabled_var = tk.BooleanVar(value=False)
         self.intensity_fc_enabled_switch = self._create_threshold_switch(
             row=2,
             text="強度倍率門檻",
@@ -92,45 +96,40 @@ class FeatureFilterWidget(BaseProcessingWidget):
             self.intensity_fc_entry,
         )
 
-        ctk.CTkLabel(
-            self.params_frame,
-            text="存在/缺失標記（MNAR 80/20）",
-            font=FONTS["body"],
-        ).grid(row=3, column=0, columnspan=3, padx=PADDING["small"], pady=(PADDING["medium"], 0), sticky="w")
 
         high_det_label = ctk.CTkLabel(self.params_frame, text="高檢出率閾值", font=FONTS["body"])
         self._style_form_label(high_det_label)
-        high_det_label.grid(row=4, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
+        high_det_label.grid(row=3, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
         self.high_det_slider = self._create_threshold_slider(
-            row=4, default_value=0.8, on_change=self._update_high_det
+            row=3, default_value=0.8, on_change=self._update_high_det
         )
         self.high_det_entry = self._create_threshold_entry(
-            row=4, default_value=0.8, on_apply=self._apply_high_det
+            row=3, default_value=0.8, on_apply=self._apply_high_det
         )
 
         low_det_label = ctk.CTkLabel(self.params_frame, text="低檢出率閾值", font=FONTS["body"])
         self._style_form_label(low_det_label)
-        low_det_label.grid(row=5, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
+        low_det_label.grid(row=4, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
         self.low_det_slider = self._create_threshold_slider(
-            row=5, default_value=0.2, on_change=self._update_low_det
+            row=4, default_value=0.2, on_change=self._update_low_det
         )
         self.low_det_entry = self._create_threshold_entry(
-            row=5, default_value=0.2, on_apply=self._apply_low_det
+            row=4, default_value=0.2, on_apply=self._apply_low_det
         )
 
         self.qc_ratio_enabled_var = tk.BooleanVar(value=True)
         self.qc_ratio_enabled_switch = self._create_threshold_switch(
-            row=6,
+            row=5,
             text="QC_ratio 門檻",
             variable=self.qc_ratio_enabled_var,
         )
         self.qc_ratio_slider = self._create_threshold_slider(
-            row=6,
+            row=5,
             default_value=0.25,
             on_change=self._update_qc_ratio,
         )
         self.qc_ratio_entry = self._create_threshold_entry(
-            row=6,
+            row=5,
             default_value=0.25,
             on_apply=self._apply_qc_ratio,
         )
@@ -142,7 +141,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
 
         self.criteria_textbox = ctk.CTkTextbox(
             self._content_frame,
-            height=180,
+            height=84,
             font=FONTS["small"],
             wrap="word",
         )
@@ -225,15 +224,19 @@ class FeatureFilterWidget(BaseProcessingWidget):
     ) -> ctk.CTkSwitch:
         switch = ctk.CTkSwitch(
             self.params_frame,
-            text=text,
+            text="",
             variable=variable,
             onvalue=True,
             offvalue=False,
             command=self._sync_threshold_control_states,
             font=FONTS["body"],
         )
-        self._style_form_switch(switch)
-        switch.grid(row=row, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
+        switch.configure(width=44)
+        switch.grid(row=row, column=0, padx=(PADDING["small"], 0), pady=PADDING["small"], sticky="w")
+
+        label = ctk.CTkLabel(self.params_frame, text=text, font=FONTS["body"])
+        self._style_form_label(label)
+        label.grid(row=row, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
         return switch
 
     def _create_threshold_slider(
@@ -252,7 +255,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
             command=on_change,
         )
         slider.set(default_value)
-        slider.grid(row=row, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="ew")
+        slider.grid(row=row, column=2, padx=PADDING["small"], pady=PADDING["small"], sticky="ew")
         return slider
 
     def _create_threshold_entry(
@@ -267,7 +270,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
         )
         self._style_numeric_entry(entry)
         entry.insert(0, f"{default_value:.3f}")
-        entry.grid(row=row, column=2, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        entry.grid(row=row, column=3, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
         entry.bind("<Return>", lambda _: on_apply())
         entry.bind("<KP_Enter>", lambda _: on_apply())
         entry.bind("<FocusOut>", lambda _: on_apply())
@@ -411,7 +414,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
             intensity_fc_threshold=params.get("intensity_fc_threshold"),
             enable_background_threshold=params.get("enable_background_threshold", True),
             enable_qc_ratio_threshold=params.get("enable_qc_ratio_threshold", True),
-            enable_intensity_fc_threshold=params.get("enable_intensity_fc_threshold", True),
+            enable_intensity_fc_threshold=params.get("enable_intensity_fc_threshold", False),
             signal_threshold=params.get("signal_threshold", 5000),
             protected_rows=set(
                 self._context.get("protected_rows") or self._context.get("red_font_rows") or []

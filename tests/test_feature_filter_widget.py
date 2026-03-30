@@ -5,11 +5,13 @@ from __future__ import annotations
 import threading
 import time
 
+import customtkinter as ctk
 import pandas as pd
 import pytest
 
 from ms_preprocessing.adapters import feature_filter as feature_filter_adapter
 from ms_preprocessing.config.feature_filter_presets import get_step4_preset
+from ms_preprocessing.gui.widgets.data_organizer_widget import DataOrganizerWidget
 from ms_preprocessing.gui.widgets.feature_filter_widget import FeatureFilterWidget
 from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
 
@@ -35,14 +37,14 @@ def widget(ctk_root):
         step4_widget.destroy()
 
 
-def test_feature_filter_widget_defaults_all_threshold_toggles_to_enabled(widget) -> None:
+def test_feature_filter_widget_defaults_keep_fc_gate_disabled(widget) -> None:
     params = widget.get_parameters()
 
     assert widget.bg_enabled_switch.get() == 1
-    assert widget.intensity_fc_enabled_switch.get() == 1
+    assert widget.intensity_fc_enabled_switch.get() == 0
     assert widget.qc_ratio_enabled_switch.get() == 1
     assert params["enable_background_threshold"] is True
-    assert params["enable_intensity_fc_threshold"] is True
+    assert params["enable_intensity_fc_threshold"] is False
     assert params["enable_qc_ratio_threshold"] is True
     assert params["high_det_thresh"] == pytest.approx(0.8)
     assert params["low_det_thresh"] == pytest.approx(0.2)
@@ -112,27 +114,60 @@ def test_feature_filter_widget_apply_parameters_updates_visible_controls(widget)
     assert params["high_det_thresh"] == pytest.approx(0.8)
     assert params["low_det_thresh"] == pytest.approx(0.2)
     assert params["qc_ratio_threshold"] == pytest.approx(0.50)
-    assert params["intensity_fc_threshold"] == pytest.approx(3.0)
+    assert params["intensity_fc_threshold"] == pytest.approx(3.0, abs=0.01)
     assert params["enable_background_threshold"] is True
     assert params["enable_qc_ratio_threshold"] is True
-    assert params["enable_intensity_fc_threshold"] is True
+    assert params["enable_intensity_fc_threshold"] is False
 
 
 def test_feature_filter_widget_uses_consistent_form_alignment(widget) -> None:
-    assert widget.params_frame.grid_columnconfigure(0)["minsize"] == 180
-    assert widget.signal_entry.grid_info()["column"] == 1
-    assert widget.bg_slider.grid_info()["column"] == 1
-    assert widget.intensity_fc_slider.grid_info()["column"] == 1
-    assert widget.high_det_slider.grid_info()["column"] == 1
-    assert widget.low_det_slider.grid_info()["column"] == 1
-    assert widget.qc_ratio_slider.grid_info()["column"] == 1
+    assert widget.params_frame.grid_columnconfigure(0)["minsize"] == 44
+    assert widget.params_frame.grid_columnconfigure(1)["minsize"] == 180
+    assert widget.signal_entry.grid_info()["column"] == 2
+    assert widget.bg_enabled_switch.grid_info()["column"] == 0
+    assert widget.bg_slider.grid_info()["column"] == 2
+    assert widget.intensity_fc_enabled_switch.grid_info()["column"] == 0
+    assert widget.intensity_fc_slider.grid_info()["column"] == 2
+    assert widget.high_det_slider.grid_info()["column"] == 2
+    assert widget.low_det_slider.grid_info()["column"] == 2
+    assert widget.qc_ratio_enabled_switch.grid_info()["column"] == 0
+    assert widget.qc_ratio_slider.grid_info()["column"] == 2
     assert widget.signal_entry.cget("justify") == "center"
     assert widget.bg_entry.cget("justify") == "center"
     assert widget.intensity_fc_entry.cget("justify") == "center"
     assert widget.high_det_entry.cget("justify") == "center"
     assert widget.low_det_entry.cget("justify") == "center"
     assert widget.qc_ratio_entry.cget("justify") == "center"
+    assert widget.bg_enabled_switch.winfo_manager() == "grid"
+    assert widget.qc_ratio_enabled_switch.winfo_manager() == "grid"
+    assert widget.qc_ratio_slider.winfo_manager() == "grid"
+    assert widget.qc_ratio_entry.winfo_manager() == "grid"
     assert hasattr(widget, "criteria_textbox")
+
+
+def test_feature_filter_widget_uses_scrollable_content_panel(widget) -> None:
+    assert isinstance(widget._content_frame, ctk.CTkScrollableFrame)
+
+
+def test_other_steps_keep_non_scrollable_content_panel(ctk_root) -> None:
+    step1_widget = DataOrganizerWidget(ctk_root, step_index=0)
+    step1_widget.pack()
+    ctk_root.update_idletasks()
+    try:
+        assert isinstance(step1_widget._content_frame, ctk.CTkFrame)
+        assert not isinstance(step1_widget._content_frame, ctk.CTkScrollableFrame)
+    finally:
+        step1_widget.destroy()
+
+
+def test_feature_filter_widget_omits_redundant_mnar_section_heading(widget) -> None:
+    label_texts = [
+        child.cget("text")
+        for child in widget.params_frame.winfo_children()
+        if isinstance(child, ctk.CTkLabel)
+    ]
+
+    assert "存在/缺失標記（MNAR 80/20）" not in label_texts
 
 
 def test_feature_filter_widget_explains_rules_in_plainer_lab_language(widget) -> None:

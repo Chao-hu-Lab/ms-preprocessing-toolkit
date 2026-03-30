@@ -33,6 +33,7 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         on_complete: Optional[Callable[[pd.DataFrame], None]] = None,
         on_log: Optional[Callable[[str], None]] = None,
         on_progress: Optional[Callable[[float, str], None]] = None,
+        scrollable_content: bool = False,
     ):
         super().__init__(parent)
 
@@ -57,6 +58,7 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         self._ui_queue_after_id: str | None = None
         self._worker_thread: threading.Thread | None = None
         self._is_processing = False
+        self._scrollable_content = scrollable_content
 
         self._create_layout()
 
@@ -65,7 +67,14 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        self._content_frame = ctk.CTkFrame(self, fg_color="transparent")
+        if self._scrollable_content:
+            self._content_frame = ctk.CTkScrollableFrame(
+                self,
+                fg_color="transparent",
+                corner_radius=0,
+            )
+        else:
+            self._content_frame = ctk.CTkFrame(self, fg_color="transparent")
         self._content_frame.grid(row=0, column=0, sticky="nsew", padx=60)
         self._content_frame.grid_columnconfigure(0, weight=1)
 
@@ -149,8 +158,10 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         self.params_frame.pack(anchor="n", fill="x")
 
         def _clamp_width(event):
-            width = min(event.width, 800)
-            self.params_frame.configure(width=width)
+            width = min(int(event.width), 800)
+            current_width = int(self.params_frame.cget("width"))
+            if current_width != width:
+                self.params_frame.configure(width=width)
 
         self._params_outer.bind("<Configure>", _clamp_width)
         self._create_parameters()
