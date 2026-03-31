@@ -151,6 +151,35 @@ class TestDuplicateRemover:
             "Higher-occurrence Feature A should survive A/B dedup"
         )
 
+    def test_istd_duplicates_are_deduplicated_keeping_highest_occurrence(self, remover):
+        """ISTD (protected) rows 之間也要去重，保留檢出率最高的那一個。"""
+        data = {
+            "Mz/RT": [
+                "Sample_Type",
+                "261.1273/5.10",  # ISTD-A: occurrence=5 → 應保留
+                "261.1274/5.11",  # ISTD-B: occurrence=2 → 應刪除（同為 protected，但檢出率低）
+                "400.0000/15.00",  # 普通 feature，不受影響
+            ],
+            "Sample1": ["case",    60000, 20000, 5000],
+            "Sample2": ["case",    58000, 22000, 4800],
+            "Sample3": ["control", 62000, 0,     5100],
+            "QC1":     ["qc",      59000, 0,     4900],
+            "QC2":     ["qc",      61000, 21000, 5050],
+        }
+        df = pd.DataFrame(data)
+        # row index 1 = ISTD-A, row index 2 = ISTD-B，兩者皆標為 protected
+        protected = {1, 2}
+        result = remover.process(df, mz_tolerance_ppm=20, rt_tolerance=0.1, protected_rows=protected)
+
+        assert result.success
+        result_mz_rt = set(result.data.iloc[1:]["Mz/RT"].tolist())
+        assert len(result.data) - 1 == 2, (
+            f"Expected 2 features (best ISTD + normal), got {len(result.data) - 1}: {result_mz_rt}"
+        )
+        assert "261.1273/5.10" in result_mz_rt, "Higher-occurrence ISTD-A should be kept"
+        assert "261.1274/5.11" not in result_mz_rt, "Lower-occurrence ISTD-B should be removed"
+        assert "400.0000/15.00" in result_mz_rt, "Unrelated feature should be untouched"
+
     def test_degeneracy_annotation_is_disabled_by_default(self, remover):
         df = pd.DataFrame(
             {
