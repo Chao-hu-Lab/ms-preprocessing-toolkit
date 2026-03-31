@@ -84,8 +84,72 @@ class TestDuplicateRemover:
         )
 
         assert result.success
-        # The higher intensity duplicate should be preserved
-        # Row with "100.1234/1.50" has higher intensity than "100.1235/1.51"
+        result_values = result.data.iloc[1:]["Mz/RT"].tolist()
+        assert "100.1234/1.50" in result_values, (
+            f"Higher-intensity feature should be kept. Got: {result_values}"
+        )
+        assert "100.1235/1.51" not in result_values, (
+            f"Lower-intensity duplicate should be removed. Got: {result_values}"
+        )
+
+    def test_keeps_higher_occurrence_over_higher_intensity(self, remover):
+        """高出現率 feature 應被保留，即使強度較低。"""
+        data = {
+            "Mz/RT": [
+                "Sample_Type",
+                "258.109431/9.042764",  # Feature A: occurrence=7, total=202000 → 應保留
+                "258.109432/9.043000",  # Feature B: occurrence=4, total=203000 → 應刪除
+            ],
+            "Tolerance": ["na", "na", "na"],
+            "Case1":    ["case",    30000, 50000],
+            "Case2":    ["case",    28000, 48000],
+            "Case3":    ["case",    32000, 52000],
+            "Control1": ["control", 25000, 0],
+            "Control2": ["control", 27000, 0],
+            "Control3": ["control", 29000, 0],
+            "QC1":      ["qc",      31000, 51000],
+        }
+        df = pd.DataFrame(data)
+        result = remover.process(df, mz_tolerance_ppm=20, rt_tolerance=0.1)
+
+        assert result.success
+        assert len(result.data) - 1 == 1, (
+            f"Expected 1 feature after dedup, got {len(result.data) - 1}"
+        )
+        kept = result.data.iloc[1]["Mz/RT"]
+        assert kept == "258.109431/9.042764", (
+            f"Higher-occurrence feature A should be kept, got: {kept}"
+        )
+
+    def test_distant_rt_feature_not_merged_with_close_duplicates(self, remover):
+        """使用 rt_tolerance=0.1 時，RT 差距大的 feature 不應與近距離 duplicates 合併。"""
+        data = {
+            "Mz/RT": [
+                "Sample_Type",
+                "258.109431/8.100000",  # C: RT 遠端 (9.0-8.1=0.9 min), occurrence=5
+                "258.109431/9.042764",  # A: occurrence=5，應在 A/B 中勝出
+                "258.109432/9.043000",  # B: occurrence=3，應被 A 刪除
+            ],
+            "Case1": ["case", 80000, 30000, 10000],
+            "Case2": ["case", 82000, 28000, 0],
+            "Case3": ["case", 78000, 32000, 0],
+            "QC1":   ["qc",   79000, 26000, 9000],
+            "QC2":   ["qc",   81000, 27000, 8000],
+        }
+        df = pd.DataFrame(data)
+        result = remover.process(df, mz_tolerance_ppm=20, rt_tolerance=0.1)
+
+        assert result.success
+        result_mz_rt = set(result.data.iloc[1:]["Mz/RT"].tolist())
+        assert len(result.data) - 1 == 2, (
+            f"Expected 2 features (C + A), got {len(result.data) - 1}: {result_mz_rt}"
+        )
+        assert "258.109431/8.100000" in result_mz_rt, (
+            "Feature C (distant RT) should not be merged with A/B"
+        )
+        assert "258.109431/9.042764" in result_mz_rt, (
+            "Higher-occurrence Feature A should survive A/B dedup"
+        )
 
     def test_degeneracy_annotation_is_disabled_by_default(self, remover):
         df = pd.DataFrame(

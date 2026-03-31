@@ -72,9 +72,9 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
         self._style_form_label(rt_label)
         rt_label.grid(row=1, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
 
-        self.rt_entry = ctk.CTkEntry(self.params_frame, placeholder_text="1.0", font=FONTS["body"])
+        self.rt_entry = ctk.CTkEntry(self.params_frame, placeholder_text="0.1", font=FONTS["body"])
         self._style_numeric_entry(self.rt_entry)
-        self.rt_entry.insert(0, "1.0")
+        self.rt_entry.insert(0, "0.1")
         self.rt_entry.grid(row=1, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
 
         topn_label = ctk.CTkLabel(self.params_frame, text="限制輸出 Top N", font=FONTS["body"])
@@ -204,7 +204,7 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
         """Get current parameter values."""
         params = {
             "mz_tolerance_ppm": float(self.mz_entry.get() or "20"),
-            "rt_tolerance": float(self.rt_entry.get() or "1.0"),
+            "rt_tolerance": float(self.rt_entry.get() or "0.1"),
             "preserve_red_font": True,
             "enable_degeneracy_annotation": bool(self.enable_degeneracy_var.get()),
             "degeneracy_ppm_tolerance": float(self.degeneracy_ppm_entry.get() or self.mz_entry.get() or "20"),
