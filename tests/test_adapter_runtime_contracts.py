@@ -183,6 +183,8 @@ def test_feature_filter_run_from_df_applies_signal_threshold_and_flags(monkeypat
         "enable_background_threshold": False,
         "enable_intensity_fc_threshold": True,
         "enable_qc_ratio_threshold": True,
+        "enable_mnar_gate": True,
+        "allow_single_group_stable": False,
         "protected_rows": {9},
     }
 

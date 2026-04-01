@@ -565,3 +565,169 @@ class TestFeatureFilter:
         feature_rows = result.data[result.data["Mz/RT"] == "100.000/1.0"]
         assert not feature_rows.empty
         assert feature_rows["is_Presence_Absence_Marker"].iloc[0] is False
+
+    # ------------------------------------------------------------------
+    # Single-group (allow_single_group_stable) tests
+    # ------------------------------------------------------------------
+
+    def test_single_group_stable_gate_deletes_all_without_degradation(self, filter_proc):
+        """With only 1 analysis group and allow_single_group_stable=False (default),
+        the stable gate always fails because sum >= 2 can never be satisfied."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0", "200.000/2.0"],
+                "Tolerance": ["na", "na", "na"],
+                "Exposure1": ["exposure", 8000, 8000],
+                "Exposure2": ["exposure", 9000, 9000],
+                "QC1": ["qc", 8000, 8000],
+            }
+        )
+        result = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            enable_intensity_fc_threshold=False,
+            enable_mnar_gate=False,
+        )
+        assert result.success
+        assert "100.000/1.0" not in result.data["Mz/RT"].tolist()
+        assert "200.000/2.0" not in result.data["Mz/RT"].tolist()
+
+    def test_single_group_stable_degradation_keeps_features_above_threshold(self, filter_proc):
+        """With allow_single_group_stable=True and exactly 1 group, stable gate
+        degrades to: group ratio >= background_threshold."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0", "200.000/2.0"],
+                "Tolerance": ["na", "na", "na"],
+                "Exposure1": ["exposure", 8000, 100],
+                "Exposure2": ["exposure", 9000, 200],
+                "QC1": ["qc", 8000, 8000],
+            }
+        )
+        result = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            enable_intensity_fc_threshold=False,
+            enable_mnar_gate=False,
+            allow_single_group_stable=True,
+        )
+        assert result.success
+        # 100.000/1.0: both exposure samples above 5000 → ratio=1.0 >= 0.33 → kept
+        assert "100.000/1.0" in result.data["Mz/RT"].tolist()
+        # 200.000/2.0: both exposure samples below 5000 → ratio=0.0 < 0.33 → deleted
+        assert "200.000/2.0" not in result.data["Mz/RT"].tolist()
+
+    def test_single_group_degradation_does_not_activate_for_two_or_more_groups(self, filter_proc):
+        """allow_single_group_stable has no effect when there are >= 2 groups."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Case2": ["case", 9000],
+                "Control1": ["control", 8000],
+                "Control2": ["control", 9000],
+                "QC1": ["qc", 8000],
+            }
+        )
+        normal = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            qc_ratio_threshold=0.0,
+        )
+        degraded = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            qc_ratio_threshold=0.0,
+            allow_single_group_stable=True,
+        )
+        assert normal.success and degraded.success
+        # Both should keep the feature (2-group stable gate passes)
+        assert "100.000/1.0" in normal.data["Mz/RT"].tolist()
+        assert "100.000/1.0" in degraded.data["Mz/RT"].tolist()
+
+    def test_single_group_degradation_metadata_records_flag(self, filter_proc):
+        """allow_single_group_stable is reflected in enabled_thresholds metadata."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Exposure1": ["exposure", 8000],
+                "QC1": ["qc", 8000],
+            }
+        )
+        result = filter_proc.process(df, allow_single_group_stable=True)
+        assert result.success
+        assert result.metadata["enabled_thresholds"]["single_group_stable"] is True
+
+    # ------------------------------------------------------------------
+    # enable_mnar_gate toggle tests
+    # ------------------------------------------------------------------
+
+    def test_disabling_mnar_gate_removes_presence_absence_feature(self, filter_proc):
+        """When enable_mnar_gate=False, a feature that only passes via MNAR is removed."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Case2": ["case", 9000],
+                "Control1": ["control", 100],
+                "Control2": ["control", 200],
+                "QC1": ["qc", 8000],
+            }
+        )
+        result = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            high_det_thresh=0.8,
+            low_det_thresh=0.2,
+            qc_ratio_threshold=0.0,
+            enable_background_threshold=False,
+            enable_intensity_fc_threshold=False,
+            enable_mnar_gate=False,
+        )
+        assert result.success
+        assert "100.000/1.0" not in result.data["Mz/RT"].tolist()
+
+    def test_enabling_mnar_gate_keeps_presence_absence_feature(self, filter_proc):
+        """When enable_mnar_gate=True (default), a MNAR feature is kept."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Case2": ["case", 9000],
+                "Control1": ["control", 100],
+                "Control2": ["control", 200],
+                "QC1": ["qc", 8000],
+            }
+        )
+        result = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            high_det_thresh=0.8,
+            low_det_thresh=0.2,
+            qc_ratio_threshold=0.0,
+            enable_background_threshold=False,
+            enable_intensity_fc_threshold=False,
+            enable_mnar_gate=True,
+        )
+        assert result.success
+        assert "100.000/1.0" in result.data["Mz/RT"].tolist()
+
+    def test_mnar_gate_metadata_records_enabled_state(self, filter_proc):
+        """enable_mnar_gate is reflected in enabled_thresholds metadata."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Control1": ["control", 8000],
+                "QC1": ["qc", 8000],
+            }
+        )
+        result_off = filter_proc.process(df, enable_mnar_gate=False)
+        result_on = filter_proc.process(df, enable_mnar_gate=True)
+        assert result_off.metadata["enabled_thresholds"]["mnar_gate"] is False
+        assert result_on.metadata["enabled_thresholds"]["mnar_gate"] is True

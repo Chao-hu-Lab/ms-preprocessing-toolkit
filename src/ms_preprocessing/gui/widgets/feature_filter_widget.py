@@ -26,6 +26,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
         on_progress: Optional[Callable[[float, str], None]] = None,
     ):
         self._threshold_controls: dict[str, tuple[tk.BooleanVar, ctk.CTkSlider, ctk.CTkEntry]] = {}
+        self._allow_single_group_stable: bool = False
         super().__init__(
             parent,
             title="Step 4: 特徵篩選 (Feature Filtering)",
@@ -97,14 +98,22 @@ class FeatureFilterWidget(BaseProcessingWidget):
         )
 
 
-        high_det_label = ctk.CTkLabel(self.params_frame, text="高檢出率閾值", font=FONTS["body"])
-        self._style_form_label(high_det_label)
-        high_det_label.grid(row=3, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
+        self.mnar_enabled_var = tk.BooleanVar(value=True)
+        self.mnar_enabled_switch = self._create_threshold_switch(
+            row=3,
+            text="高檢出率閾值",
+            variable=self.mnar_enabled_var,
+        )
         self.high_det_slider = self._create_threshold_slider(
             row=3, default_value=0.8, on_change=self._update_high_det
         )
         self.high_det_entry = self._create_threshold_entry(
             row=3, default_value=0.8, on_apply=self._apply_high_det
+        )
+        self._threshold_controls["mnar_high"] = (
+            self.mnar_enabled_var,
+            self.high_det_slider,
+            self.high_det_entry,
         )
 
         low_det_label = ctk.CTkLabel(self.params_frame, text="低檢出率閾值", font=FONTS["body"])
@@ -115,6 +124,11 @@ class FeatureFilterWidget(BaseProcessingWidget):
         )
         self.low_det_entry = self._create_threshold_entry(
             row=4, default_value=0.2, on_apply=self._apply_low_det
+        )
+        self._threshold_controls["mnar_low"] = (
+            self.mnar_enabled_var,
+            self.low_det_slider,
+            self.low_det_entry,
         )
 
         self.qc_ratio_enabled_var = tk.BooleanVar(value=True)
@@ -357,6 +371,8 @@ class FeatureFilterWidget(BaseProcessingWidget):
             "enable_background_threshold": bool(self.bg_enabled_var.get()),
             "enable_qc_ratio_threshold": bool(self.qc_ratio_enabled_var.get()),
             "enable_intensity_fc_threshold": bool(self.intensity_fc_enabled_var.get()),
+            "enable_mnar_gate": bool(self.mnar_enabled_var.get()),
+            "allow_single_group_stable": self._allow_single_group_stable,
         }
 
     def apply_parameters(self, params: dict) -> None:
@@ -373,6 +389,8 @@ class FeatureFilterWidget(BaseProcessingWidget):
             "intensity_fc_threshold",
             "enable_intensity_fc_threshold",
         )
+        if "enable_mnar_gate" in params:
+            self.mnar_enabled_var.set(bool(params["enable_mnar_gate"]))
         if "high_det_thresh" in params:
             parsed = self._clamp_to_slider(float(params["high_det_thresh"]), self.high_det_slider)
             self.high_det_slider.set(parsed)
@@ -403,6 +421,41 @@ class FeatureFilterWidget(BaseProcessingWidget):
             entry.delete(0, "end")
             entry.insert(0, f"{parsed:.3f}")
 
+    def _count_analysis_groups(self) -> int:
+        """Count non-QC analysis groups in the loaded data."""
+        if self._data is None:
+            return 0
+        from ms_core.preprocessing.ms_quality_filter import FeatureFilter
+        processor = FeatureFilter()
+        group_info = processor._detect_sample_types(self._data)
+        return len(group_info["groups"])
+
+    def _confirm_single_group_run(self) -> bool:
+        """Show a confirmation dialog for single-group degraded stable gate.
+
+        Extracted as a separate method so tests can monkeypatch it without
+        needing a real Tk dialog.
+        """
+        import tkinter.messagebox
+        return bool(tkinter.messagebox.askokcancel(
+            "單一組別警告",
+            "偵測到資料只有 1 個分析組別（非 QC）。\n\n"
+            "「背景比例門檻（Stable gate）」正常需要至少 2 組，\n"
+            "繼續執行將退化為：只要該組 ratio ≥ 設定閾值即保留特徵。\n\n"
+            "確認要以單組降級模式繼續嗎？",
+            parent=self,
+        ))
+
+    def _on_run_clicked(self) -> None:
+        """Override to check for single-group condition before starting worker."""
+        self._allow_single_group_stable = False
+        if self._data is not None and self.bg_enabled_var.get():
+            if self._count_analysis_groups() == 1:
+                if not self._confirm_single_group_run():
+                    return
+                self._allow_single_group_stable = True
+        super()._on_run_clicked()
+
     def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
         """Run the feature filtering step."""
         result = feature_filter_adapter.run_from_df(
@@ -415,6 +468,8 @@ class FeatureFilterWidget(BaseProcessingWidget):
             enable_background_threshold=params.get("enable_background_threshold", True),
             enable_qc_ratio_threshold=params.get("enable_qc_ratio_threshold", True),
             enable_intensity_fc_threshold=params.get("enable_intensity_fc_threshold", False),
+            enable_mnar_gate=params.get("enable_mnar_gate", True),
+            allow_single_group_stable=params.get("allow_single_group_stable", False),
             signal_threshold=params.get("signal_threshold", 5000),
             protected_rows=set(
                 self._context.get("protected_rows") or self._context.get("red_font_rows") or []

@@ -242,3 +242,124 @@ def test_feature_filter_widget_runs_processing_in_background_without_duplicate_r
     assert any(status == "Worker started" for _, status in progress_updates)
     assert any(status == "Complete!" for _, status in progress_updates)
     assert any("already in progress" in message for message in logs)
+
+
+def test_feature_filter_widget_defaults_mnar_gate_enabled(widget) -> None:
+    params = widget.get_parameters()
+
+    assert widget.mnar_enabled_switch.get() == 1
+    assert params["enable_mnar_gate"] is True
+    assert params["allow_single_group_stable"] is False
+
+
+def test_feature_filter_widget_mnar_switch_disables_both_sliders(widget) -> None:
+    widget.mnar_enabled_switch.deselect()
+    widget._sync_threshold_control_states()
+
+    assert widget.high_det_slider.cget("state") == "disabled"
+    assert widget.high_det_entry.cget("state") == "disabled"
+    assert widget.low_det_slider.cget("state") == "disabled"
+    assert widget.low_det_entry.cget("state") == "disabled"
+    assert widget.get_parameters()["enable_mnar_gate"] is False
+
+
+def test_feature_filter_widget_mnar_switch_in_column_zero(widget) -> None:
+    assert widget.mnar_enabled_switch.grid_info()["column"] == 0
+
+
+def test_feature_filter_widget_single_group_aborts_when_user_cancels(
+    widget, monkeypatch
+) -> None:
+    """When single group detected and user cancels, _on_run_clicked returns without starting."""
+    monkeypatch.setattr(widget, "_confirm_single_group_run", lambda: False)
+
+    single_group_df = pd.DataFrame(
+        {
+            "Mz/RT": ["Sample_Type", "100.0/1.0"],
+            "Tolerance": ["na", "na"],
+            "Exposure1": ["exposure", 9000],
+            "Exposure2": ["exposure", 9000],
+            "QC1": ["qc", 9000],
+        }
+    )
+    widget.set_data(single_group_df)
+    widget._on_run_clicked()
+
+    assert not widget.is_processing()
+    assert widget._allow_single_group_stable is False
+
+
+def test_feature_filter_widget_single_group_sets_degradation_flag_when_confirmed(
+    widget, ctk_root, monkeypatch
+) -> None:
+    """When single group detected and user confirms, allow_single_group_stable is set True."""
+    monkeypatch.setattr(widget, "_confirm_single_group_run", lambda: True)
+
+    captured: dict = {}
+
+    def fake_run_from_df(data, **kwargs):
+        captured.update(kwargs)
+        return ProcessingResult(
+            success=True,
+            step="feature_filter",
+            output_path=None,
+            data=data.copy(),
+            metadata=ProcessingMetadata(),
+            statistics={},
+        )
+
+    monkeypatch.setattr(feature_filter_adapter, "run_from_df", fake_run_from_df)
+
+    single_group_df = pd.DataFrame(
+        {
+            "Mz/RT": ["Sample_Type", "100.0/1.0"],
+            "Tolerance": ["na", "na"],
+            "Exposure1": ["exposure", 9000],
+            "Exposure2": ["exposure", 9000],
+            "QC1": ["qc", 9000],
+        }
+    )
+    widget.set_data(single_group_df)
+    widget._on_run_clicked()
+
+    assert _spin_until(ctk_root, lambda: not widget.is_processing())
+    assert captured.get("allow_single_group_stable") is True
+
+
+def test_feature_filter_widget_two_groups_skips_single_group_dialog(
+    widget, ctk_root, monkeypatch
+) -> None:
+    """With 2+ groups, _confirm_single_group_run is never called."""
+    confirm_called = []
+    monkeypatch.setattr(
+        widget,
+        "_confirm_single_group_run",
+        lambda: confirm_called.append(True) or True,
+    )
+
+    def fake_run_from_df(data, **kwargs):
+        return ProcessingResult(
+            success=True,
+            step="feature_filter",
+            output_path=None,
+            data=data.copy(),
+            metadata=ProcessingMetadata(),
+            statistics={},
+        )
+
+    monkeypatch.setattr(feature_filter_adapter, "run_from_df", fake_run_from_df)
+
+    two_group_df = pd.DataFrame(
+        {
+            "Mz/RT": ["Sample_Type", "100.0/1.0"],
+            "Tolerance": ["na", "na"],
+            "Case1": ["case", 9000],
+            "Control1": ["control", 9000],
+            "QC1": ["qc", 9000],
+        }
+    )
+    widget.set_data(two_group_df)
+    widget._on_run_clicked()
+
+    assert _spin_until(ctk_root, lambda: not widget.is_processing())
+    assert not confirm_called
