@@ -314,7 +314,7 @@ def test_cli_default_profile_uses_integrated_step_parameters(monkeypatch, projec
         ) == profile["step2"]["istd_record_file"]
         assert captured["step2"]["istd_record_date"] == "20260106"
         assert captured["step3"]["mz_tolerance_ppm"] == 20.0
-        assert captured["step3"]["rt_tolerance"] == 1.0
+        assert captured["step3"]["rt_tolerance"] == 0.1
         assert captured["step3"]["enable_degeneracy_annotation"] is False
         assert captured["step3"]["degeneracy_ppm_tolerance"] == 20.0
         assert captured["step3"]["degeneracy_rt_tolerance"] == 0.05
