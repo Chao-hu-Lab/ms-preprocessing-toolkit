@@ -101,13 +101,13 @@ class TestDuplicateRemover:
                 "258.109432/9.043000",  # Feature B: occurrence=4, total=203000 → 應刪除
             ],
             "Tolerance": ["na", "na", "na"],
-            "Case1":    ["case",    30000, 50000],
-            "Case2":    ["case",    28000, 48000],
-            "Case3":    ["case",    32000, 52000],
+            "Case1": ["case", 30000, 50000],
+            "Case2": ["case", 28000, 48000],
+            "Case3": ["case", 32000, 52000],
             "Control1": ["control", 25000, 0],
             "Control2": ["control", 27000, 0],
             "Control3": ["control", 29000, 0],
-            "QC1":      ["qc",      31000, 51000],
+            "QC1": ["qc", 31000, 51000],
         }
         df = pd.DataFrame(data)
         result = remover.process(df, mz_tolerance_ppm=20, rt_tolerance=0.1)
@@ -133,8 +133,8 @@ class TestDuplicateRemover:
             "Case1": ["case", 80000, 30000, 10000],
             "Case2": ["case", 82000, 28000, 0],
             "Case3": ["case", 78000, 32000, 0],
-            "QC1":   ["qc",   79000, 26000, 9000],
-            "QC2":   ["qc",   81000, 27000, 8000],
+            "QC1": ["qc", 79000, 26000, 9000],
+            "QC2": ["qc", 81000, 27000, 8000],
         }
         df = pd.DataFrame(data)
         result = remover.process(df, mz_tolerance_ppm=20, rt_tolerance=0.1)
@@ -160,16 +160,18 @@ class TestDuplicateRemover:
                 "261.1274/5.11",  # ISTD-B: occurrence=2 → 應刪除（同為 protected，但檢出率低）
                 "400.0000/15.00",  # 普通 feature，不受影響
             ],
-            "Sample1": ["case",    60000, 20000, 5000],
-            "Sample2": ["case",    58000, 22000, 4800],
-            "Sample3": ["control", 62000, 0,     5100],
-            "QC1":     ["qc",      59000, 0,     4900],
-            "QC2":     ["qc",      61000, 21000, 5050],
+            "Sample1": ["case", 60000, 20000, 5000],
+            "Sample2": ["case", 58000, 22000, 4800],
+            "Sample3": ["control", 62000, 0, 5100],
+            "QC1": ["qc", 59000, 0, 4900],
+            "QC2": ["qc", 61000, 21000, 5050],
         }
         df = pd.DataFrame(data)
         # row index 1 = ISTD-A, row index 2 = ISTD-B，兩者皆標為 protected
         protected = {1, 2}
-        result = remover.process(df, mz_tolerance_ppm=20, rt_tolerance=0.1, protected_rows=protected)
+        result = remover.process(
+            df, mz_tolerance_ppm=20, rt_tolerance=0.1, protected_rows=protected
+        )
 
         assert result.success
         result_mz_rt = set(result.data.iloc[1:]["Mz/RT"].tolist())
@@ -179,6 +181,81 @@ class TestDuplicateRemover:
         assert "261.1273/5.10" in result_mz_rt, "Higher-occurrence ISTD-A should be kept"
         assert "261.1274/5.11" not in result_mz_rt, "Lower-occurrence ISTD-B should be removed"
         assert "400.0000/15.00" in result_mz_rt, "Unrelated feature should be untouched"
+
+    def test_merge_recovers_complementary_data_points(self, remover):
+        """Duplicate rows with complementary sample coverage should be merged, not discarded."""
+        data = {
+            "Mz/RT": [
+                "Sample_Type",
+                "250.080914/8.571",  # Row A: has Sample1-3
+                "250.080914/8.571",  # Row B: has Sample3-5 (overlaps on Sample3, adds Sample4-5)
+            ],
+            "Sample1": ["case", 1000, 0],
+            "Sample2": ["case", 2000, 0],
+            "Sample3": ["case", 3000, 3000],
+            "Sample4": ["case", 0, 4000],
+            "Sample5": ["case", 0, 5000],
+        }
+        df = pd.DataFrame(data)
+        result = remover.process(df, mz_tolerance_ppm=20, rt_tolerance=0.1)
+
+        assert result.success
+        assert len(result.data) - 1 == 1, "Should merge into 1 feature"
+
+        merged_row = result.data.iloc[1]
+        assert float(merged_row["Sample1"]) == 1000, "Sample1 from Row A preserved"
+        assert float(merged_row["Sample2"]) == 2000, "Sample2 from Row A preserved"
+        assert float(merged_row["Sample3"]) == 3000, "Sample3 keeps best row value"
+        assert float(merged_row["Sample4"]) == 4000, "Sample4 recovered from Row B"
+        assert float(merged_row["Sample5"]) == 5000, "Sample5 recovered from Row B"
+
+        assert result.statistics["data_points_recovered"] == 2
+        assert result.statistics["groups_merged"] >= 1
+
+    def test_merge_four_way_duplicate_union(self, remover):
+        """Four-way duplicate (like FH multi-trigger) should merge all coverage."""
+        data = {
+            "Mz/RT": [
+                "Sample_Type",
+                "250.080914/8.571",  # Row A: 5/5 samples
+                "250.080914/8.571",  # Row B: 3/5 samples
+                "250.080914/8.571",  # Row C: 1/5 samples
+                "250.080914/8.571",  # Row D: 0/5 samples (empty)
+            ],
+            "S1": ["case", 100, 100, 0, 0],
+            "S2": ["case", 200, 200, 0, 0],
+            "S3": ["case", 300, 0, 0, 0],
+            "S4": ["case", 400, 0, 400, 0],
+            "S5": ["case", 500, 500, 0, 0],
+        }
+        df = pd.DataFrame(data)
+        result = remover.process(df, mz_tolerance_ppm=20, rt_tolerance=0.1)
+
+        assert result.success
+        assert len(result.data) - 1 == 1
+        merged = result.data.iloc[1]
+        # Row A already has all 5, so no recovery needed in this case
+        for col in ["S1", "S2", "S3", "S4", "S5"]:
+            assert float(merged[col]) > 0, f"{col} should have data after merge"
+
+    def test_merge_does_not_affect_non_duplicates(self, remover):
+        """Non-duplicate features should pass through unchanged."""
+        data = {
+            "Mz/RT": [
+                "Sample_Type",
+                "100.0000/1.00",
+                "200.0000/2.00",
+                "300.0000/3.00",
+            ],
+            "S1": ["case", 100, 200, 300],
+            "S2": ["case", 110, 0, 310],
+        }
+        df = pd.DataFrame(data)
+        result = remover.process(df, mz_tolerance_ppm=20, rt_tolerance=0.1)
+
+        assert result.success
+        assert len(result.data) - 1 == 3
+        assert result.statistics.get("data_points_recovered", 0) == 0
 
     def test_degeneracy_annotation_is_disabled_by_default(self, remover):
         df = pd.DataFrame(
