@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from pathlib import Path
+import re
 import shutil
 import sys
+from typing import Iterator
 import uuid
 
 import numpy as np
@@ -16,12 +18,81 @@ import customtkinter as ctk
 # Ensure src/ is on the import path for tests
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
-TMP_ROOT = ROOT / ".tmp"
-PROJECT_TEST_TEMP_ROOT = TMP_ROOT / "tests"
+PYTEST_ROOT = ROOT / "build" / "pytest"
+PROJECT_TEST_TEMP_ROOT = PYTEST_ROOT / "tmp-fixtures"
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
+
+
+def _session_temp_root() -> Path:
+    """Create a repo-local session root without using pytest temp internals."""
+    PROJECT_TEST_TEMP_ROOT.mkdir(parents=True, exist_ok=True)
+    session_root = PROJECT_TEST_TEMP_ROOT / f"session_{uuid.uuid4().hex}"
+    session_root.mkdir(parents=True, exist_ok=False)
+    return session_root
+
+
+def _normalize_temp_prefix(name: str) -> str:
+    """Convert a node name into a filesystem-safe temp prefix."""
+    normalized = re.sub(r"[^A-Za-z0-9_-]+", "-", name).strip("-")
+    return normalized or "tmp-path"
+
+
+def _remove_tree(path: Path) -> None:
+    """Best-effort recursive removal for repo-local temp directories."""
+    if path.exists():
+        shutil.rmtree(path, ignore_errors=True)
+
+
+def _prune_empty_parents(path: Path, *, stop_at: Path) -> None:
+    """Remove empty parent directories up to the configured pytest root."""
+    current = path
+    while True:
+        if current == stop_at.parent:
+            break
+        try:
+            current.rmdir()
+        except OSError:
+            break
+        if current == stop_at:
+            break
+        current = current.parent
+
+
+def _should_preserve_tmp_path(request: pytest.FixtureRequest) -> bool:
+    """Keep tmp_path artifacts only when setup/call failed, matching failed retention."""
+    for phase in ("setup", "call"):
+        report = getattr(request.node, f"rep_{phase}", None)
+        if report is not None and report.failed:
+            return True
+    return False
+
+
+class RepoTmpPathFactory:
+    """Minimal tmp_path_factory replacement rooted inside the repository."""
+
+    def __init__(self, base_root: Path) -> None:
+        self._base_root = base_root
+
+    def getbasetemp(self) -> Path:
+        return self._base_root
+
+    def mktemp(self, basename: str, numbered: bool = True) -> Path:
+        prefix = _normalize_temp_prefix(basename)
+        suffix = uuid.uuid4().hex if numbered else "shared"
+        temp_dir = self._base_root / f"{prefix}-{suffix}"
+        temp_dir.mkdir(parents=True, exist_ok=False)
+        return temp_dir
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[object]):
+    """Expose per-phase reports so custom tmp fixtures can honor retention policy."""
+    outcome = yield
+    report = outcome.get_result()
+    setattr(item, f"rep_{report.when}", report)
 
 
 @pytest.fixture(scope="session")
@@ -36,10 +107,13 @@ def ctk_root():
 
 
 @pytest.fixture(scope="session")
-def project_temp_root() -> Path:
+def project_temp_root() -> Iterator[Path]:
     """Central temp root for tests that need explicit temporary directories."""
-    PROJECT_TEST_TEMP_ROOT.mkdir(parents=True, exist_ok=True)
-    return PROJECT_TEST_TEMP_ROOT
+    session_root = _session_temp_root()
+    try:
+        yield session_root
+    finally:
+        _prune_empty_parents(session_root, stop_at=PYTEST_ROOT)
 
 
 @pytest.fixture
@@ -53,7 +127,7 @@ def project_temp_dir(project_temp_root: Path):
         try:
             yield temp_dir
         finally:
-            shutil.rmtree(temp_dir, ignore_errors=True)
+            _remove_tree(temp_dir)
 
     return _factory
 
@@ -65,11 +139,24 @@ def temp_dir(project_temp_dir):
         yield tmpdir
 
 
+@pytest.fixture(scope="session")
+def tmp_path_factory(project_temp_root: Path) -> RepoTmpPathFactory:
+    """Override pytest's builtin tmp_path_factory with a repo-local factory."""
+    return RepoTmpPathFactory(project_temp_root)
+
+
 @pytest.fixture
-def tmp_path(project_temp_dir) -> Path:
+def tmp_path(
+    request: pytest.FixtureRequest,
+    tmp_path_factory: RepoTmpPathFactory,
+) -> Iterator[Path]:
     """Override pytest's builtin tmp_path to avoid Windows temp ACL issues."""
-    with project_temp_dir(prefix="tmp-path-") as tmpdir:
-        yield tmpdir
+    temp_dir = tmp_path_factory.mktemp(request.node.name)
+    try:
+        yield temp_dir
+    finally:
+        if not _should_preserve_tmp_path(request):
+            _remove_tree(temp_dir)
 
 
 @pytest.fixture

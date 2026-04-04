@@ -75,6 +75,12 @@ All 82+ tests must pass. No merging without passing tests.
 - **`tests/` 下只放 `.py` 檔案**，測試用的固定資料放 `tests/fixtures/`
 - 清理：`find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; rm -rf .tmp/ .pytest_cache/`
 
+### Temp Path Source Of Truth
+
+- Current repo-local pytest temp root: `build/pytest/tmp-fixtures/`
+- Use the fixtures in `tests/conftest.py` instead of writing temp paths from `Path.cwd()`
+- Routine cleanup command: `powershell -ExecutionPolicy Bypass -File scripts\clean_local_artifacts.ps1`
+
 ## Key Commands
 
 ```bash
