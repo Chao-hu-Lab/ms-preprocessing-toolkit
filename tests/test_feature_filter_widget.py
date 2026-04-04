@@ -16,25 +16,12 @@ from ms_preprocessing.gui.widgets.feature_filter_widget import FeatureFilterWidg
 from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
 
 
-def _spin_until(ctk_root, predicate, timeout: float = 1.5) -> bool:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        ctk_root.update()
-        if predicate():
-            return True
-        time.sleep(0.01)
-    ctk_root.update()
-    return predicate()
+from tests.conftest import spin_until
+
 
 @pytest.fixture
-def widget(ctk_root):
-    step4_widget = FeatureFilterWidget(ctk_root, step_index=3)
-    step4_widget.pack()
-    ctk_root.update_idletasks()
-    try:
-        yield step4_widget
-    finally:
-        step4_widget.destroy()
+def widget(step_widget_factory):
+    return step_widget_factory(FeatureFilterWidget, step_index=3)
 
 
 def test_feature_filter_widget_defaults_keep_fc_gate_disabled(widget) -> None:
@@ -236,7 +223,7 @@ def test_feature_filter_widget_runs_processing_in_background_without_duplicate_r
     widget._on_run_clicked()
     release_worker.set()
 
-    assert _spin_until(ctk_root, lambda: not widget.is_processing())
+    assert spin_until(ctk_root, lambda: not widget.is_processing())
     assert call_count == 1
     assert completions and completions[0].equals(input_df)
     assert any(status == "Worker started" for _, status in progress_updates)
@@ -267,9 +254,7 @@ def test_feature_filter_widget_mnar_switch_in_column_zero(widget) -> None:
     assert widget.mnar_enabled_switch.grid_info()["column"] == 0
 
 
-def test_feature_filter_widget_single_group_aborts_when_user_cancels(
-    widget, monkeypatch
-) -> None:
+def test_feature_filter_widget_single_group_aborts_when_user_cancels(widget, monkeypatch) -> None:
     """When single group detected and user cancels, _on_run_clicked returns without starting."""
     monkeypatch.setattr(widget, "_confirm_single_group_run", lambda: False)
 
@@ -322,7 +307,7 @@ def test_feature_filter_widget_single_group_sets_degradation_flag_when_confirmed
     widget.set_data(single_group_df)
     widget._on_run_clicked()
 
-    assert _spin_until(ctk_root, lambda: not widget.is_processing())
+    assert spin_until(ctk_root, lambda: not widget.is_processing())
     assert captured.get("allow_single_group_stable") is True
 
 
@@ -361,5 +346,5 @@ def test_feature_filter_widget_two_groups_skips_single_group_dialog(
     widget.set_data(two_group_df)
     widget._on_run_clicked()
 
-    assert _spin_until(ctk_root, lambda: not widget.is_processing())
+    assert spin_until(ctk_root, lambda: not widget.is_processing())
     assert not confirm_called

@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import shutil
 import sys
+import time
 from typing import Iterator
 import uuid
 
@@ -61,6 +62,18 @@ def _prune_empty_parents(path: Path, *, stop_at: Path) -> None:
         current = current.parent
 
 
+def spin_until(ctk_root: ctk.CTk, predicate, timeout: float = 1.5) -> bool:
+    """Poll the Tk event loop until predicate() returns True or timeout expires."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        ctk_root.update()
+        if predicate():
+            return True
+        time.sleep(0.01)
+    ctk_root.update()
+    return predicate()
+
+
 def _should_preserve_tmp_path(request: pytest.FixtureRequest) -> bool:
     """Keep tmp_path artifacts only when setup/call failed, matching failed retention."""
     for phase in ("setup", "call"):
@@ -104,6 +117,24 @@ def ctk_root():
         yield root
     finally:
         root.destroy()
+
+
+@pytest.fixture
+def step_widget_factory(ctk_root: ctk.CTk):
+    """Factory fixture: create a step widget and auto-destroy on teardown."""
+    created: list = []
+
+    def _make(widget_class, step_index: int):
+        w = widget_class(ctk_root, step_index=step_index)
+        w.pack()
+        ctk_root.update_idletasks()
+        created.append(w)
+        return w
+
+    yield _make
+
+    for w in reversed(created):
+        w.destroy()
 
 
 @pytest.fixture(scope="session")

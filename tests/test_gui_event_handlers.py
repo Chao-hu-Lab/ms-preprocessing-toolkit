@@ -16,15 +16,7 @@ from ms_preprocessing.gui.pipeline_session import PipelineSession
 from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
 
 
-def _spin_until(ctk_root, predicate, timeout: float = 1.5) -> bool:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        ctk_root.update()
-        if predicate():
-            return True
-        time.sleep(0.01)
-    ctk_root.update()
-    return predicate()
+from tests.conftest import spin_until
 
 
 def test_run_all_steps_checks_pipeline_prerequisites_before_processing() -> None:
@@ -104,7 +96,9 @@ def test_run_all_steps_rebuilds_clean_pipeline_session_from_loaded_source(tmp_pa
     window._last_run_all = False
     window._last_materialized_export_path = None
     window._completed_steps = {0, 1, 2}
-    window._pipeline_session = PipelineSession(output_dir=window._output_dir, source_file=window._source_file)
+    window._pipeline_session = PipelineSession(
+        output_dir=window._output_dir, source_file=window._source_file
+    )
     window._pipeline_session.update_context_from_metadata(
         {"red_font_rows": [99], "protected_rows": [99], "highlight_rows": [77]}
     )
@@ -260,7 +254,9 @@ class _RunAllAsyncHarness(MainWindowEventHandlersMixin, ctk.CTkFrame):
         self._last_run_all = False
         self._last_materialized_export_path = None
         self._completed_steps = set()
-        self._pipeline_session = PipelineSession(output_dir=self._output_dir, source_file=self._source_file)
+        self._pipeline_session = PipelineSession(
+            output_dir=self._output_dir, source_file=self._source_file
+        )
         self._step_output_paths = {}
         self._context = self._pipeline_session.context
         self._source_context_snapshot = None
@@ -340,7 +336,7 @@ def test_run_all_steps_runs_in_background_when_ui_scheduler_available(ctk_root, 
 
         release_worker.set()
 
-        assert _spin_until(ctk_root, lambda: not app._pipeline_is_processing)
+        assert spin_until(ctk_root, lambda: not app._pipeline_is_processing)
         assert app._last_run_all is True
         assert app._last_completed_step == 0
     finally:
@@ -397,7 +393,7 @@ def test_run_all_auto_exports_final_results_when_pipeline_completes(ctk_root, tm
 
         release_worker.set()
 
-        assert _spin_until(ctk_root, lambda: not app._pipeline_is_processing)
+        assert spin_until(ctk_root, lambda: not app._pipeline_is_processing)
         app._export_results.assert_called_once_with()
         assert any("Auto-exporting results" in message for message in app._log_messages)
     finally:

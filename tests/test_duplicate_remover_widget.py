@@ -11,14 +11,8 @@ from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
 
 
 @pytest.fixture
-def widget(ctk_root):
-    step3_widget = DuplicateRemoverWidget(ctk_root, step_index=2)
-    step3_widget.pack()
-    ctk_root.update_idletasks()
-    try:
-        yield step3_widget
-    finally:
-        step3_widget.destroy()
+def widget(step_widget_factory):
+    return step_widget_factory(DuplicateRemoverWidget, step_index=2)
 
 
 def test_duplicate_remover_widget_keeps_controls_in_aligned_columns(widget) -> None:
