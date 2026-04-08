@@ -51,6 +51,7 @@ def _make_cli_args(input_path: Path, output_path: Path | None, step: str) -> Sim
         diff_threshold=None,
         qc_ratio_threshold=None,
         persist_intermediate=False,
+        export_deleted_feature=False,
         no_gui=True,
         version=False,
     )
@@ -115,7 +116,9 @@ def _patch_cli_dependencies(monkeypatch, fake_handler: _FakeFileHandler) -> None
     )
 
 
-def test_cli_step_all_default_does_not_write_step_parquet_intermediates(monkeypatch, project_temp_dir) -> None:
+def test_cli_step_all_default_does_not_write_step_parquet_intermediates(
+    monkeypatch, project_temp_dir
+) -> None:
     with project_temp_dir() as temp_dir:
         base = Path(temp_dir)
         df = pd.DataFrame(
@@ -145,7 +148,9 @@ def test_cli_step_all_default_does_not_write_step_parquet_intermediates(monkeypa
         assert save_suffixes[-1] == ".xlsx"
 
 
-def test_cli_persist_intermediate_writes_parquet_to_internal_cache_not_output(monkeypatch, project_temp_dir) -> None:
+def test_cli_persist_intermediate_writes_parquet_to_internal_cache_not_output(
+    monkeypatch, project_temp_dir
+) -> None:
     with project_temp_dir() as temp_dir:
         base = Path(temp_dir)
         cache_root = base / "internal-cache"
@@ -171,7 +176,9 @@ def test_cli_persist_intermediate_writes_parquet_to_internal_cache_not_output(mo
         rc = run_cli(args)
         assert rc == 0
 
-        parquet_saves = [path for op, suffix, path in fake_handler.calls if op == "save" and suffix == ".parquet"]
+        parquet_saves = [
+            path for op, suffix, path in fake_handler.calls if op == "save" and suffix == ".parquet"
+        ]
         assert parquet_saves
         assert all(cache_root in path.parents for path in parquet_saves)
         assert all("OUTPUT" not in str(path) for path in parquet_saves)
