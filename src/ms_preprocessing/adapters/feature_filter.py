@@ -229,3 +229,12 @@ def run_from_df(
         progress_callback=progress_callback,
         **kwargs,
     )
+
+
+def count_analysis_groups(df: pd.DataFrame) -> int:
+    """Return the number of non-QC analysis groups in df.
+
+    Wraps FeatureFilter.count_analysis_groups() so GUI code
+    never needs to import ms_core directly.
+    """
+    return _FeatureFilter().count_analysis_groups(df)

@@ -438,10 +438,9 @@ class FeatureFilterWidget(BaseProcessingWidget):
         """Count non-QC analysis groups in the loaded data."""
         if self._data is None:
             return 0
-        from ms_core.preprocessing.ms_quality_filter import FeatureFilter
+        from ms_preprocessing.adapters import feature_filter as _ff_adapter
 
-        processor = FeatureFilter()
-        return processor.count_analysis_groups(self._data)
+        return _ff_adapter.count_analysis_groups(self._data)
 
     def _confirm_single_group_run(self) -> bool:
         """Show a confirmation dialog for single-group degraded stable gate.
