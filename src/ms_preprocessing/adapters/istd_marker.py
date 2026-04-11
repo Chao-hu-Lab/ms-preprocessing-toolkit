@@ -15,11 +15,14 @@ from ms_preprocessing.adapters import _capture_output_path, _persist_adapter_out
 from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
 
 _STEP = "istd_marker"
-_DEFAULT_ISTD_MZ = tuple(_ISTDMarker().config.default_istd_mz)
+_DEFAULT_ISTD_MZ: tuple[float, ...] | None = None
 
 
 def get_default_istd_mz() -> tuple[float, ...]:
     """Expose default ISTD targets without leaking core imports into widgets."""
+    global _DEFAULT_ISTD_MZ
+    if _DEFAULT_ISTD_MZ is None:
+        _DEFAULT_ISTD_MZ = tuple(_ISTDMarker().config.default_istd_mz)
     return _DEFAULT_ISTD_MZ
 
 
