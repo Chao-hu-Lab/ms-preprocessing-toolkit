@@ -111,6 +111,12 @@ def test_duplicate_remover_run_from_df_forwards_protected_rows(monkeypatch) -> N
         rt_tolerance=0.4,
         top_n=2,
         protected_rows={1, 2},
+        enable_degeneracy_annotation=True,
+        degeneracy_ppm_tolerance=12.0,
+        degeneracy_rt_tolerance=0.05,
+        degeneracy_correlation_threshold=0.9,
+        degeneracy_min_correlation_points=4,
+        degeneracy_adduct_table_file="custom_adducts.xlsx",
     )
 
     assert result.success is True
@@ -120,6 +126,12 @@ def test_duplicate_remover_run_from_df_forwards_protected_rows(monkeypatch) -> N
         "rt_tolerance": 0.4,
         "top_n": 2,
         "protected_rows": {1, 2},
+        "enable_degeneracy_annotation": True,
+        "degeneracy_ppm_tolerance": 12.0,
+        "degeneracy_rt_tolerance": 0.05,
+        "degeneracy_correlation_threshold": 0.9,
+        "degeneracy_min_correlation_points": 4,
+        "degeneracy_adduct_table_file": "custom_adducts.xlsx",
     }
 
 
@@ -148,11 +160,11 @@ def test_feature_filter_run_from_df_applies_signal_threshold_and_flags(monkeypat
         df,
         background_threshold=0.1,
         intensity_fc_threshold=0.2,
-        diff_threshold=0.3,
+        high_det_thresh=0.8,
+        low_det_thresh=0.2,
         qc_ratio_threshold=0.4,
         enable_background_threshold=False,
         enable_intensity_fc_threshold=True,
-        enable_diff_threshold=False,
         enable_qc_ratio_threshold=True,
         signal_threshold=123.0,
         protected_rows={9},
@@ -165,12 +177,14 @@ def test_feature_filter_run_from_df_applies_signal_threshold_and_flags(monkeypat
     assert calls["kwargs"] == {
         "background_threshold": 0.1,
         "intensity_fc_threshold": 0.2,
-        "diff_threshold": 0.3,
+        "high_det_thresh": 0.8,
+        "low_det_thresh": 0.2,
         "qc_ratio_threshold": 0.4,
         "enable_background_threshold": False,
         "enable_intensity_fc_threshold": True,
-        "enable_diff_threshold": False,
         "enable_qc_ratio_threshold": True,
+        "enable_mnar_gate": True,
+        "allow_single_group_stable": False,
         "protected_rows": {9},
     }
 

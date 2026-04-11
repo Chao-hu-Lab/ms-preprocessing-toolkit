@@ -15,6 +15,13 @@ def _resolve_cli_step_parameters(args):
     """Resolve CLI step parameters from the selected profile plus explicit overrides."""
     from ms_preprocessing.config import get_pipeline_profile
 
+    enable_degeneracy_annotation = bool(getattr(args, "enable_degeneracy_annotation", False))
+    degeneracy_ppm_tol = getattr(args, "degeneracy_ppm_tol", None)
+    degeneracy_rt_tol = getattr(args, "degeneracy_rt_tol", None)
+    degeneracy_corr_threshold = getattr(args, "degeneracy_corr_threshold", None)
+    degeneracy_min_corr_points = getattr(args, "degeneracy_min_corr_points", None)
+    degeneracy_adduct_table_file = getattr(args, "degeneracy_adduct_table_file", None)
+
     profile = get_pipeline_profile(args.profile)
     step1 = dict(profile["step1"])
     step2 = dict(profile["step2"])
@@ -45,13 +52,48 @@ def _resolve_cli_step_parameters(args):
             "rt_tolerance": args.rt_tol if args.rt_tol is not None else step3.get("rt_tolerance"),
             "preserve_red_font": step3.get("preserve_red_font"),
             "top_n": step3.get("top_n"),
+            "enable_degeneracy_annotation": (
+                enable_degeneracy_annotation
+                if enable_degeneracy_annotation
+                else step3.get("enable_degeneracy_annotation", False)
+            ),
+            "degeneracy_ppm_tolerance": (
+                degeneracy_ppm_tol
+                if degeneracy_ppm_tol is not None
+                else step3.get("degeneracy_ppm_tolerance", step3.get("mz_tolerance_ppm"))
+            ),
+            "degeneracy_rt_tolerance": (
+                degeneracy_rt_tol
+                if degeneracy_rt_tol is not None
+                else step3.get("degeneracy_rt_tolerance")
+            ),
+            "degeneracy_correlation_threshold": (
+                degeneracy_corr_threshold
+                if degeneracy_corr_threshold is not None
+                else step3.get("degeneracy_correlation_threshold", 0.8)
+            ),
+            "degeneracy_min_correlation_points": (
+                degeneracy_min_corr_points
+                if degeneracy_min_corr_points is not None
+                else step3.get("degeneracy_min_correlation_points", 3)
+            ),
+            "degeneracy_adduct_table_file": (
+                degeneracy_adduct_table_file
+                if degeneracy_adduct_table_file is not None
+                else step3.get("degeneracy_adduct_table_file")
+            ),
         },
         "step4": {
             "signal_threshold": step4.get("signal_threshold"),
             "background_threshold": (
                 args.bg_threshold if args.bg_threshold is not None else step4.get("background_threshold")
             ),
-            "diff_threshold": args.diff_threshold if args.diff_threshold is not None else step4.get("diff_threshold"),
+            "high_det_thresh": (
+                args.high_det_thresh if args.high_det_thresh is not None else step4.get("high_det_thresh")
+            ),
+            "low_det_thresh": (
+                args.low_det_thresh if args.low_det_thresh is not None else step4.get("low_det_thresh")
+            ),
             "intensity_fc_threshold": (
                 args.intensity_fc_threshold
                 if args.intensity_fc_threshold is not None
@@ -61,9 +103,8 @@ def _resolve_cli_step_parameters(args):
                 args.qc_ratio_threshold if args.qc_ratio_threshold is not None else step4.get("qc_ratio_threshold")
             ),
             "enable_background_threshold": step4.get("enable_background_threshold", True),
-            "enable_diff_threshold": step4.get("enable_diff_threshold", True),
             "enable_qc_ratio_threshold": step4.get("enable_qc_ratio_threshold", True),
-            "enable_intensity_fc_threshold": step4.get("enable_intensity_fc_threshold", True),
+            "enable_intensity_fc_threshold": step4.get("enable_intensity_fc_threshold", False),
         },
     }
 
@@ -153,6 +194,47 @@ Examples:
     )
 
     parser.add_argument(
+        "--enable-degeneracy-annotation",
+        action="store_true",
+        help="Enable Step 3 degeneracy/adduct annotation without removing matched features",
+    )
+
+    parser.add_argument(
+        "--degeneracy-ppm-tol",
+        type=float,
+        default=None,
+        help="m/z tolerance in ppm for Step 3 degeneracy annotation",
+    )
+
+    parser.add_argument(
+        "--degeneracy-rt-tol",
+        type=float,
+        default=None,
+        help="RT tolerance in minutes for Step 3 degeneracy annotation",
+    )
+
+    parser.add_argument(
+        "--degeneracy-corr-threshold",
+        type=float,
+        default=None,
+        help="Minimum Pearson correlation for Step 3 degeneracy annotation",
+    )
+
+    parser.add_argument(
+        "--degeneracy-min-corr-points",
+        type=int,
+        default=None,
+        help="Minimum shared positive samples required to compute Step 3 degeneracy correlation",
+    )
+
+    parser.add_argument(
+        "--degeneracy-adduct-table-file",
+        type=str,
+        default=None,
+        help="Optional custom adduct table file for Step 3 degeneracy annotation",
+    )
+
+    parser.add_argument(
         "--bg-threshold",
         type=float,
         default=None,
@@ -167,10 +249,17 @@ Examples:
     )
 
     parser.add_argument(
-        "--diff-threshold",
+        "--high-det-thresh",
         type=float,
         default=None,
-        help="Difference threshold for feature filtering (overrides profile value)",
+        help="MNAR high detection rate threshold (0-1, overrides profile value, default 0.8)",
+    )
+
+    parser.add_argument(
+        "--low-det-thresh",
+        type=float,
+        default=None,
+        help="MNAR low detection rate threshold (0-1, overrides profile value, default 0.2)",
     )
 
     parser.add_argument(

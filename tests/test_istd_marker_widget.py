@@ -12,14 +12,8 @@ from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
 
 
 @pytest.fixture
-def widget(ctk_root):
-    step2_widget = ISTDMarkerWidget(ctk_root, step_index=1)
-    step2_widget.pack()
-    ctk_root.update_idletasks()
-    try:
-        yield step2_widget
-    finally:
-        step2_widget.destroy()
+def widget(step_widget_factory):
+    return step_widget_factory(ISTDMarkerWidget, step_index=1)
 
 
 def test_istd_marker_widget_defaults_rt_tolerance_to_1_5(widget) -> None:

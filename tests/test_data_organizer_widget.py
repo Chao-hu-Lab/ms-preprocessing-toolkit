@@ -11,14 +11,8 @@ from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
 
 
 @pytest.fixture
-def widget(ctk_root):
-    step1_widget = DataOrganizerWidget(ctk_root, step_index=0)
-    step1_widget.pack()
-    ctk_root.update_idletasks()
-    try:
-        yield step1_widget
-    finally:
-        step1_widget.destroy()
+def widget(step_widget_factory):
+    return step_widget_factory(DataOrganizerWidget, step_index=0)
 
 
 def test_data_organizer_widget_uses_global_form_alignment(widget) -> None:

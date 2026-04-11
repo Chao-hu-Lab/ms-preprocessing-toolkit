@@ -3,6 +3,8 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $literalTargets = @(
     ".tmp",
+    "build\pytest\tmp-fixtures",
+    "build\pytest",
     ".pytest_cache",
     ".pytest-local-temp",
     ".pytest-tmp",

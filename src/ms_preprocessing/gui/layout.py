@@ -224,14 +224,14 @@ class MainWindowLayoutMixin:
         self.content_frame = ctk.CTkFrame(self)
         self.content_frame.grid(row=0, column=1, sticky="nsew")
         self.content_frame.grid_columnconfigure(0, weight=1)
-        self.content_frame.grid_rowconfigure(0, weight=0)
-        self.content_frame.grid_rowconfigure(1, weight=1)
+        self.content_frame.grid_rowconfigure(0, weight=1)
+        self.content_frame.grid_rowconfigure(1, weight=0)
 
         self.main_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
         self.main_frame.grid(
             row=0,
             column=0,
-            sticky="ew",
+            sticky="nsew",
             pady=(DIMENSIONS["content_top_offset"], 0),
         )
         self.main_frame.grid_columnconfigure(0, weight=1)

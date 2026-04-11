@@ -62,7 +62,6 @@ class TestFeatureFilter:
         result = filter_proc.process(
             sample_data,
             background_threshold=0.33,
-            diff_threshold=0.30,
         )
 
         assert result.success
@@ -75,24 +74,6 @@ class TestFeatureFilter:
 
         # Max diff should be 0.9 - 0.1 = 0.8
         assert abs(max_diff - 0.8) < 0.001
-
-    def test_imputation(self, filter_proc, sample_data):
-        """Test missing value imputation."""
-        # Add some missing values
-        sample_data_with_na = sample_data.copy()
-        sample_data_with_na.at[2, "Case1"] = np.nan
-        sample_data_with_na.at[3, "Control1"] = ""
-
-        result = filter_proc.process(sample_data_with_na)
-
-        assert result.success
-        # Check that no NaN values remain in data columns
-        if result.data is not None:
-            data_rows = result.data.iloc[1:]
-            for col in result.data.columns[2:]:
-                if str(col).endswith("_ratio") or str(col) == "QC_ratio":
-                    continue
-                assert data_rows[col].isna().sum() == 0
 
     def test_qc_ratio_threshold_filters_low_qc_features(self, filter_proc):
         """Features with non-zero but low QC_ratio should be removed when threshold is set."""
@@ -110,7 +91,6 @@ class TestFeatureFilter:
         result = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.30,
             qc_ratio_threshold=0.60,
         )
 
@@ -136,7 +116,6 @@ class TestFeatureFilter:
         result = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.30,
             qc_ratio_threshold=0.0,
         )
 
@@ -161,14 +140,12 @@ class TestFeatureFilter:
         enabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.30,
             qc_ratio_threshold=0.0,
             enable_intensity_fc_threshold=False,
         )
         disabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.30,
             qc_ratio_threshold=0.0,
             enable_background_threshold=False,
             enable_intensity_fc_threshold=False,
@@ -179,39 +156,96 @@ class TestFeatureFilter:
         assert "100.000/1.0" in enabled.data["Mz/RT"].tolist()
         assert "100.000/1.0" not in disabled.data["Mz/RT"].tolist()
 
-    def test_disabling_diff_rule_removes_feature_kept_only_by_diff_ratio(self, filter_proc):
+    def test_mnar_gate_keeps_presence_absence_feature(self, filter_proc):
+        """MNAR gate should keep a feature where case is fully detected, control is absent."""
+        # case_ratio = 1.0 (both samples above 5000) → ≥ 0.8 → high
+        # control_ratio = 0.0 (both samples below 5000) → ≤ 0.2 → low
+        # → MNAR gate passes; stable gate fails (only 1 group ≥ 0.33)
         df = pd.DataFrame(
             {
                 "Mz/RT": ["Sample_Type", "100.000/1.0"],
                 "Tolerance": ["na", "na"],
                 "Case1": ["case", 8000],
-                "Case2": ["case", 100],
+                "Case2": ["case", 9000],
                 "Control1": ["control", 100],
-                "Control2": ["control", 100],
+                "Control2": ["control", 200],
                 "QC1": ["qc", 8000],
             }
         )
 
-        enabled = filter_proc.process(
+        result = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.30,
+            high_det_thresh=0.8,
+            low_det_thresh=0.2,
             qc_ratio_threshold=0.0,
-            enable_intensity_fc_threshold=False,
-        )
-        disabled = filter_proc.process(
-            df,
-            background_threshold=0.33,
-            diff_threshold=0.30,
-            qc_ratio_threshold=0.0,
-            enable_diff_threshold=False,
+            enable_background_threshold=False,
             enable_intensity_fc_threshold=False,
         )
 
-        assert enabled.success
-        assert disabled.success
-        assert "100.000/1.0" in enabled.data["Mz/RT"].tolist()
-        assert "100.000/1.0" not in disabled.data["Mz/RT"].tolist()
+        assert result.success
+        assert "100.000/1.0" in result.data["Mz/RT"].tolist()
+        assert result.statistics.get("mnar_kept", 0) >= 1
+
+    def test_mnar_feature_overrides_qc_zero_gate_only_for_presence_absence_marker(self, filter_proc):
+        """MNAR markers should survive QC_ratio==0, while non-MNAR features should still be deleted."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0", "200.000/2.0"],
+                "Tolerance": ["na", "na", "na"],
+                "Case1": ["case", 8000, 8000],
+                "Case2": ["case", 9000, 9000],
+                "Control1": ["control", 100, 8200],
+                "Control2": ["control", 200, 9100],
+                "QC1": ["qc", 100, 100],
+                "QC2": ["qc", 200, 200],
+            }
+        )
+
+        result = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            high_det_thresh=0.8,
+            low_det_thresh=0.2,
+            qc_ratio_threshold=0.0,
+            enable_intensity_fc_threshold=False,
+        )
+
+        assert result.success
+        assert result.data is not None
+        assert "100.000/1.0" in result.data["Mz/RT"].tolist()
+        assert "200.000/2.0" not in result.data["Mz/RT"].tolist()
+        assert result.statistics.get("qc_zero_deleted", 0) == 1
+
+    def test_mnar_feature_overrides_low_qc_ratio_gate_only_for_presence_absence_marker(self, filter_proc):
+        """MNAR markers should survive low non-zero QC_ratio, while non-MNAR features should still be deleted."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0", "200.000/2.0"],
+                "Tolerance": ["na", "na", "na"],
+                "Case1": ["case", 8000, 8000],
+                "Case2": ["case", 9000, 9000],
+                "Control1": ["control", 100, 8200],
+                "Control2": ["control", 200, 9100],
+                "QC1": ["qc", 8000, 8000],
+                "QC2": ["qc", 100, 100],
+            }
+        )
+
+        result = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            high_det_thresh=0.8,
+            low_det_thresh=0.2,
+            qc_ratio_threshold=0.75,
+            enable_intensity_fc_threshold=False,
+        )
+
+        assert result.success
+        assert result.data is not None
+        assert "100.000/1.0" in result.data["Mz/RT"].tolist()
+        assert "200.000/2.0" not in result.data["Mz/RT"].tolist()
+        assert result.statistics.get("qc_low_deleted", 0) == 1
 
     def test_disabling_qc_rule_keeps_feature_even_when_qc_ratio_is_zero(self, filter_proc):
         df = pd.DataFrame(
@@ -229,13 +263,11 @@ class TestFeatureFilter:
         enabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.30,
             qc_ratio_threshold=0.0,
         )
         disabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.30,
             qc_ratio_threshold=0.0,
             enable_qc_ratio_threshold=False,
         )
@@ -263,13 +295,11 @@ class TestFeatureFilter:
         enabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.30,
             qc_ratio_threshold=0.75,
         )
         disabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.30,
             qc_ratio_threshold=0.75,
             enable_qc_ratio_threshold=False,
         )
@@ -278,160 +308,6 @@ class TestFeatureFilter:
         assert disabled.success
         assert "100.000/1.0" not in enabled.data["Mz/RT"].tolist()
         assert "100.000/1.0" in disabled.data["Mz/RT"].tolist()
-
-    def test_imputation_treats_zero_as_missing_for_group_columns(self, filter_proc):
-        df = pd.DataFrame(
-            {
-                "Mz/RT": ["Sample_Type", "100.0/1.0"],
-                "Tolerance": ["na", "na"],
-                "Case1": ["case", 0],
-                "Case2": ["case", 8000],
-                "Control1": ["control", 0],
-                "Control2": ["control", 9000],
-                "QC1": ["qc", 7000],
-            }
-        )
-
-        result = filter_proc.process(df, qc_ratio_threshold=0.0)
-
-        assert result.success
-        out = result.data
-        assert out is not None
-        assert float(out.loc[1, "Case1"]) > 0
-        assert float(out.loc[1, "Control1"]) > 0
-
-    def test_imputation_treats_zero_as_missing_for_qc_columns(self, filter_proc):
-        df = pd.DataFrame(
-            {
-                "Mz/RT": ["Sample_Type", "100.0/1.0"],
-                "Tolerance": ["na", "na"],
-                "Case1": ["case", 8000],
-                "Case2": ["case", 8500],
-                "Control1": ["control", 9000],
-                "QC1": ["qc", 0],
-                "QC2": ["qc", 6000],
-            }
-        )
-
-        result = filter_proc.process(df, qc_ratio_threshold=0.0)
-
-        assert result.success
-        out = result.data
-        assert out is not None
-        assert float(out.loc[1, "QC1"]) > 0
-
-    def test_imputation_stats_split_consistency(self, filter_proc):
-        df = pd.DataFrame(
-            {
-                "Mz/RT": ["Sample_Type", "100.0/1.0"],
-                "Tolerance": ["na", "na"],
-                "Case1": ["case", np.nan],
-                "Case2": ["case", 8000],
-                "Control1": ["control", 0],
-                "Control2": ["control", 9000],
-                "QC1": ["qc", 0],
-                "QC2": ["qc", 6000],
-            }
-        )
-
-        result = filter_proc.process(df, qc_ratio_threshold=0.0)
-
-        assert result.success, f"process failed: {result.message}"
-        assert "cells_imputed" in result.statistics
-        assert "cells_imputed_from_nan" in result.statistics
-        assert "cells_imputed_from_zero" in result.statistics
-        assert result.statistics["cells_imputed"] == (
-            result.statistics["cells_imputed_from_nan"] + result.statistics["cells_imputed_from_zero"]
-        )
-
-    def test_imputation_keeps_all_zero_group_at_zero(self, filter_proc):
-        df = pd.DataFrame(
-            {
-                "Mz/RT": ["Sample_Type", "100.0/1.0"],
-                "Tolerance": ["na", "na"],
-                "Case1": ["case", 0],
-                "Case2": ["case", 0],
-                "Control1": ["control", 9000],
-                "Control2": ["control", 100],
-                "QC1": ["qc", 6000],
-                "QC2": ["qc", 6000],
-            }
-        )
-
-        result = filter_proc.process(df, qc_ratio_threshold=0.0)
-
-        assert result.success
-        out = result.data
-        assert out is not None
-        assert float(out.loc[1, "Case1"]) == 0.0
-        assert float(out.loc[1, "Case2"]) == 0.0
-
-    def test_imputation_keeps_all_zero_qc_group_at_zero(self, filter_proc):
-        df = pd.DataFrame(
-            {
-                "Mz/RT": ["Sample_Type", "100.0/1.0"],
-                "Tolerance": ["na", "na"],
-                "Case1": ["case", 8000],
-                "Case2": ["case", 8500],
-                "Control1": ["control", 9000],
-                "Control2": ["control", 9100],
-                "QC1": ["qc", 0],
-                "QC2": ["qc", 0],
-            }
-        )
-
-        result = filter_proc.process(df, qc_ratio_threshold=0.0, enable_qc_ratio_threshold=False)
-
-        assert result.success
-        out = result.data
-        assert out is not None
-        assert float(out.loc[1, "QC1"]) == 0.0
-        assert float(out.loc[1, "QC2"]) == 0.0
-
-    def test_imputation_treats_zero_as_missing_for_group_and_qc_columns(self, filter_proc):
-        df = pd.DataFrame(
-            {
-                "Mz/RT": ["Sample_Type", "100.0/1.0"],
-                "Tolerance": ["na", "na"],
-                "Case1": ["case", 0],
-                "Case2": ["case", 8000],
-                "Control1": ["control", 9000],
-                "QC1": ["qc", 0],
-                "QC2": ["qc", 6000],
-            }
-        )
-
-        result = filter_proc.process(df, qc_ratio_threshold=0.0)
-        assert result.success
-        out = result.data
-        assert out is not None
-        assert float(out.loc[1, "Case1"]) > 0
-        assert float(out.loc[1, "QC1"]) > 0
-
-    def test_imputation_stats_split_nan_and_zero_counts(self, filter_proc):
-        df = pd.DataFrame(
-            {
-                "Mz/RT": ["Sample_Type", "100.0/1.0"],
-                "Tolerance": ["na", "na"],
-                "Case1": ["case", np.nan],
-                "Case2": ["case", 8000],
-                "Control1": ["control", 0],
-                "Control2": ["control", 9000],
-                "QC1": ["qc", 0],
-                "QC2": ["qc", 6000],
-            }
-        )
-
-        result = filter_proc.process(df, qc_ratio_threshold=0.0)
-
-        assert result.success
-        assert result.statistics["cells_imputed_from_nan"] == 1
-        assert result.statistics["cells_imputed_from_zero"] == 2
-        assert result.statistics["cells_imputed"] == 3
-
-        assert "imputation_stats" in result.metadata
-        assert result.metadata["imputation_stats"]["cells_imputed_from_nan"] == 1
-        assert result.metadata["imputation_stats"]["cells_imputed_from_zero"] == 2
 
     def test_intensity_fc_keeps_high_fold_change_feature(self, filter_proc):
         """A feature with high intensity fold-change between groups should be kept."""
@@ -451,7 +327,7 @@ class TestFeatureFilter:
             df,
             intensity_fc_threshold=2.0,
             enable_background_threshold=False,
-            enable_diff_threshold=False,
+            enable_intensity_fc_threshold=True,
         )
 
         assert result.success
@@ -476,7 +352,7 @@ class TestFeatureFilter:
             df,
             intensity_fc_threshold=2.0,
             enable_background_threshold=False,
-            enable_diff_threshold=False,
+            enable_intensity_fc_threshold=True,
         )
 
         assert result.success
@@ -487,7 +363,7 @@ class TestFeatureFilter:
 
         Data design: Case ratio=0.5 (1/2 above 5000), Control ratio=0 (0/2 above 5000).
         - Stable gate: only 1 group >= 0.33 → FAIL (needs >=2)
-        - Diff gate: 0.5 - 0.0 = 0.5 < 0.60 → FAIL with high threshold
+        - MNAR gate: case_ratio=0.5 < 0.8 → FAIL (does not reach high threshold)
         - Intensity FC: Case mean=25050, Control mean=100 → FC=250.5 → PASS
         """
         df = pd.DataFrame(
@@ -505,13 +381,12 @@ class TestFeatureFilter:
         enabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.60,
             intensity_fc_threshold=2.0,
+            enable_intensity_fc_threshold=True,
         )
         disabled = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.60,
             intensity_fc_threshold=2.0,
             enable_intensity_fc_threshold=False,
         )
@@ -520,6 +395,29 @@ class TestFeatureFilter:
         assert disabled.success
         assert "100.000/1.0" in enabled.data["Mz/RT"].tolist()
         assert "100.000/1.0" not in disabled.data["Mz/RT"].tolist()
+
+    def test_intensity_fc_rule_is_disabled_by_default(self, filter_proc):
+        """High fold-change alone should not keep a feature unless the FC gate is explicitly enabled."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 50000],
+                "Case2": ["case", 100],
+                "Control1": ["control", 100],
+                "Control2": ["control", 100],
+                "QC1": ["qc", 8000],
+            }
+        )
+
+        result = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            intensity_fc_threshold=2.0,
+        )
+
+        assert result.success
+        assert "100.000/1.0" not in result.data["Mz/RT"].tolist()
 
     def test_unique_stats_marginal_contribution(self, filter_proc):
         """Unique stats should reflect marginal contribution of each gate."""
@@ -538,195 +436,15 @@ class TestFeatureFilter:
         result = filter_proc.process(
             df,
             background_threshold=0.33,
-            diff_threshold=0.30,
             intensity_fc_threshold=2.0,
+            enable_intensity_fc_threshold=True,
         )
 
         assert result.success
         stats = result.statistics
         assert "unique_stable_kept" in stats
-        assert "unique_diff_kept" in stats
+        assert "unique_mnar_kept" in stats
         assert "unique_intensity_fc_kept" in stats
-
-    # ── Low-prevalence imputation gate tests ────────────────────────────
-
-    def test_imputation_skips_group_with_low_prevalence(self, filter_proc):
-        """Group detection rate < 40% → missing values stay 0, not imputed.
-
-        Case group: 1/3 samples above signal_threshold → ratio=0.33 < 0.40.
-        Control group: 3/3 above threshold → ratio=1.0, all kept.
-        The feature survives filtering (diff=0.67 > 0.30) but Case cells
-        must NOT be imputed.
-        """
-        df = pd.DataFrame(
-            {
-                "Mz/RT": ["Sample_Type", "100.0/1.0"],
-                "Tolerance": ["na", "na"],
-                "Case1": ["case", 8000],   # above threshold
-                "Case2": ["case", 0],      # missing
-                "Case3": ["case", 0],      # missing
-                "Control1": ["control", 9000],
-                "Control2": ["control", 9500],
-                "Control3": ["control", 10000],
-                "QC1": ["qc", 7000],
-            }
-        )
-
-        result = filter_proc.process(df, qc_ratio_threshold=0.0)
-
-        assert result.success
-        out = result.data
-        # Case ratio = 1/3 ≈ 0.33 < 0.40 → no imputation
-        assert float(out.loc[1, "Case2"]) == 0.0
-        assert float(out.loc[1, "Case3"]) == 0.0
-        # Case1 was already above threshold — untouched
-        assert float(out.loc[1, "Case1"]) == 8000.0
-
-    def test_imputation_fills_group_at_40pct_prevalence(self, filter_proc):
-        """Group detection rate == 40% → missing values ARE imputed.
-
-        Case group: 2/5 samples above signal_threshold → ratio=0.40 >= 0.40.
-        """
-        df = pd.DataFrame(
-            {
-                "Mz/RT": ["Sample_Type", "100.0/1.0"],
-                "Tolerance": ["na", "na"],
-                "Case1": ["case", 8000],
-                "Case2": ["case", 10000],
-                "Case3": ["case", 0],
-                "Case4": ["case", 0],
-                "Case5": ["case", 0],
-                "Control1": ["control", 9000],
-                "Control2": ["control", 9500],
-                "QC1": ["qc", 7000],
-            }
-        )
-
-        result = filter_proc.process(df, qc_ratio_threshold=0.0)
-
-        assert result.success
-        out = result.data
-        # Case ratio = 2/5 = 0.40 >= 0.40 → imputation triggered
-        assert float(out.loc[1, "Case3"]) > 0
-        assert float(out.loc[1, "Case4"]) > 0
-        assert float(out.loc[1, "Case5"]) > 0
-
-    def test_imputation_uses_min_divided_by_five(self, filter_proc):
-        """Fill value should be group_min_positive / 5, not / 2.
-
-        Case group: 2/2 above threshold, min positive = 8000.
-        Fill value = 8000 / 5 = 1600.
-        """
-        df = pd.DataFrame(
-            {
-                "Mz/RT": ["Sample_Type", "100.0/1.0"],
-                "Tolerance": ["na", "na"],
-                "Case1": ["case", 0],       # missing → should be filled
-                "Case2": ["case", 8000],
-                "Case3": ["case", 12000],
-                "Control1": ["control", 9000],
-                "Control2": ["control", 9500],
-                "Control3": ["control", 10000],
-                "QC1": ["qc", 7000],
-            }
-        )
-
-        result = filter_proc.process(df, qc_ratio_threshold=0.0)
-
-        assert result.success
-        out = result.data
-        # Case ratio = 2/3 ≈ 0.67 >= 0.40 → imputed
-        # min positive in Case = 8000, fill = 8000 / 5 = 1600
-        assert float(out.loc[1, "Case1"]) == pytest.approx(1600.0)
-
-    def test_imputation_skips_qc_with_low_prevalence(self, filter_proc):
-        """QC detection rate < 40% → QC missing values stay 0.
-
-        QC group: 1/3 samples above signal_threshold → ratio=0.33 < 0.40.
-        """
-        df = pd.DataFrame(
-            {
-                "Mz/RT": ["Sample_Type", "100.0/1.0"],
-                "Tolerance": ["na", "na"],
-                "Case1": ["case", 8000],
-                "Case2": ["case", 9000],
-                "Control1": ["control", 9000],
-                "Control2": ["control", 9500],
-                "QC1": ["qc", 6000],   # above threshold
-                "QC2": ["qc", 0],      # missing
-                "QC3": ["qc", 0],      # missing
-            }
-        )
-
-        result = filter_proc.process(
-            df, qc_ratio_threshold=0.0, enable_qc_ratio_threshold=False,
-        )
-
-        assert result.success
-        out = result.data
-        # QC ratio = 1/3 ≈ 0.33 < 0.40 → no imputation
-        assert float(out.loc[1, "QC2"]) == 0.0
-        assert float(out.loc[1, "QC3"]) == 0.0
-
-    def test_cells_skipped_low_prevalence_stat(self, filter_proc):
-        """cells_skipped_low_prevalence counts cells NOT imputed due to
-        the 40% prevalence gate (excludes all-zero groups).
-
-        Case: 1/3 detected → 2 missing cells skipped.
-        Control: 3/3 detected → 0 skipped.
-        """
-        df = pd.DataFrame(
-            {
-                "Mz/RT": ["Sample_Type", "100.0/1.0"],
-                "Tolerance": ["na", "na"],
-                "Case1": ["case", 8000],
-                "Case2": ["case", 0],
-                "Case3": ["case", 0],
-                "Control1": ["control", 9000],
-                "Control2": ["control", 9500],
-                "Control3": ["control", 10000],
-                "QC1": ["qc", 7000],
-            }
-        )
-
-        result = filter_proc.process(df, qc_ratio_threshold=0.0)
-
-        assert result.success
-        assert result.statistics["cells_skipped_low_prevalence"] == 2
-
-    def test_imputation_low_prevalence_mixed_features(self, filter_proc):
-        """Two features: one with high prevalence, one with low.
-
-        Feature 1 (100.0/1.0): Case 2/3 detected → imputed with min/5.
-        Feature 2 (200.0/2.0): Case 1/3 detected → NOT imputed.
-        Both features survive filtering due to high diff vs Control.
-        """
-        df = pd.DataFrame(
-            {
-                "Mz/RT": ["Sample_Type", "100.0/1.0", "200.0/2.0"],
-                "Tolerance": ["na", "na", "na"],
-                "Case1": ["case", 8000, 7000],
-                "Case2": ["case", 10000, 0],
-                "Case3": ["case", 0, 0],
-                "Control1": ["control", 0, 0],
-                "Control2": ["control", 0, 0],
-                "Control3": ["control", 0, 0],
-                "QC1": ["qc", 7000, 6000],
-            }
-        )
-
-        result = filter_proc.process(df, qc_ratio_threshold=0.0)
-
-        assert result.success
-        out = result.data
-        # Feature 1: Case ratio = 2/3 ≈ 0.67 → imputed
-        row1 = out[out["Mz/RT"] == "100.0/1.0"].iloc[0]
-        assert float(row1["Case3"]) == pytest.approx(8000 / 5)
-
-        # Feature 2: Case ratio = 1/3 ≈ 0.33 → NOT imputed
-        row2 = out[out["Mz/RT"] == "200.0/2.0"].iloc[0]
-        assert float(row2["Case2"]) == 0.0
-        assert float(row2["Case3"]) == 0.0
 
     def test_deprecated_skew_parameter_warns(self, filter_proc):
         """Passing removed skew_threshold should emit a DeprecationWarning."""
@@ -750,3 +468,266 @@ class TestFeatureFilter:
             assert "skew_threshold" in str(deprecation_warnings[0].message)
 
         assert result.success
+
+    def test_deprecated_diff_threshold_warns(self, filter_proc):
+        """Passing removed diff_threshold should emit a DeprecationWarning."""
+        import warnings
+
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Control1": ["control", 8000],
+                "QC1": ["qc", 8000],
+            }
+        )
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = filter_proc.process(df, diff_threshold=0.30)
+            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+            assert len(deprecation_warnings) >= 1
+            assert "diff_threshold" in str(deprecation_warnings[0].message)
+
+        assert result.success
+
+    def test_output_contains_is_presence_absence_marker_column(self, filter_proc):
+        """Output DataFrame must have is_Presence_Absence_Marker column."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0", "200.000/2.0"],
+                "Tolerance": ["na", "na", "na"],
+                "Case1": ["case", 8000, 8000],
+                "Case2": ["case", 9000, 8500],
+                "Control1": ["control", 100, 8000],
+                "Control2": ["control", 200, 8500],
+                "QC1": ["qc", 8000, 8000],
+            }
+        )
+
+        result = filter_proc.process(df, background_threshold=0.33, qc_ratio_threshold=0.0)
+
+        assert result.success
+        assert "is_Presence_Absence_Marker" in result.data.columns
+
+    def test_mnar_feature_is_marked_true_in_output(self, filter_proc):
+        """A feature that passes the MNAR 80/20 rule must have is_Presence_Absence_Marker=True."""
+        # case_ratio = 1.0 (both above 5000), control_ratio = 0.0 (both below 5000)
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Case2": ["case", 9000],
+                "Control1": ["control", 100],
+                "Control2": ["control", 200],
+                "QC1": ["qc", 8000],
+            }
+        )
+
+        result = filter_proc.process(
+            df,
+            high_det_thresh=0.8,
+            low_det_thresh=0.2,
+            qc_ratio_threshold=0.0,
+        )
+
+        assert result.success
+        feature_rows = result.data[result.data["Mz/RT"] == "100.000/1.0"]
+        assert not feature_rows.empty
+        assert feature_rows["is_Presence_Absence_Marker"].iloc[0] is True
+
+    def test_symmetric_feature_is_marked_false_in_output(self, filter_proc):
+        """A feature with symmetric detection in both groups must have is_Presence_Absence_Marker=False."""
+        # case_ratio = 1.0, control_ratio = 1.0 → no low group → MNAR=False
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Case2": ["case", 9000],
+                "Control1": ["control", 8000],
+                "Control2": ["control", 9000],
+                "QC1": ["qc", 8000],
+            }
+        )
+
+        result = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            high_det_thresh=0.8,
+            low_det_thresh=0.2,
+            qc_ratio_threshold=0.0,
+        )
+
+        assert result.success
+        feature_rows = result.data[result.data["Mz/RT"] == "100.000/1.0"]
+        assert not feature_rows.empty
+        assert feature_rows["is_Presence_Absence_Marker"].iloc[0] is False
+
+    # ------------------------------------------------------------------
+    # Single-group (allow_single_group_stable) tests
+    # ------------------------------------------------------------------
+
+    def test_single_group_stable_gate_deletes_all_without_degradation(self, filter_proc):
+        """With only 1 analysis group and allow_single_group_stable=False (default),
+        the stable gate always fails because sum >= 2 can never be satisfied."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0", "200.000/2.0"],
+                "Tolerance": ["na", "na", "na"],
+                "Exposure1": ["exposure", 8000, 8000],
+                "Exposure2": ["exposure", 9000, 9000],
+                "QC1": ["qc", 8000, 8000],
+            }
+        )
+        result = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            enable_intensity_fc_threshold=False,
+            enable_mnar_gate=False,
+        )
+        assert result.success
+        assert "100.000/1.0" not in result.data["Mz/RT"].tolist()
+        assert "200.000/2.0" not in result.data["Mz/RT"].tolist()
+
+    def test_single_group_stable_degradation_keeps_features_above_threshold(self, filter_proc):
+        """With allow_single_group_stable=True and exactly 1 group, stable gate
+        degrades to: group ratio >= background_threshold."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0", "200.000/2.0"],
+                "Tolerance": ["na", "na", "na"],
+                "Exposure1": ["exposure", 8000, 100],
+                "Exposure2": ["exposure", 9000, 200],
+                "QC1": ["qc", 8000, 8000],
+            }
+        )
+        result = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            enable_intensity_fc_threshold=False,
+            enable_mnar_gate=False,
+            allow_single_group_stable=True,
+        )
+        assert result.success
+        # 100.000/1.0: both exposure samples above 5000 → ratio=1.0 >= 0.33 → kept
+        assert "100.000/1.0" in result.data["Mz/RT"].tolist()
+        # 200.000/2.0: both exposure samples below 5000 → ratio=0.0 < 0.33 → deleted
+        assert "200.000/2.0" not in result.data["Mz/RT"].tolist()
+
+    def test_single_group_degradation_does_not_activate_for_two_or_more_groups(self, filter_proc):
+        """allow_single_group_stable has no effect when there are >= 2 groups."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Case2": ["case", 9000],
+                "Control1": ["control", 8000],
+                "Control2": ["control", 9000],
+                "QC1": ["qc", 8000],
+            }
+        )
+        normal = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            qc_ratio_threshold=0.0,
+        )
+        degraded = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            qc_ratio_threshold=0.0,
+            allow_single_group_stable=True,
+        )
+        assert normal.success and degraded.success
+        # Both should keep the feature (2-group stable gate passes)
+        assert "100.000/1.0" in normal.data["Mz/RT"].tolist()
+        assert "100.000/1.0" in degraded.data["Mz/RT"].tolist()
+
+    def test_single_group_degradation_metadata_records_flag(self, filter_proc):
+        """allow_single_group_stable is reflected in enabled_thresholds metadata."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Exposure1": ["exposure", 8000],
+                "QC1": ["qc", 8000],
+            }
+        )
+        result = filter_proc.process(df, allow_single_group_stable=True)
+        assert result.success
+        assert result.metadata["enabled_thresholds"]["single_group_stable"] is True
+
+    # ------------------------------------------------------------------
+    # enable_mnar_gate toggle tests
+    # ------------------------------------------------------------------
+
+    def test_disabling_mnar_gate_removes_presence_absence_feature(self, filter_proc):
+        """When enable_mnar_gate=False, a feature that only passes via MNAR is removed."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Case2": ["case", 9000],
+                "Control1": ["control", 100],
+                "Control2": ["control", 200],
+                "QC1": ["qc", 8000],
+            }
+        )
+        result = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            high_det_thresh=0.8,
+            low_det_thresh=0.2,
+            qc_ratio_threshold=0.0,
+            enable_background_threshold=False,
+            enable_intensity_fc_threshold=False,
+            enable_mnar_gate=False,
+        )
+        assert result.success
+        assert "100.000/1.0" not in result.data["Mz/RT"].tolist()
+
+    def test_enabling_mnar_gate_keeps_presence_absence_feature(self, filter_proc):
+        """When enable_mnar_gate=True (default), a MNAR feature is kept."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Case2": ["case", 9000],
+                "Control1": ["control", 100],
+                "Control2": ["control", 200],
+                "QC1": ["qc", 8000],
+            }
+        )
+        result = filter_proc.process(
+            df,
+            background_threshold=0.33,
+            high_det_thresh=0.8,
+            low_det_thresh=0.2,
+            qc_ratio_threshold=0.0,
+            enable_background_threshold=False,
+            enable_intensity_fc_threshold=False,
+            enable_mnar_gate=True,
+        )
+        assert result.success
+        assert "100.000/1.0" in result.data["Mz/RT"].tolist()
+
+    def test_mnar_gate_metadata_records_enabled_state(self, filter_proc):
+        """enable_mnar_gate is reflected in enabled_thresholds metadata."""
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.000/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 8000],
+                "Control1": ["control", 8000],
+                "QC1": ["qc", 8000],
+            }
+        )
+        result_off = filter_proc.process(df, enable_mnar_gate=False)
+        result_on = filter_proc.process(df, enable_mnar_gate=True)
+        assert result_off.metadata["enabled_thresholds"]["mnar_gate"] is False
+        assert result_on.metadata["enabled_thresholds"]["mnar_gate"] is True

@@ -75,7 +75,7 @@ DIMENSIONS = {
     "button_width": 120,
     "entry_width": 200,
     "sidebar_width": 240,
-    "log_height": 220,
+    "log_height": 110,
     "action_bar_height": 52,
     "left_panel_width": 420,
     "content_top_offset": 48,

@@ -14,7 +14,7 @@ from ms_preprocessing.gui.widgets.base_widget import BaseProcessingWidget
 
 
 class FeatureFilterWidget(BaseProcessingWidget):
-    """Widget for the Step 4 feature filter and imputation workflow."""
+    """Widget for the Step 4 feature filter workflow."""
 
     def __init__(
         self,
@@ -26,24 +26,29 @@ class FeatureFilterWidget(BaseProcessingWidget):
         on_progress: Optional[Callable[[float, str], None]] = None,
     ):
         self._threshold_controls: dict[str, tuple[tk.BooleanVar, ctk.CTkSlider, ctk.CTkEntry]] = {}
+        self._allow_single_group_stable: bool = False
         super().__init__(
             parent,
-            title="Step 4: 特徵篩選與缺失值補值 (Feature Filtering)",
-            description="依訊號強度、背景比例、組間差異與 QC 表現篩選特徵，並對保留下來的 feature 進行保守補值。",
+            title="Step 4: 特徵篩選 (Feature Filtering)",
+            description="依訊號強度、背景比例、存在/缺失標記（MNAR）與 QC 表現篩選特徵。",
             step_index=step_index,
             on_load_file=on_load_file,
             on_complete=on_complete,
             on_log=on_log,
             on_progress=on_progress,
+            scrollable_content=True,
         )
 
     def _create_parameters(self) -> None:
         """Create parameter inputs."""
-        self._configure_form_grid()
+        self.params_frame.grid_columnconfigure(0, minsize=44)
+        self.params_frame.grid_columnconfigure(1, minsize=180)
+        self.params_frame.grid_columnconfigure(2, minsize=160, weight=1)
+        self.params_frame.grid_columnconfigure(3, minsize=110)
 
         signal_label = ctk.CTkLabel(self.params_frame, text="訊號門檻值", font=FONTS["body"])
         self._style_form_label(signal_label)
-        signal_label.grid(row=0, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
+        signal_label.grid(row=0, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
 
         self.signal_entry = ctk.CTkEntry(
             self.params_frame,
@@ -52,7 +57,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
         )
         self._style_numeric_entry(self.signal_entry)
         self.signal_entry.insert(0, "5000")
-        self.signal_entry.grid(row=0, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        self.signal_entry.grid(row=0, column=2, columnspan=2, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
 
         self.bg_enabled_var = tk.BooleanVar(value=True)
         self.bg_enabled_switch = self._create_threshold_switch(
@@ -68,7 +73,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
             self.bg_entry,
         )
 
-        self.intensity_fc_enabled_var = tk.BooleanVar(value=True)
+        self.intensity_fc_enabled_var = tk.BooleanVar(value=False)
         self.intensity_fc_enabled_switch = self._create_threshold_switch(
             row=2,
             text="強度倍率門檻",
@@ -92,33 +97,53 @@ class FeatureFilterWidget(BaseProcessingWidget):
             self.intensity_fc_entry,
         )
 
-        self.diff_enabled_var = tk.BooleanVar(value=True)
-        self.diff_enabled_switch = self._create_threshold_switch(
+
+        self.mnar_enabled_var = tk.BooleanVar(value=True)
+        self.mnar_enabled_switch = self._create_threshold_switch(
             row=3,
-            text="組間差異門檻",
-            variable=self.diff_enabled_var,
+            text="高檢出率閾值",
+            variable=self.mnar_enabled_var,
         )
-        self.diff_slider = self._create_threshold_slider(row=3, default_value=0.25, on_change=self._update_diff)
-        self.diff_entry = self._create_threshold_entry(row=3, default_value=0.25, on_apply=self._apply_diff)
-        self._threshold_controls["diff"] = (
-            self.diff_enabled_var,
-            self.diff_slider,
-            self.diff_entry,
+        self.high_det_slider = self._create_threshold_slider(
+            row=3, default_value=0.8, on_change=self._update_high_det
+        )
+        self.high_det_entry = self._create_threshold_entry(
+            row=3, default_value=0.8, on_apply=self._apply_high_det
+        )
+        self._threshold_controls["mnar_high"] = (
+            self.mnar_enabled_var,
+            self.high_det_slider,
+            self.high_det_entry,
+        )
+
+        low_det_label = ctk.CTkLabel(self.params_frame, text="低檢出率閾值", font=FONTS["body"])
+        self._style_form_label(low_det_label)
+        low_det_label.grid(row=4, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
+        self.low_det_slider = self._create_threshold_slider(
+            row=4, default_value=0.2, on_change=self._update_low_det
+        )
+        self.low_det_entry = self._create_threshold_entry(
+            row=4, default_value=0.2, on_apply=self._apply_low_det
+        )
+        self._threshold_controls["mnar_low"] = (
+            self.mnar_enabled_var,
+            self.low_det_slider,
+            self.low_det_entry,
         )
 
         self.qc_ratio_enabled_var = tk.BooleanVar(value=True)
         self.qc_ratio_enabled_switch = self._create_threshold_switch(
-            row=4,
+            row=5,
             text="QC_ratio 門檻",
             variable=self.qc_ratio_enabled_var,
         )
         self.qc_ratio_slider = self._create_threshold_slider(
-            row=4,
+            row=5,
             default_value=0.25,
             on_change=self._update_qc_ratio,
         )
         self.qc_ratio_entry = self._create_threshold_entry(
-            row=4,
+            row=5,
             default_value=0.25,
             on_apply=self._apply_qc_ratio,
         )
@@ -130,7 +155,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
 
         self.criteria_textbox = ctk.CTkTextbox(
             self._content_frame,
-            height=180,
+            height=84,
             font=FONTS["small"],
             wrap="word",
         )
@@ -164,7 +189,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
             "QC_ratio 則是負向覆寫條件，用來排除在 QC 中完全不穩定或幾乎沒有檢出的 feature。\n\n"
             "1. 訊號門檻值\n"
             "   先確認這個 feature 本身有沒有足夠訊號。\n"
-            "   後續的 ratio、diff ratio 與 QC_ratio，都是以高於訊號門檻的樣本數為基礎計算。\n\n"
+            "   後續的 ratio 與 QC_ratio，都是以高於訊號門檻的樣本數為基礎計算。\n\n"
             "2. 背景比例門檻（Stable gate）\n"
             "   ratio = 組內高於訊號門檻的樣本數 / 組內總樣本數\n"
             "   若至少 2 組的 ratio 都大於等於背景比例門檻，代表這個 feature 在多個實驗組都能穩定檢出，可先保留。\n\n"
@@ -172,18 +197,14 @@ class FeatureFilterWidget(BaseProcessingWidget):
             "   這一條看的是不同組別之間的平均強度差異。\n"
             "   fold-change = 最大組平均強度 / 最小組平均強度\n"
             "   若 fold-change 大於等於強度倍率門檻，代表至少有一組顯著高於另一組，可視為具生物差異訊號。\n\n"
-            "4. 組間差異門檻（Diff gate）\n"
-            "   diff ratio = 最大 ratio - 最小 ratio\n"
-            "   若 diff ratio 大於等於組間差異門檻，代表各組檢出比例差異夠大，可保留作後續分析。\n\n"
+            "4. 存在/缺失標記（MNAR 80/20 gate）\n"
+            "   ratio = 組內高於訊號門檻的樣本數 / 組內總樣本數\n"
+            "   若至少一組 ratio ≥ 高檢出率閾值，且至少另一組 ratio ≤ 低檢出率閾值，\n"
+            "   代表此 feature 在某組中高頻率出現、在另一組中幾乎缺失（MNAR 特徵），予以保留並標記。\n"
+            "   輸出欄位 is_Presence_Absence_Marker = True 的特徵即屬此類。\n\n"
             "5. QC_ratio 門檻（QC gate）\n"
             "   QC_ratio = QC 中高於訊號門檻的樣本數 / QC 總樣本數\n"
-            "   若 QC_ratio = 0，或低於你設定的 QC_ratio 門檻，代表這個 feature 在 QC 中表現不穩定，會被移除。\n\n"
-            "6. 缺失值補值流程\n"
-            "   只有保留下來的 feature 才會進入後續缺失值補值流程。\n"
-            "   補值時會把 0 與缺失值一起視為待補值。\n"
-            "   如果某一組高於訊號門檻的樣本比例 < 40%，表示該組檢出率太低，會跳過補值並維持 0。\n"
-            "   只有檢出率 >= 40% 的組別，才會以該組最小正值的 1/5 進行保守補值。\n"
-            "   QC 樣本也套用相同的 40% 規則。"
+            "   若 QC_ratio = 0，或低於你設定的 QC_ratio 門檻，代表這個 feature 在 QC 中表現不穩定，會被移除。"
         )
         self.criteria_textbox.insert("1.0", content)
         inner_text = getattr(self.criteria_textbox, "_textbox", None)
@@ -196,9 +217,8 @@ class FeatureFilterWidget(BaseProcessingWidget):
                 "1. 訊號門檻值",
                 "2. 背景比例門檻（Stable gate）",
                 "3. 強度倍率門檻（Intensity FC gate）",
-                "4. 組間差異門檻（Diff gate）",
+                "4. 存在/缺失標記（MNAR 80/20 gate）",
                 "5. QC_ratio 門檻（QC gate）",
-                "6. 缺失值補值流程",
             ]:
                 start = "1.0"
                 while True:
@@ -218,15 +238,19 @@ class FeatureFilterWidget(BaseProcessingWidget):
     ) -> ctk.CTkSwitch:
         switch = ctk.CTkSwitch(
             self.params_frame,
-            text=text,
+            text="",
             variable=variable,
             onvalue=True,
             offvalue=False,
             command=self._sync_threshold_control_states,
             font=FONTS["body"],
         )
-        self._style_form_switch(switch)
-        switch.grid(row=row, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
+        switch.configure(width=44)
+        switch.grid(row=row, column=0, padx=(PADDING["small"], 0), pady=PADDING["small"], sticky="w")
+
+        label = ctk.CTkLabel(self.params_frame, text=text, font=FONTS["body"])
+        self._style_form_label(label)
+        label.grid(row=row, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
         return switch
 
     def _create_threshold_slider(
@@ -245,7 +269,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
             command=on_change,
         )
         slider.set(default_value)
-        slider.grid(row=row, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="ew")
+        slider.grid(row=row, column=2, padx=PADDING["small"], pady=PADDING["small"], sticky="ew")
         return slider
 
     def _create_threshold_entry(
@@ -260,7 +284,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
         )
         self._style_numeric_entry(entry)
         entry.insert(0, f"{default_value:.3f}")
-        entry.grid(row=row, column=2, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        entry.grid(row=row, column=3, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
         entry.bind("<Return>", lambda _: on_apply())
         entry.bind("<KP_Enter>", lambda _: on_apply())
         entry.bind("<FocusOut>", lambda _: on_apply())
@@ -311,8 +335,11 @@ class FeatureFilterWidget(BaseProcessingWidget):
     def _update_intensity_fc(self, value: float) -> None:
         self._sync_entry_from_slider(float(value), self.intensity_fc_entry)
 
-    def _update_diff(self, value: float) -> None:
-        self._sync_entry_from_slider(float(value), self.diff_entry)
+    def _update_high_det(self, value: float) -> None:
+        self._sync_entry_from_slider(float(value), self.high_det_entry)
+
+    def _update_low_det(self, value: float) -> None:
+        self._sync_entry_from_slider(float(value), self.low_det_entry)
 
     def _update_qc_ratio(self, value: float) -> None:
         self._sync_entry_from_slider(float(value), self.qc_ratio_entry)
@@ -323,8 +350,11 @@ class FeatureFilterWidget(BaseProcessingWidget):
     def _apply_intensity_fc(self) -> float:
         return self._commit_entry_to_slider(self.intensity_fc_entry, self.intensity_fc_slider)
 
-    def _apply_diff(self) -> float:
-        return self._commit_entry_to_slider(self.diff_entry, self.diff_slider)
+    def _apply_high_det(self) -> float:
+        return self._commit_entry_to_slider(self.high_det_entry, self.high_det_slider)
+
+    def _apply_low_det(self) -> float:
+        return self._commit_entry_to_slider(self.low_det_entry, self.low_det_slider)
 
     def _apply_qc_ratio(self) -> float:
         return self._commit_entry_to_slider(self.qc_ratio_entry, self.qc_ratio_slider)
@@ -334,13 +364,15 @@ class FeatureFilterWidget(BaseProcessingWidget):
         return {
             "signal_threshold": float(self.signal_entry.get() or "5000"),
             "background_threshold": self._apply_bg(),
-            "diff_threshold": self._apply_diff(),
+            "high_det_thresh": self._apply_high_det(),
+            "low_det_thresh": self._apply_low_det(),
             "qc_ratio_threshold": self._apply_qc_ratio(),
             "intensity_fc_threshold": self._apply_intensity_fc(),
             "enable_background_threshold": bool(self.bg_enabled_var.get()),
-            "enable_diff_threshold": bool(self.diff_enabled_var.get()),
             "enable_qc_ratio_threshold": bool(self.qc_ratio_enabled_var.get()),
             "enable_intensity_fc_threshold": bool(self.intensity_fc_enabled_var.get()),
+            "enable_mnar_gate": bool(self.mnar_enabled_var.get()),
+            "allow_single_group_stable": self._allow_single_group_stable,
         }
 
     def apply_parameters(self, params: dict) -> None:
@@ -350,7 +382,6 @@ class FeatureFilterWidget(BaseProcessingWidget):
             self.signal_entry.insert(0, str(params["signal_threshold"]))
 
         self._apply_threshold_value("background", params, "background_threshold", "enable_background_threshold")
-        self._apply_threshold_value("diff", params, "diff_threshold", "enable_diff_threshold")
         self._apply_threshold_value("qc_ratio", params, "qc_ratio_threshold", "enable_qc_ratio_threshold")
         self._apply_threshold_value(
             "intensity_fc",
@@ -358,6 +389,18 @@ class FeatureFilterWidget(BaseProcessingWidget):
             "intensity_fc_threshold",
             "enable_intensity_fc_threshold",
         )
+        if "enable_mnar_gate" in params:
+            self.mnar_enabled_var.set(bool(params["enable_mnar_gate"]))
+        if "high_det_thresh" in params:
+            parsed = self._clamp_to_slider(float(params["high_det_thresh"]), self.high_det_slider)
+            self.high_det_slider.set(parsed)
+            self.high_det_entry.delete(0, "end")
+            self.high_det_entry.insert(0, f"{parsed:.3f}")
+        if "low_det_thresh" in params:
+            parsed = self._clamp_to_slider(float(params["low_det_thresh"]), self.low_det_slider)
+            self.low_det_slider.set(parsed)
+            self.low_det_entry.delete(0, "end")
+            self.low_det_entry.insert(0, f"{parsed:.3f}")
         self._sync_threshold_control_states()
 
     def _apply_threshold_value(
@@ -378,18 +421,55 @@ class FeatureFilterWidget(BaseProcessingWidget):
             entry.delete(0, "end")
             entry.insert(0, f"{parsed:.3f}")
 
+    def _count_analysis_groups(self) -> int:
+        """Count non-QC analysis groups in the loaded data."""
+        if self._data is None:
+            return 0
+        from ms_core.preprocessing.ms_quality_filter import FeatureFilter
+        processor = FeatureFilter()
+        group_info = processor._detect_sample_types(self._data)
+        return len(group_info["groups"])
+
+    def _confirm_single_group_run(self) -> bool:
+        """Show a confirmation dialog for single-group degraded stable gate.
+
+        Extracted as a separate method so tests can monkeypatch it without
+        needing a real Tk dialog.
+        """
+        import tkinter.messagebox
+        return bool(tkinter.messagebox.askokcancel(
+            "單一組別警告",
+            "偵測到資料只有 1 個分析組別（非 QC）。\n\n"
+            "「背景比例門檻（Stable gate）」正常需要至少 2 組，\n"
+            "繼續執行將退化為：只要該組 ratio ≥ 設定閾值即保留特徵。\n\n"
+            "確認要以單組降級模式繼續嗎？",
+            parent=self,
+        ))
+
+    def _on_run_clicked(self) -> None:
+        """Override to check for single-group condition before starting worker."""
+        self._allow_single_group_stable = False
+        if self._data is not None and self.bg_enabled_var.get():
+            if self._count_analysis_groups() == 1:
+                if not self._confirm_single_group_run():
+                    return
+                self._allow_single_group_stable = True
+        super()._on_run_clicked()
+
     def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
         """Run the feature filtering step."""
         result = feature_filter_adapter.run_from_df(
             data,
             background_threshold=params.get("background_threshold"),
-            diff_threshold=params.get("diff_threshold"),
+            high_det_thresh=params.get("high_det_thresh"),
+            low_det_thresh=params.get("low_det_thresh"),
             qc_ratio_threshold=params.get("qc_ratio_threshold"),
             intensity_fc_threshold=params.get("intensity_fc_threshold"),
             enable_background_threshold=params.get("enable_background_threshold", True),
-            enable_diff_threshold=params.get("enable_diff_threshold", True),
             enable_qc_ratio_threshold=params.get("enable_qc_ratio_threshold", True),
-            enable_intensity_fc_threshold=params.get("enable_intensity_fc_threshold", True),
+            enable_intensity_fc_threshold=params.get("enable_intensity_fc_threshold", False),
+            enable_mnar_gate=params.get("enable_mnar_gate", True),
+            allow_single_group_stable=params.get("allow_single_group_stable", False),
             signal_threshold=params.get("signal_threshold", 5000),
             protected_rows=set(
                 self._context.get("protected_rows") or self._context.get("red_font_rows") or []
@@ -407,11 +487,6 @@ class FeatureFilterWidget(BaseProcessingWidget):
             **result.metadata.as_context_dict(),
             "statistics": dict(result.statistics),
             "step_parameters": dict(params),
-            "imputation_stats": {
-                "cells_imputed": result.statistics.get("cells_imputed", 0),
-                "cells_imputed_from_nan": result.statistics.get("cells_imputed_from_nan", 0),
-                "cells_imputed_from_zero": result.statistics.get("cells_imputed_from_zero", 0),
-            },
         }
         if result.data is None:
             raise Exception("Adapter returned no data")

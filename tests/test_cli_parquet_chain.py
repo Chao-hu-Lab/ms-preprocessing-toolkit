@@ -46,11 +46,19 @@ def _make_cli_args(input_path: Path, output_path: Path | None, step: str) -> Sim
         istd_record_file=None,
         istd_record_date=None,
         rt_tol=None,
+        enable_degeneracy_annotation=False,
+        degeneracy_ppm_tol=None,
+        degeneracy_rt_tol=None,
+        degeneracy_corr_threshold=None,
+        degeneracy_min_corr_points=None,
+        degeneracy_adduct_table_file=None,
         bg_threshold=None,
         intensity_fc_threshold=None,
-        diff_threshold=None,
+        high_det_thresh=None,
+        low_det_thresh=None,
         qc_ratio_threshold=None,
         persist_intermediate=False,
+        export_deleted_feature=False,
         no_gui=True,
         version=False,
     )
@@ -306,12 +314,18 @@ def test_cli_default_profile_uses_integrated_step_parameters(monkeypatch, projec
         ) == profile["step2"]["istd_record_file"]
         assert captured["step2"]["istd_record_date"] == "20260106"
         assert captured["step3"]["mz_tolerance_ppm"] == 20.0
-        assert captured["step3"]["rt_tolerance"] == 1.0
+        assert captured["step3"]["rt_tolerance"] == 0.1
+        assert captured["step3"]["enable_degeneracy_annotation"] is False
+        assert captured["step3"]["degeneracy_ppm_tolerance"] == 20.0
+        assert captured["step3"]["degeneracy_rt_tolerance"] == 0.05
+        assert captured["step3"]["degeneracy_correlation_threshold"] == 0.8
+        assert captured["step3"]["degeneracy_min_correlation_points"] == 3
+        assert captured["step3"]["degeneracy_adduct_table_file"] == ""
         assert captured["step4"]["background_threshold"] == 0.33
-        assert captured["step4"]["diff_threshold"] == 0.25
+        assert captured["step4"]["high_det_thresh"] == 0.8
+        assert captured["step4"]["low_det_thresh"] == 0.2
         assert captured["step4"]["qc_ratio_threshold"] == 0.25
         assert captured["step4"]["intensity_fc_threshold"] == 2.0
         assert captured["step4"]["enable_background_threshold"] is True
-        assert captured["step4"]["enable_diff_threshold"] is True
         assert captured["step4"]["enable_qc_ratio_threshold"] is True
-        assert captured["step4"]["enable_intensity_fc_threshold"] is True
+        assert captured["step4"]["enable_intensity_fc_threshold"] is False
