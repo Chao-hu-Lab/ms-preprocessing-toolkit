@@ -28,7 +28,6 @@ def test_license_file_exists_for_release_packages() -> None:
 def test_build_workflow_copies_release_docs_into_packaged_zip() -> None:
     workflow = (ROOT / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8")
 
-    assert 'Copy-Item "docs\\release\\README.md"' in workflow
-    assert 'Copy-Item "LICENSE"' in workflow
-    assert 'cp "docs/release/README.md" "$stage_dir/README.md"' in workflow
-    assert 'cp "LICENSE" "$stage_dir/LICENSE"' in workflow
+    # build.yml now delegates to shared-workflows; verify correct delegation
+    assert "Chao-hu-Lab/shared-workflows" in workflow
+    assert "python-build.yml@main" in workflow
