@@ -8,8 +8,8 @@ from typing import Any, Callable
 
 import pandas as pd
 
-from ms_core.preprocessing.istd_marker import ISTDMarker as _ISTDMarker
-from ms_core.preprocessing.settings import Settings as _CoreSettings
+from ms_core.preprocessing import ISTDMarker as _ISTDMarker
+from ms_core.preprocessing import Settings as _CoreSettings
 
 from ms_preprocessing.adapters import _capture_output_path, _persist_adapter_output
 from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
@@ -44,7 +44,9 @@ def _save_output(df: pd.DataFrame) -> str | None:
 
 def _build_metadata(raw_meta: dict[str, Any]) -> ProcessingMetadata:
     red_font_rows = set(raw_meta.get("red_font_rows") or raw_meta.get("istd_rows") or [])
-    protected_rows = set(raw_meta.get("protected_rows") or raw_meta.get("istd_rows") or red_font_rows)
+    protected_rows = set(
+        raw_meta.get("protected_rows") or raw_meta.get("istd_rows") or red_font_rows
+    )
 
     return ProcessingMetadata(
         red_font_rows=red_font_rows,
