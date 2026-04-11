@@ -7,8 +7,8 @@ from typing import Any, Callable
 
 import pandas as pd
 
-from ms_core.preprocessing.ms_quality_filter import FeatureFilter as _FeatureFilter
-from ms_core.preprocessing.settings import Settings as _CoreSettings
+from ms_core.preprocessing import FeatureFilter as _FeatureFilter
+from ms_core.preprocessing import Settings as _CoreSettings
 
 from ms_preprocessing.adapters import _capture_output_path, _persist_adapter_output
 from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
@@ -47,7 +47,9 @@ def _deleted_features_to_dataframe(raw_meta: dict[str, Any]) -> pd.DataFrame | N
     try:
         first = deleted_features[0]
         if isinstance(first, pd.Series):
-            return pd.DataFrame([row.tolist() for row in deleted_features], columns=list(first.index))
+            return pd.DataFrame(
+                [row.tolist() for row in deleted_features], columns=list(first.index)
+            )
         return pd.DataFrame(deleted_features)
     except Exception:
         return None
@@ -227,3 +229,12 @@ def run_from_df(
         progress_callback=progress_callback,
         **kwargs,
     )
+
+
+def count_analysis_groups(df: pd.DataFrame) -> int:
+    """Return the number of non-QC analysis groups in df.
+
+    Wraps FeatureFilter.count_analysis_groups() so GUI code
+    never needs to import ms_core directly.
+    """
+    return _FeatureFilter().count_analysis_groups(df)

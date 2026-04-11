@@ -68,6 +68,66 @@ All 82+ tests must pass. No merging without passing tests.
 3. Return to toolkit root, `git add ms-core` to update submodule reference
 4. Commit in toolkit: `fix: bump ms-core for <reason>`
 
+## ms-core Bump SOP
+
+每次需要更新 ms-core 版本時，按以下步驟操作：
+
+### ms-core 變更（先做）
+
+```bash
+# 1. 在 ms-core repo 建立 feature/fix branch 開發
+cd ms-core
+git checkout -b fix/<description>
+# ... 開發、測試、commit ...
+git push origin fix/<description>
+
+# 2. GitHub 上開 PR → 等 CI → merge 進 master
+
+# 3. 若有 public API 變動，打 version tag
+git checkout master && git pull
+git tag -a v0.X.Y -m "v0.X.Y: <說明>"
+git push origin v0.X.Y
+```
+
+**Version bump 規則：**
+
+| 變更類型 | Bump |
+|----------|------|
+| 新增 public method（向後相容） | patch v0.x.y+1 |
+| 改變 public method 簽名 | minor v0.x+1.0 |
+| 移除 public method | minor v0.x+1.0 |
+| 只改 private / 內部邏輯 | 不強制 tag |
+
+### toolkit 變更（後做）
+
+```bash
+# 4. 在 toolkit 建立 fix branch
+cd <toolkit-root>
+git checkout -b fix/<description>
+
+# 5. 更新 submodule 到新 tag
+cd ms-core
+git fetch --tags
+git checkout v0.X.Y
+cd ..
+git add ms-core
+
+# 6. 改 toolkit 代碼（若有）→ 跑測試 → commit → PR
+PYTHONPATH=ms-core/src uv run pytest tests/ -q --tb=short -x
+git commit -m "chore: bump ms-core to v0.X.Y
+
+ms-core changes:
+- <ms-core 這次改了什麼>
+
+Toolkit changes:
+- <toolkit 對應改了什麼，若有>"
+```
+
+### DNP 版本策略
+
+- DNP 獨立固定自己使用的 ms-core tag，與 toolkit 可以不同步
+- ms-core minor bump（破壞性 API 變更）時，在 toolkit PR description 標記「⚠️ DNP 需同步升級」
+
 ## Hygiene Rules
 
 - **測試暫存一律在 `.tmp/` 下**：使用 `conftest.py` 的 `project_temp_dir` fixture，禁止用 `Path.cwd()` 產生暫存

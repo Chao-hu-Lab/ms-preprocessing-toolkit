@@ -7,8 +7,8 @@ from typing import Any, Callable
 
 import pandas as pd
 
-from ms_core.preprocessing.data_organizer import DataOrganizer as _DataOrganizer
-from ms_core.preprocessing.settings import Settings as _CoreSettings
+from ms_core.preprocessing import DataOrganizer as _DataOrganizer
+from ms_core.preprocessing import Settings as _CoreSettings
 
 from ms_preprocessing.adapters import _capture_output_path, _persist_adapter_output
 from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
