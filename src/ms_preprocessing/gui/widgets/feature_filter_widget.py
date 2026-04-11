@@ -57,7 +57,9 @@ class FeatureFilterWidget(BaseProcessingWidget):
         )
         self._style_numeric_entry(self.signal_entry)
         self.signal_entry.insert(0, "5000")
-        self.signal_entry.grid(row=0, column=2, columnspan=2, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        self.signal_entry.grid(
+            row=0, column=2, columnspan=2, padx=PADDING["small"], pady=PADDING["small"], sticky="w"
+        )
 
         self.bg_enabled_var = tk.BooleanVar(value=True)
         self.bg_enabled_switch = self._create_threshold_switch(
@@ -65,8 +67,12 @@ class FeatureFilterWidget(BaseProcessingWidget):
             text="背景比例門檻",
             variable=self.bg_enabled_var,
         )
-        self.bg_slider = self._create_threshold_slider(row=1, default_value=0.33, on_change=self._update_bg)
-        self.bg_entry = self._create_threshold_entry(row=1, default_value=0.33, on_apply=self._apply_bg)
+        self.bg_slider = self._create_threshold_slider(
+            row=1, default_value=0.33, on_change=self._update_bg
+        )
+        self.bg_entry = self._create_threshold_entry(
+            row=1, default_value=0.33, on_apply=self._apply_bg
+        )
         self._threshold_controls["background"] = (
             self.bg_enabled_var,
             self.bg_slider,
@@ -97,7 +103,6 @@ class FeatureFilterWidget(BaseProcessingWidget):
             self.intensity_fc_entry,
         )
 
-
         self.mnar_enabled_var = tk.BooleanVar(value=True)
         self.mnar_enabled_switch = self._create_threshold_switch(
             row=3,
@@ -118,7 +123,9 @@ class FeatureFilterWidget(BaseProcessingWidget):
 
         low_det_label = ctk.CTkLabel(self.params_frame, text="低檢出率閾值", font=FONTS["body"])
         self._style_form_label(low_det_label)
-        low_det_label.grid(row=4, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
+        low_det_label.grid(
+            row=4, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="e"
+        )
         self.low_det_slider = self._create_threshold_slider(
             row=4, default_value=0.2, on_change=self._update_low_det
         )
@@ -246,7 +253,9 @@ class FeatureFilterWidget(BaseProcessingWidget):
             font=FONTS["body"],
         )
         switch.configure(width=44)
-        switch.grid(row=row, column=0, padx=(PADDING["small"], 0), pady=PADDING["small"], sticky="w")
+        switch.grid(
+            row=row, column=0, padx=(PADDING["small"], 0), pady=PADDING["small"], sticky="w"
+        )
 
         label = ctk.CTkLabel(self.params_frame, text=text, font=FONTS["body"])
         self._style_form_label(label)
@@ -381,8 +390,12 @@ class FeatureFilterWidget(BaseProcessingWidget):
             self.signal_entry.delete(0, "end")
             self.signal_entry.insert(0, str(params["signal_threshold"]))
 
-        self._apply_threshold_value("background", params, "background_threshold", "enable_background_threshold")
-        self._apply_threshold_value("qc_ratio", params, "qc_ratio_threshold", "enable_qc_ratio_threshold")
+        self._apply_threshold_value(
+            "background", params, "background_threshold", "enable_background_threshold"
+        )
+        self._apply_threshold_value(
+            "qc_ratio", params, "qc_ratio_threshold", "enable_qc_ratio_threshold"
+        )
         self._apply_threshold_value(
             "intensity_fc",
             params,
@@ -426,9 +439,9 @@ class FeatureFilterWidget(BaseProcessingWidget):
         if self._data is None:
             return 0
         from ms_core.preprocessing.ms_quality_filter import FeatureFilter
+
         processor = FeatureFilter()
-        group_info = processor._detect_sample_types(self._data)
-        return len(group_info["groups"])
+        return processor.count_analysis_groups(self._data)
 
     def _confirm_single_group_run(self) -> bool:
         """Show a confirmation dialog for single-group degraded stable gate.
@@ -437,14 +450,17 @@ class FeatureFilterWidget(BaseProcessingWidget):
         needing a real Tk dialog.
         """
         import tkinter.messagebox
-        return bool(tkinter.messagebox.askokcancel(
-            "單一組別警告",
-            "偵測到資料只有 1 個分析組別（非 QC）。\n\n"
-            "「背景比例門檻（Stable gate）」正常需要至少 2 組，\n"
-            "繼續執行將退化為：只要該組 ratio ≥ 設定閾值即保留特徵。\n\n"
-            "確認要以單組降級模式繼續嗎？",
-            parent=self,
-        ))
+
+        return bool(
+            tkinter.messagebox.askokcancel(
+                "單一組別警告",
+                "偵測到資料只有 1 個分析組別（非 QC）。\n\n"
+                "「背景比例門檻（Stable gate）」正常需要至少 2 組，\n"
+                "繼續執行將退化為：只要該組 ratio ≥ 設定閾值即保留特徵。\n\n"
+                "確認要以單組降級模式繼續嗎？",
+                parent=self,
+            )
+        )
 
     def _on_run_clicked(self) -> None:
         """Override to check for single-group condition before starting worker."""
