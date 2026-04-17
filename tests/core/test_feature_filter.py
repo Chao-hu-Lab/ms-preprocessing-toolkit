@@ -82,7 +82,25 @@ class TestFeatureFilter:
                 "Mz/RT": ["Sample_Type", "100.000/1.0", "200.000/2.0"],
                 "Tolerance": ["na", "na", "na"],
                 "Case1": ["case", 8000, 8000],
+                "Case2": ["case", 8000, 8000],
+                "Case3": ["case", 8000, 8000],
+                "Case4": ["case", 8000, 8000],
+                "Case5": ["case", 8000, 8000],
+                "Case6": ["case", 8000, 8000],
+                "Case7": ["case", 8000, 8000],
+                "Case8": ["case", 8000, 8000],
+                "Case9": ["case", 8000, 8000],
+                "Case10": ["case", 8000, 8000],
                 "Control1": ["control", 8000, 8000],
+                "Control2": ["control", 8000, 8000],
+                "Control3": ["control", 8000, 8000],
+                "Control4": ["control", 8000, 8000],
+                "Control5": ["control", 8000, 8000],
+                "Control6": ["control", 8000, 8000],
+                "Control7": ["control", 8000, 8000],
+                "Control8": ["control", 8000, 8000],
+                "Control9": ["control", 8000, 8000],
+                "Control10": ["control", 8000, 8000],
                 "QC1": ["qc", 8000, 8000],
                 "QC2": ["qc", 100, 8000],
             }
@@ -107,7 +125,25 @@ class TestFeatureFilter:
                 "Mz/RT": ["Sample_Type", "100.000/1.0"],
                 "Tolerance": ["na", "na"],
                 "Case1": ["case", 8000],
+                "Case2": ["case", 8000],
+                "Case3": ["case", 8000],
+                "Case4": ["case", 8000],
+                "Case5": ["case", 8000],
+                "Case6": ["case", 8000],
+                "Case7": ["case", 8000],
+                "Case8": ["case", 8000],
+                "Case9": ["case", 8000],
+                "Case10": ["case", 8000],
                 "Control1": ["control", 8000],
+                "Control2": ["control", 8000],
+                "Control3": ["control", 8000],
+                "Control4": ["control", 8000],
+                "Control5": ["control", 8000],
+                "Control6": ["control", 8000],
+                "Control7": ["control", 8000],
+                "Control8": ["control", 8000],
+                "Control9": ["control", 8000],
+                "Control10": ["control", 8000],
                 "QC1": ["qc", 8000],
                 "QC2": ["qc", 100],
             }
@@ -130,9 +166,25 @@ class TestFeatureFilter:
                 "Mz/RT": ["Sample_Type", "100.000/1.0"],
                 "Tolerance": ["na", "na"],
                 "Case1": ["case", 8000],
-                "Case2": ["case", 100],
+                "Case2": ["case", 8000],
+                "Case3": ["case", 8000],
+                "Case4": ["case", 8000],
+                "Case5": ["case", 8000],
+                "Case6": ["case", 100],
+                "Case7": ["case", 100],
+                "Case8": ["case", 100],
+                "Case9": ["case", 100],
+                "Case10": ["case", 100],
                 "Control1": ["control", 8000],
-                "Control2": ["control", 100],
+                "Control2": ["control", 8000],
+                "Control3": ["control", 8000],
+                "Control4": ["control", 8000],
+                "Control5": ["control", 8000],
+                "Control6": ["control", 100],
+                "Control7": ["control", 100],
+                "Control8": ["control", 100],
+                "Control9": ["control", 100],
+                "Control10": ["control", 100],
                 "QC1": ["qc", 8000],
             }
         )
@@ -158,8 +210,8 @@ class TestFeatureFilter:
 
     def test_mnar_gate_keeps_presence_absence_feature(self, filter_proc):
         """MNAR gate should keep a feature where case is fully detected, control is absent."""
-        # case_ratio = 1.0 (both samples above 5000) → ≥ 0.8 → high
-        # control_ratio = 0.0 (both samples below 5000) → ≤ 0.2 → low
+        # case_ratio = 1.0 (all 10 samples above 5000) → ≥ 0.8 → high
+        # control_ratio = 0.0 (all 10 samples below 5000) → ≤ 0.2 → low
         # → MNAR gate passes; stable gate fails (only 1 group ≥ 0.33)
         df = pd.DataFrame(
             {
@@ -167,8 +219,24 @@ class TestFeatureFilter:
                 "Tolerance": ["na", "na"],
                 "Case1": ["case", 8000],
                 "Case2": ["case", 9000],
+                "Case3": ["case", 8000],
+                "Case4": ["case", 9000],
+                "Case5": ["case", 8000],
+                "Case6": ["case", 9000],
+                "Case7": ["case", 8000],
+                "Case8": ["case", 9000],
+                "Case9": ["case", 8000],
+                "Case10": ["case", 9000],
                 "Control1": ["control", 100],
                 "Control2": ["control", 200],
+                "Control3": ["control", 100],
+                "Control4": ["control", 200],
+                "Control5": ["control", 100],
+                "Control6": ["control", 200],
+                "Control7": ["control", 100],
+                "Control8": ["control", 200],
+                "Control9": ["control", 100],
+                "Control10": ["control", 200],
                 "QC1": ["qc", 8000],
             }
         )
@@ -187,7 +255,9 @@ class TestFeatureFilter:
         assert "100.000/1.0" in result.data["Mz/RT"].tolist()
         assert result.statistics.get("mnar_kept", 0) >= 1
 
-    def test_mnar_feature_overrides_qc_zero_gate_only_for_presence_absence_marker(self, filter_proc):
+    def test_mnar_feature_overrides_qc_zero_gate_only_for_presence_absence_marker(
+        self, filter_proc
+    ):
         """MNAR markers should survive QC_ratio==0, while non-MNAR features should still be deleted."""
         df = pd.DataFrame(
             {
@@ -195,8 +265,24 @@ class TestFeatureFilter:
                 "Tolerance": ["na", "na", "na"],
                 "Case1": ["case", 8000, 8000],
                 "Case2": ["case", 9000, 9000],
+                "Case3": ["case", 8000, 8000],
+                "Case4": ["case", 9000, 9000],
+                "Case5": ["case", 8000, 8000],
+                "Case6": ["case", 9000, 9000],
+                "Case7": ["case", 8000, 8000],
+                "Case8": ["case", 9000, 9000],
+                "Case9": ["case", 8000, 8000],
+                "Case10": ["case", 9000, 9000],
                 "Control1": ["control", 100, 8200],
                 "Control2": ["control", 200, 9100],
+                "Control3": ["control", 100, 8200],
+                "Control4": ["control", 200, 9100],
+                "Control5": ["control", 100, 8200],
+                "Control6": ["control", 200, 9100],
+                "Control7": ["control", 100, 8200],
+                "Control8": ["control", 200, 9100],
+                "Control9": ["control", 100, 8200],
+                "Control10": ["control", 200, 9100],
                 "QC1": ["qc", 100, 100],
                 "QC2": ["qc", 200, 200],
             }
@@ -217,7 +303,9 @@ class TestFeatureFilter:
         assert "200.000/2.0" not in result.data["Mz/RT"].tolist()
         assert result.statistics.get("qc_zero_deleted", 0) == 1
 
-    def test_mnar_feature_overrides_low_qc_ratio_gate_only_for_presence_absence_marker(self, filter_proc):
+    def test_mnar_feature_overrides_low_qc_ratio_gate_only_for_presence_absence_marker(
+        self, filter_proc
+    ):
         """MNAR markers should survive low non-zero QC_ratio, while non-MNAR features should still be deleted."""
         df = pd.DataFrame(
             {
@@ -225,8 +313,24 @@ class TestFeatureFilter:
                 "Tolerance": ["na", "na", "na"],
                 "Case1": ["case", 8000, 8000],
                 "Case2": ["case", 9000, 9000],
+                "Case3": ["case", 8000, 8000],
+                "Case4": ["case", 9000, 9000],
+                "Case5": ["case", 8000, 8000],
+                "Case6": ["case", 9000, 9000],
+                "Case7": ["case", 8000, 8000],
+                "Case8": ["case", 9000, 9000],
+                "Case9": ["case", 8000, 8000],
+                "Case10": ["case", 9000, 9000],
                 "Control1": ["control", 100, 8200],
                 "Control2": ["control", 200, 9100],
+                "Control3": ["control", 100, 8200],
+                "Control4": ["control", 200, 9100],
+                "Control5": ["control", 100, 8200],
+                "Control6": ["control", 200, 9100],
+                "Control7": ["control", 100, 8200],
+                "Control8": ["control", 200, 9100],
+                "Control9": ["control", 100, 8200],
+                "Control10": ["control", 200, 9100],
                 "QC1": ["qc", 8000, 8000],
                 "QC2": ["qc", 100, 100],
             }
@@ -513,15 +617,31 @@ class TestFeatureFilter:
 
     def test_mnar_feature_is_marked_true_in_output(self, filter_proc):
         """A feature that passes the MNAR 80/20 rule must have is_Presence_Absence_Marker=True."""
-        # case_ratio = 1.0 (both above 5000), control_ratio = 0.0 (both below 5000)
+        # case_ratio = 1.0 (all 10 above 5000), control_ratio = 0.0 (all 10 below 5000)
         df = pd.DataFrame(
             {
                 "Mz/RT": ["Sample_Type", "100.000/1.0"],
                 "Tolerance": ["na", "na"],
                 "Case1": ["case", 8000],
                 "Case2": ["case", 9000],
+                "Case3": ["case", 8000],
+                "Case4": ["case", 9000],
+                "Case5": ["case", 8000],
+                "Case6": ["case", 9000],
+                "Case7": ["case", 8000],
+                "Case8": ["case", 9000],
+                "Case9": ["case", 8000],
+                "Case10": ["case", 9000],
                 "Control1": ["control", 100],
                 "Control2": ["control", 200],
+                "Control3": ["control", 100],
+                "Control4": ["control", 200],
+                "Control5": ["control", 100],
+                "Control6": ["control", 200],
+                "Control7": ["control", 100],
+                "Control8": ["control", 200],
+                "Control9": ["control", 100],
+                "Control10": ["control", 200],
                 "QC1": ["qc", 8000],
             }
         )
@@ -698,8 +818,24 @@ class TestFeatureFilter:
                 "Tolerance": ["na", "na"],
                 "Case1": ["case", 8000],
                 "Case2": ["case", 9000],
+                "Case3": ["case", 8000],
+                "Case4": ["case", 9000],
+                "Case5": ["case", 8000],
+                "Case6": ["case", 9000],
+                "Case7": ["case", 8000],
+                "Case8": ["case", 9000],
+                "Case9": ["case", 8000],
+                "Case10": ["case", 9000],
                 "Control1": ["control", 100],
                 "Control2": ["control", 200],
+                "Control3": ["control", 100],
+                "Control4": ["control", 200],
+                "Control5": ["control", 100],
+                "Control6": ["control", 200],
+                "Control7": ["control", 100],
+                "Control8": ["control", 200],
+                "Control9": ["control", 100],
+                "Control10": ["control", 200],
                 "QC1": ["qc", 8000],
             }
         )
