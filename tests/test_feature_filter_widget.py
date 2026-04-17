@@ -350,6 +350,57 @@ def test_feature_filter_widget_two_groups_skips_single_group_dialog(
     assert not confirm_called
 
 
+def test_on_run_shows_small_group_dialog_when_any_group_lt10(widget, monkeypatch) -> None:
+    """When any biological group N < 10, _confirm_small_group_run must be called."""
+    import pandas as pd
+
+    rows: dict = {"feature": ["Sample_Type", "f1"]}
+    for i in range(5):
+        rows[f"A_{i + 1}"] = ["a", 10000]
+    for i in range(15):
+        rows[f"B_{i + 1}"] = ["b", 10000]
+    df = pd.DataFrame(rows)
+    widget.set_data(df)
+
+    called_with: list[dict] = []
+
+    def fake_confirm(small_groups: dict) -> bool:
+        called_with.append(dict(small_groups))
+        return False  # user cancels
+
+    monkeypatch.setattr(widget, "_confirm_small_group_run", fake_confirm)
+
+    widget._on_run_clicked()
+
+    assert len(called_with) == 1
+    assert "a" in called_with[0]
+    assert called_with[0]["a"] == 5
+
+
+def test_on_run_skips_small_group_dialog_when_all_groups_gte10(widget, monkeypatch) -> None:
+    """When all biological groups N >= 10, no small-group dialog shown."""
+    import pandas as pd
+    from ms_preprocessing.gui.widgets.base_widget import BaseProcessingWidget
+
+    rows: dict = {"feature": ["Sample_Type", "f1"]}
+    for i in range(10):
+        rows[f"A_{i + 1}"] = ["a", 10000]
+    for i in range(12):
+        rows[f"B_{i + 1}"] = ["b", 10000]
+    df = pd.DataFrame(rows)
+    widget.set_data(df)
+
+    confirm_called: list = []
+    monkeypatch.setattr(
+        widget, "_confirm_small_group_run", lambda _: confirm_called.append(True) or False
+    )
+    monkeypatch.setattr(BaseProcessingWidget, "_on_run_clicked", lambda self: None)
+
+    widget._on_run_clicked()
+
+    assert len(confirm_called) == 0
+
+
 def test_adapter_get_group_summary_returns_correct_counts() -> None:
     """get_group_summary returns sample counts for biological groups and QC."""
     rows: dict = {"feature": ["Sample_Type", "f1"]}
