@@ -537,6 +537,13 @@ class FeatureFilterWidget(BaseProcessingWidget):
         self._processing_result = result
         if result.statistics:
             self.log(f"Statistics: {result.statistics}")
+            qc_n = result.statistics.get("qc_count", 0)
+            if 0 < qc_n < 10:
+                step_pct = round(100 / qc_n, 1)
+                self.log(
+                    f"[QC 提示] QC N={qc_n}（建議 ≥10）："
+                    f"每缺失 1 筆 QC 樣本，ratio 下降 {step_pct}%"
+                )
         self._last_metadata = {
             **result.metadata.as_context_dict(),
             "statistics": dict(result.statistics),

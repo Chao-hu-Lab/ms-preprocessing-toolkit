@@ -418,3 +418,69 @@ def test_adapter_get_group_summary_returns_correct_counts() -> None:
     assert summary["groups"]["b"]["sample_count"] == 5
     assert summary["qc_count"] == 2
     assert summary["has_qc"] is True
+
+
+def test_run_processing_logs_qc_small_n_note(widget, monkeypatch) -> None:
+    """When QC N < 10, run_processing logs per-sample impact percentage."""
+    import pandas as pd
+    from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
+
+    def fake_run(data, **kwargs):
+        return ProcessingResult(
+            success=True,
+            step="feature_filter",
+            output_path=None,
+            data=data.copy(),
+            metadata=ProcessingMetadata(),
+            statistics={
+                "kept_count": 1,
+                "deleted_count": 0,
+                "qc_count": 7,
+                "has_qc": True,
+                "groups_detected": 1,
+                "final_features": 1,
+            },
+        )
+
+    monkeypatch.setattr("ms_preprocessing.adapters.feature_filter.run_from_df", fake_run)
+
+    log_messages: list[str] = []
+    widget.on_log = lambda msg: log_messages.append(msg)
+    widget._data = pd.DataFrame({"f": ["Sample_Type", "f1"]})
+    widget.run_processing(widget._data)
+
+    qc_logs = [m for m in log_messages if "QC 提示" in m and "14.3" in m]
+    assert len(qc_logs) == 1
+
+
+def test_run_processing_no_qc_note_when_qc_n_gte10(widget, monkeypatch) -> None:
+    """When QC N >= 10, no QC note is logged."""
+    import pandas as pd
+    from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
+
+    def fake_run(data, **kwargs):
+        return ProcessingResult(
+            success=True,
+            step="feature_filter",
+            output_path=None,
+            data=data.copy(),
+            metadata=ProcessingMetadata(),
+            statistics={
+                "kept_count": 1,
+                "deleted_count": 0,
+                "qc_count": 10,
+                "has_qc": True,
+                "groups_detected": 1,
+                "final_features": 1,
+            },
+        )
+
+    monkeypatch.setattr("ms_preprocessing.adapters.feature_filter.run_from_df", fake_run)
+
+    log_messages: list[str] = []
+    widget.on_log = lambda msg: log_messages.append(msg)
+    widget._data = pd.DataFrame({"f": ["Sample_Type", "f1"]})
+    widget.run_processing(widget._data)
+
+    qc_warn = [m for m in log_messages if "QC 提示" in m]
+    assert len(qc_warn) == 0
