@@ -238,3 +238,17 @@ def count_analysis_groups(df: pd.DataFrame) -> int:
     never needs to import ms_core directly.
     """
     return _FeatureFilter().count_analysis_groups(df)
+
+
+def get_group_summary(df: pd.DataFrame) -> dict[str, Any]:
+    """Return group summary including sample counts and QC count.
+
+    Wraps FeatureFilter.get_group_summary() so GUI code
+    never needs to import ms_core directly.
+    """
+    raw = _FeatureFilter().get_group_summary(df)
+    return {
+        "groups": raw.get("groups", {}),
+        "qc_count": raw.get("qc_count", 0),
+        "has_qc": raw.get("has_qc", False),
+    }

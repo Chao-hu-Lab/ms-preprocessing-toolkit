@@ -348,3 +348,22 @@ def test_feature_filter_widget_two_groups_skips_single_group_dialog(
 
     assert spin_until(ctk_root, lambda: not widget.is_processing())
     assert not confirm_called
+
+
+def test_adapter_get_group_summary_returns_correct_counts() -> None:
+    """get_group_summary returns sample counts for biological groups and QC."""
+    rows: dict = {"feature": ["Sample_Type", "f1"]}
+    for i in range(3):
+        rows[f"A_{i + 1}"] = ["a", 10000]
+    for i in range(5):
+        rows[f"B_{i + 1}"] = ["b", 10000]
+    for i in range(2):
+        rows[f"QC_{i + 1}"] = ["qc", 10000]
+    df = pd.DataFrame(rows)
+
+    summary = feature_filter_adapter.get_group_summary(df)
+
+    assert summary["groups"]["a"]["sample_count"] == 3
+    assert summary["groups"]["b"]["sample_count"] == 5
+    assert summary["qc_count"] == 2
+    assert summary["has_qc"] is True
