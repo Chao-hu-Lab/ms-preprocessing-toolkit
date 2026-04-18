@@ -171,6 +171,8 @@ def test_feature_filter_widget_runs_processing_in_background_without_duplicate_r
     ctk_root,
     monkeypatch,
 ) -> None:
+    monkeypatch.setattr(widget, "_confirm_small_group_run", lambda _: True)
+
     call_started = threading.Event()
     release_worker = threading.Event()
     progress_updates: list[tuple[float, str]] = []
@@ -279,6 +281,7 @@ def test_feature_filter_widget_single_group_sets_degradation_flag_when_confirmed
 ) -> None:
     """When single group detected and user confirms, allow_single_group_stable is set True."""
     monkeypatch.setattr(widget, "_confirm_single_group_run", lambda: True)
+    monkeypatch.setattr(widget, "_confirm_small_group_run", lambda _: True)
 
     captured: dict = {}
 
@@ -321,6 +324,7 @@ def test_feature_filter_widget_two_groups_skips_single_group_dialog(
         "_confirm_single_group_run",
         lambda: confirm_called.append(True) or True,
     )
+    monkeypatch.setattr(widget, "_confirm_small_group_run", lambda _: True)
 
     def fake_run_from_df(data, **kwargs):
         return ProcessingResult(
