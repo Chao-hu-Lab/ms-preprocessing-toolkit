@@ -171,6 +171,8 @@ def test_feature_filter_widget_runs_processing_in_background_without_duplicate_r
     ctk_root,
     monkeypatch,
 ) -> None:
+    monkeypatch.setattr(widget, "_confirm_small_group_run", lambda _: True)
+
     call_started = threading.Event()
     release_worker = threading.Event()
     progress_updates: list[tuple[float, str]] = []
@@ -279,6 +281,7 @@ def test_feature_filter_widget_single_group_sets_degradation_flag_when_confirmed
 ) -> None:
     """When single group detected and user confirms, allow_single_group_stable is set True."""
     monkeypatch.setattr(widget, "_confirm_single_group_run", lambda: True)
+    monkeypatch.setattr(widget, "_confirm_small_group_run", lambda _: True)
 
     captured: dict = {}
 
@@ -321,6 +324,7 @@ def test_feature_filter_widget_two_groups_skips_single_group_dialog(
         "_confirm_single_group_run",
         lambda: confirm_called.append(True) or True,
     )
+    monkeypatch.setattr(widget, "_confirm_small_group_run", lambda _: True)
 
     def fake_run_from_df(data, **kwargs):
         return ProcessingResult(
@@ -348,3 +352,139 @@ def test_feature_filter_widget_two_groups_skips_single_group_dialog(
 
     assert spin_until(ctk_root, lambda: not widget.is_processing())
     assert not confirm_called
+
+
+def test_on_run_shows_small_group_dialog_when_any_group_lt10(widget, monkeypatch) -> None:
+    """When any biological group N < 10, _confirm_small_group_run must be called."""
+    import pandas as pd
+
+    rows: dict = {"feature": ["Sample_Type", "f1"]}
+    for i in range(5):
+        rows[f"A_{i + 1}"] = ["a", 10000]
+    for i in range(15):
+        rows[f"B_{i + 1}"] = ["b", 10000]
+    df = pd.DataFrame(rows)
+    widget.set_data(df)
+
+    called_with: list[dict] = []
+
+    def fake_confirm(small_groups: dict) -> bool:
+        called_with.append(dict(small_groups))
+        return False  # user cancels
+
+    monkeypatch.setattr(widget, "_confirm_small_group_run", fake_confirm)
+
+    widget._on_run_clicked()
+
+    assert len(called_with) == 1
+    assert "a" in called_with[0]
+    assert called_with[0]["a"] == 5
+
+
+def test_on_run_skips_small_group_dialog_when_all_groups_gte10(widget, monkeypatch) -> None:
+    """When all biological groups N >= 10, no small-group dialog shown."""
+    import pandas as pd
+    from ms_preprocessing.gui.widgets.base_widget import BaseProcessingWidget
+
+    rows: dict = {"feature": ["Sample_Type", "f1"]}
+    for i in range(10):
+        rows[f"A_{i + 1}"] = ["a", 10000]
+    for i in range(12):
+        rows[f"B_{i + 1}"] = ["b", 10000]
+    df = pd.DataFrame(rows)
+    widget.set_data(df)
+
+    confirm_called: list = []
+    monkeypatch.setattr(
+        widget, "_confirm_small_group_run", lambda _: confirm_called.append(True) or False
+    )
+    monkeypatch.setattr(BaseProcessingWidget, "_on_run_clicked", lambda self: None)
+
+    widget._on_run_clicked()
+
+    assert len(confirm_called) == 0
+
+
+def test_adapter_get_group_summary_returns_correct_counts() -> None:
+    """get_group_summary returns sample counts for biological groups and QC."""
+    rows: dict = {"feature": ["Sample_Type", "f1"]}
+    for i in range(3):
+        rows[f"A_{i + 1}"] = ["a", 10000]
+    for i in range(5):
+        rows[f"B_{i + 1}"] = ["b", 10000]
+    for i in range(2):
+        rows[f"QC_{i + 1}"] = ["qc", 10000]
+    df = pd.DataFrame(rows)
+
+    summary = feature_filter_adapter.get_group_summary(df)
+
+    assert summary["groups"]["a"]["sample_count"] == 3
+    assert summary["groups"]["b"]["sample_count"] == 5
+    assert summary["qc_count"] == 2
+    assert summary["has_qc"] is True
+
+
+def test_run_processing_logs_qc_small_n_note(widget, monkeypatch) -> None:
+    """When QC N < 10, run_processing logs per-sample impact percentage."""
+    import pandas as pd
+    from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
+
+    def fake_run(data, **kwargs):
+        return ProcessingResult(
+            success=True,
+            step="feature_filter",
+            output_path=None,
+            data=data.copy(),
+            metadata=ProcessingMetadata(),
+            statistics={
+                "kept_count": 1,
+                "deleted_count": 0,
+                "qc_count": 7,
+                "has_qc": True,
+                "groups_detected": 1,
+                "final_features": 1,
+            },
+        )
+
+    monkeypatch.setattr("ms_preprocessing.adapters.feature_filter.run_from_df", fake_run)
+
+    log_messages: list[str] = []
+    widget.on_log = lambda msg: log_messages.append(msg)
+    widget._data = pd.DataFrame({"f": ["Sample_Type", "f1"]})
+    widget.run_processing(widget._data)
+
+    qc_logs = [m for m in log_messages if "QC 提示" in m and "14.3" in m]
+    assert len(qc_logs) == 1
+
+
+def test_run_processing_no_qc_note_when_qc_n_gte10(widget, monkeypatch) -> None:
+    """When QC N >= 10, no QC note is logged."""
+    import pandas as pd
+    from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
+
+    def fake_run(data, **kwargs):
+        return ProcessingResult(
+            success=True,
+            step="feature_filter",
+            output_path=None,
+            data=data.copy(),
+            metadata=ProcessingMetadata(),
+            statistics={
+                "kept_count": 1,
+                "deleted_count": 0,
+                "qc_count": 10,
+                "has_qc": True,
+                "groups_detected": 1,
+                "final_features": 1,
+            },
+        )
+
+    monkeypatch.setattr("ms_preprocessing.adapters.feature_filter.run_from_df", fake_run)
+
+    log_messages: list[str] = []
+    widget.on_log = lambda msg: log_messages.append(msg)
+    widget._data = pd.DataFrame({"f": ["Sample_Type", "f1"]})
+    widget.run_processing(widget._data)
+
+    qc_warn = [m for m in log_messages if "QC 提示" in m]
+    assert len(qc_warn) == 0

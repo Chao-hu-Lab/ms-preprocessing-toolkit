@@ -461,14 +461,53 @@ class FeatureFilterWidget(BaseProcessingWidget):
             )
         )
 
+    def _detect_small_biological_groups(self) -> dict[str, int]:
+        """Return {group_name: n} for biological groups with N < 10."""
+        if self._data is None:
+            return {}
+        summary = feature_filter_adapter.get_group_summary(self._data)
+        return {
+            name: info["sample_count"]
+            for name, info in summary.get("groups", {}).items()
+            if info["sample_count"] < 10
+        }
+
+    def _confirm_small_group_run(self, small_groups: dict[str, int]) -> bool:
+        """Show Wilson CI warning for small biological groups.
+
+        Extracted as a separate method so tests can monkeypatch it without
+        needing a real Tk dialog.
+        """
+        import tkinter.messagebox
+
+        group_lines = "\n".join(
+            f"  {name}：N={n}（每缺失 1 筆影響 {100 / n:.1f}%）" for name, n in small_groups.items()
+        )
+        return bool(
+            tkinter.messagebox.askokcancel(
+                "小樣本警告",
+                f"偵測到以下組別樣本數不足（建議 N≥10）：\n{group_lines}\n\n"
+                "系統將自動套用 Wilson CI 校正，小 N 組別需更高比例才能通過門檻。\n"
+                "例：N=5 時，80% 門檻實際需要近 100% 檢出。\n\n"
+                "確認要繼續嗎？",
+                parent=self,
+            )
+        )
+
     def _on_run_clicked(self) -> None:
-        """Override to check for single-group condition before starting worker."""
+        """Override to check for single-group and small-N conditions before starting worker."""
         self._allow_single_group_stable = False
         if self._data is not None and self.bg_enabled_var.get():
             if self._count_analysis_groups() == 1:
                 if not self._confirm_single_group_run():
                     return
                 self._allow_single_group_stable = True
+
+        if self._data is not None:
+            small_groups = self._detect_small_biological_groups()
+            if small_groups and not self._confirm_small_group_run(small_groups):
+                return
+
         super()._on_run_clicked()
 
     def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
@@ -498,6 +537,13 @@ class FeatureFilterWidget(BaseProcessingWidget):
         self._processing_result = result
         if result.statistics:
             self.log(f"Statistics: {result.statistics}")
+            qc_n = result.statistics.get("qc_count", 0)
+            if 0 < qc_n < 10:
+                step_pct = round(100 / qc_n, 1)
+                self.log(
+                    f"[QC 提示] QC N={qc_n}（建議 ≥10）："
+                    f"每缺失 1 筆 QC 樣本，ratio 下降 {step_pct}%"
+                )
         self._last_metadata = {
             **result.metadata.as_context_dict(),
             "statistics": dict(result.statistics),
