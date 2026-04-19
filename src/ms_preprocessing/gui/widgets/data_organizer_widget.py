@@ -198,6 +198,7 @@ class DataOrganizerWidget(BaseProcessingWidget):
         )
         if filepath:
             self._set_entry_value(self.combined_method_entry, filepath)
+            self.prefill_normal_method_from_combined()
 
     def _run_combined_preprocessor(self) -> None:
         if self._on_run_combined_preprocessor is not None:
@@ -232,6 +233,8 @@ class DataOrganizerWidget(BaseProcessingWidget):
         }
 
         method_file = self.method_entry.get().strip()
+        if not method_file:
+            method_file = self.combined_method_entry.get().strip()
         if method_file:
             params["method_file"] = method_file
 

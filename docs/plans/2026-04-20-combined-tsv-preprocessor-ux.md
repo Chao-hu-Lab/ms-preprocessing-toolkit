@@ -164,6 +164,7 @@ Add tests for these GUI behaviors:
 - `combined_tsv_entry`, `combined_method_entry`, and `combined_run_btn` exist.
 - no output file picker exists in the preprocessor group; output is system-generated under `OUTPUT/combined_fix/`.
 - choosing or setting a combined method can be copied one-way into the normal method field after success.
+- the combined method also acts as the normal Step 1 default when the normal method field is empty, so already-generated `combined_fix.xlsx` files still receive injection-order metadata.
 - changing the normal method field does not change the combined method field.
 
 Example:

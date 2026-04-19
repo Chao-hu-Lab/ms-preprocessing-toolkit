@@ -76,6 +76,27 @@ def test_combined_method_prefill_is_one_way(widget) -> None:
     widget.method_entry.delete(0, "end")
     widget.method_entry.insert(0, "normal-method.docx")
     assert widget.combined_method_entry.get() == "combined-method.docx"
+    assert widget.get_parameters()["method_file"] == "normal-method.docx"
+
+
+def test_get_parameters_uses_combined_method_as_normal_default(widget) -> None:
+    widget.combined_method_entry.insert(0, "combined-method.docx")
+
+    params = widget.get_parameters()
+
+    assert params["method_file"] == "combined-method.docx"
+
+
+def test_combined_method_browse_prefills_normal_method(widget, monkeypatch) -> None:
+    monkeypatch.setattr(
+        "ms_preprocessing.gui.widgets.data_organizer_widget.filedialog.askopenfilename",
+        lambda **_kwargs: "combined-method.docx",
+    )
+
+    widget._browse_combined_method_file()
+
+    assert widget.combined_method_entry.get() == "combined-method.docx"
+    assert widget.method_entry.get() == "combined-method.docx"
 
 
 def test_normal_step1_rejects_raw_combined_tsv(widget) -> None:
