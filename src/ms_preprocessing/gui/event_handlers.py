@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, Optional, Protocol
 
 import pandas as pd
 
+from ms_preprocessing.adapters import data_organizer as data_organizer_adapter
 from ms_preprocessing.bootstrap_paths import ensure_dnp_bridge_on_path, find_dnp_main_module
 from ms_preprocessing.config import get_pipeline_profile
 from ms_preprocessing.config.settings import Settings
@@ -147,6 +148,16 @@ class MainWindowEventHandlersMixin:
         for button in self.__dict__.get("step_buttons", []):
             if button not in controls:
                 controls.append(button)
+
+        for widget in self.__dict__.get("step_widgets", []):
+            for attr_name in (
+                "combined_tsv_btn",
+                "combined_method_btn",
+                "combined_run_btn",
+            ):
+                control = getattr(widget, attr_name, None)
+                if control is not None and control not in controls:
+                    controls.append(control)
 
         return controls
 
@@ -330,6 +341,95 @@ class MainWindowEventHandlersMixin:
         except Exception as exc:
             self._log(f"Error loading file: {exc}")
             self._show_error(f"Failed to load file:\n{exc}")
+
+    def _build_combined_fix_output_path(
+        self: "_MainWindowEventHost",
+        raw_path: Path,
+    ) -> Path:
+        output_dir = self._output_dir / "combined_fix"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        base = output_dir / f"{raw_path.stem}_combined_fix_{timestamp}.xlsx"
+        if not base.exists():
+            return base
+
+        counter = 2
+        while True:
+            candidate = output_dir / f"{raw_path.stem}_combined_fix_{timestamp}_{counter}.xlsx"
+            if not candidate.exists():
+                return candidate
+            counter += 1
+
+    def _run_combined_tsv_preprocessor(self: "_MainWindowEventHost") -> None:
+        if self._has_active_processing():
+            self._log("Busy: wait for the current task to finish before creating combined_fix.")
+            return
+
+        if not self.__dict__.get("step_widgets"):
+            self._show_error("Step 1 widget is not available.")
+            return
+
+        widget = self.step_widgets[0]
+        path_getter = getattr(widget, "get_combined_preprocessor_paths", None)
+        if not callable(path_getter):
+            self._show_error("Combined TSV controls are not available.")
+            return
+
+        paths = path_getter()
+        raw_text = str(paths.get("combined_tsv") or "").strip()
+        method_text = str(paths.get("method_file") or "").strip()
+        if not raw_text:
+            self._show_error("Please select a combined TSV file first.")
+            return
+
+        raw_path = Path(raw_text)
+        if not raw_path.exists():
+            self._show_error(f"Combined TSV file not found:\n{raw_path}")
+            return
+
+        output_path = self._build_combined_fix_output_path(raw_path)
+        loaded_path: Path | None = None
+
+        self._set_pipeline_busy_state(True)
+        try:
+            self._log(f"Creating combined_fix file from: {raw_path}")
+            result = data_organizer_adapter.run_combined_fix(
+                str(raw_path),
+                method_file=method_text or None,
+                progress_callback=self._safe_update_action_bar_progress,
+            )
+            if not result.success or result.data is None:
+                self._show_error(result.error or "Combined TSV preprocessing failed.")
+                return
+
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            saved_path = self._file_handler.save_data(
+                result.data,
+                output_path,
+                save_parquet_cache=False,
+            )
+            loaded_path = Path(saved_path)
+
+            stats = result.statistics or {}
+            removed = stats.get("removed_features", "unknown")
+            output_features = stats.get("output_features", len(result.data))
+            self._log(
+                f"Combined TSV preprocessing complete: {output_features} features kept, "
+                f"{removed} removed. Output: {loaded_path}"
+            )
+        except Exception as exc:
+            self._show_error(f"Combined TSV preprocessing failed:\n{exc}")
+            return
+        finally:
+            self._set_pipeline_busy_state(False)
+
+        if loaded_path is None:
+            return
+
+        self._load_file_for_step(0, path=loaded_path)
+        prefill = getattr(self.step_widgets[0], "prefill_normal_method_from_combined", None)
+        if callable(prefill):
+            prefill()
+        self._log("Ready: review Step 1 settings, then run Step 1 or Run All.")
 
     def _show_error(self: "_MainWindowEventHost", message: str) -> None:
         self._log(f"ERROR: {message}")

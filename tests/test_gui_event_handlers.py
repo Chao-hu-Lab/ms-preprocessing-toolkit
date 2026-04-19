@@ -9,6 +9,7 @@ from unittest.mock import Mock
 import customtkinter as ctk
 import pandas as pd
 
+from ms_preprocessing.adapters import data_organizer as data_organizer_adapter
 from ms_preprocessing.config.pipeline_profiles import get_pipeline_profile
 from ms_preprocessing.gui.event_handlers import MainWindowEventHandlersMixin
 from ms_preprocessing.gui.main_window import MainWindow
@@ -17,6 +18,84 @@ from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
 
 
 from tests.conftest import spin_until
+
+
+def test_combined_preprocessor_saves_loads_and_prefills_method(monkeypatch, tmp_path) -> None:
+    class _Step1Widget:
+        def __init__(self) -> None:
+            self.prefilled = False
+
+        def get_combined_preprocessor_paths(self) -> dict[str, str]:
+            return {
+                "combined_tsv": str(tmp_path / "raw.tsv"),
+                "method_file": str(tmp_path / "method.docx"),
+            }
+
+        def prefill_normal_method_from_combined(self) -> None:
+            self.prefilled = True
+
+    raw_path = tmp_path / "raw.tsv"
+    raw_path.write_text("Mz\tRT\tSample\tMZmine ID\n1\t2\t3\tid\n", encoding="utf-8")
+    method_path = tmp_path / "method.docx"
+    method_path.write_text("placeholder", encoding="utf-8")
+
+    saved: dict[str, object] = {}
+    loaded: dict[str, object] = {}
+    captured: dict[str, object] = {}
+
+    def fake_run_combined_fix(input_path, **kwargs):
+        captured["input_path"] = input_path
+        captured.update(kwargs)
+        return ProcessingResult(
+            success=True,
+            step="data_organizer",
+            output_path=None,
+            data=pd.DataFrame({"Mz": [1.0], "RT": [2.0], "Sample": [99]}),
+            metadata=ProcessingMetadata(),
+            statistics={"removed_features": 4, "output_features": 1},
+        )
+
+    def fake_save_data(df, file_path, **kwargs):
+        saved["df"] = df
+        saved["path"] = file_path
+        saved["kwargs"] = kwargs
+        return file_path
+
+    monkeypatch.setattr(data_organizer_adapter, "run_combined_fix", fake_run_combined_fix)
+
+    widget = _Step1Widget()
+    window = MainWindow.__new__(MainWindow)
+    window._output_dir = tmp_path / "OUTPUT"
+    window._file_handler = Mock()
+    window._file_handler.save_data.side_effect = fake_save_data
+    window.step_widgets = [widget]
+    window.step_buttons = []
+    window._step_status_labels = []
+    window._pipeline_is_processing = False
+    window._pipeline_worker_thread = None
+    window._ui_thread_id = threading.get_ident()
+    window._ui_queue = Mock()
+    window._ui_queue_after_id = None
+    window._log = Mock()
+    window._show_error = Mock()
+    window._safe_update_action_bar_progress = Mock()
+
+    def fake_load_file_for_step(step_index, path=None):
+        loaded["step_index"] = step_index
+        loaded["path"] = path
+
+    window._load_file_for_step = fake_load_file_for_step
+    window.configure = Mock()
+
+    window._run_combined_tsv_preprocessor()
+
+    assert captured["input_path"] == str(raw_path)
+    assert captured["method_file"] == str(method_path)
+    assert saved["path"].suffix == ".xlsx"
+    assert saved["path"].parent == tmp_path / "OUTPUT" / "combined_fix"
+    assert saved["kwargs"].get("save_parquet_cache") is False
+    assert loaded == {"step_index": 0, "path": saved["path"]}
+    assert widget.prefilled is True
 
 
 def test_run_all_steps_checks_pipeline_prerequisites_before_processing() -> None:
