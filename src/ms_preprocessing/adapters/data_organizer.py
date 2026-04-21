@@ -71,6 +71,7 @@ def _run_processor(
     sample_type_mapping: dict[str, str] | None = None,
     mode: str = "normalization",
     auto_detect: bool = False,
+    persist_output: bool = True,
     progress_callback: Callable[[float, str], None] | None = None,
     **kwargs,
 ) -> ProcessingResult:
@@ -103,7 +104,7 @@ def _run_processor(
         )
 
     output_path = None
-    if core_result.success and core_result.data is not None:
+    if persist_output and core_result.success and core_result.data is not None:
         output_path = _capture_output_path(_save_output, core_result.data, step_name=_STEP)
 
     raw_meta = core_result.metadata if isinstance(core_result.metadata, dict) else {}
@@ -152,6 +153,34 @@ def run(
         auto_detect=auto_detect,
         progress_callback=progress_callback,
         **kwargs,
+    )
+
+
+def run_combined_fix(
+    input_path: str,
+    *,
+    method_file: str | None = None,
+    progress_callback: Callable[[float, str], None] | None = None,
+) -> ProcessingResult:
+    """Read a raw combined TSV and run the dedicated combined-fix processor."""
+    if not os.path.exists(input_path):
+        return ProcessingResult(
+            success=False,
+            step=_STEP,
+            output_path=None,
+            data=None,
+            metadata=ProcessingMetadata(),
+            error=f"Input file not found: {input_path}",
+        )
+
+    df = _read_input(input_path)
+    return _run_processor(
+        df,
+        method_file=method_file,
+        mode="combined_fix",
+        auto_detect=True,
+        persist_output=False,
+        progress_callback=progress_callback,
     )
 
 

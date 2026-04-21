@@ -44,3 +44,34 @@ class TestDataOrganizerAdapter:
         assert isinstance(result.metadata.red_font_rows, set)
         assert isinstance(result.metadata.protected_rows, set)
         assert isinstance(result.metadata.blue_font_cells, list)
+
+
+def test_run_combined_fix_uses_combined_fix_mode(monkeypatch, tmp_path) -> None:
+    input_path = tmp_path / "raw.tsv"
+    pd.DataFrame({"Mz": [1], "RT": [2], "MZmine ID": ["id"]}).to_csv(
+        input_path,
+        sep="\t",
+        index=False,
+    )
+    captured: dict[str, object] = {}
+
+    def fake_run_processor(df, **kwargs):
+        captured.update(kwargs)
+        return ProcessingResult(
+            success=True,
+            step="data_organizer",
+            output_path=None,
+            data=df.copy(),
+            metadata=ProcessingMetadata(),
+            statistics={"mode": "combined_fix"},
+        )
+
+    monkeypatch.setattr(data_organizer, "_run_processor", fake_run_processor)
+
+    result = data_organizer.run_combined_fix(str(input_path), method_file="method.docx")
+
+    assert result.success is True
+    assert result.output_path is None
+    assert captured["mode"] == "combined_fix"
+    assert captured["method_file"] == "method.docx"
+    assert captured["persist_output"] is False

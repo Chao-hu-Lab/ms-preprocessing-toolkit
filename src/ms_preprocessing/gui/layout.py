@@ -245,6 +245,11 @@ class MainWindowLayoutMixin:
                 on_complete=self._on_step_complete,
                 on_log=self._log,
                 on_progress=self._update_action_bar_progress,
+                on_run_combined_preprocessor=getattr(
+                    self,
+                    "_run_combined_tsv_preprocessor",
+                    None,
+                ),
             ),
             ISTDMarkerWidget(
                 self.main_frame,

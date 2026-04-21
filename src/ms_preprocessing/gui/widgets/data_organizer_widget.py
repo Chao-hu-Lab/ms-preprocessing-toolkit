@@ -2,6 +2,7 @@
 Data Organizer Widget - GUI for Step 1.
 """
 
+import re
 from typing import Callable, Optional
 from tkinter import filedialog
 
@@ -24,7 +25,9 @@ class DataOrganizerWidget(BaseProcessingWidget):
         on_complete: Optional[Callable[[pd.DataFrame], None]] = None,
         on_log: Optional[Callable[[str], None]] = None,
         on_progress: Optional[Callable[[float, str], None]] = None,
+        on_run_combined_preprocessor: Optional[Callable[[], None]] = None,
     ):
+        self._on_run_combined_preprocessor = on_run_combined_preprocessor
         super().__init__(
             parent,
             title="Step 1: 資料整理 (Data Organization)",
@@ -40,36 +43,132 @@ class DataOrganizerWidget(BaseProcessingWidget):
         """Create parameter inputs."""
         self._configure_form_grid()
 
-        mode_label = ctk.CTkLabel(self.params_frame, text="轉換模式", font=FONTS["body"])
-        self._style_form_label(mode_label)
-        mode_label.grid(row=0, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
-
-        self.mode_var = ctk.StringVar(value="normalization")
-        self.mode_selector = ctk.CTkSegmentedButton(
+        combined_title = ctk.CTkLabel(
             self.params_frame,
-            values=["normalization", "statistics"],
-            variable=self.mode_var,
+            text="Combined TSV 前處理（選用）",
+            font=FONTS["small"],
+            text_color="#9fb8d0",
+        )
+        combined_title.grid(
+            row=0,
+            column=0,
+            columnspan=3,
+            padx=PADDING["small"],
+            pady=(PADDING["small"], 2),
+            sticky="w",
+        )
+
+        combined_tsv_label = ctk.CTkLabel(
+            self.params_frame,
+            text="Combined TSV",
             font=FONTS["body"],
         )
-        self.mode_selector.grid(
-            row=0,
-            column=1,
-            columnspan=2,
+        self._style_form_label(combined_tsv_label)
+        combined_tsv_label.grid(
+            row=1,
+            column=0,
             padx=PADDING["small"],
             pady=PADDING["small"],
+            sticky="e",
+        )
+
+        self.combined_tsv_entry = ctk.CTkEntry(
+            self.params_frame,
+            placeholder_text="選擇 raw combined TSV",
+            font=FONTS["body"],
+        )
+        self.combined_tsv_entry.grid(
+            row=1,
+            column=1,
+            padx=PADDING["small"],
+            pady=PADDING["small"],
+            sticky="ew",
+        )
+
+        self.combined_tsv_btn = ctk.CTkButton(
+            self.params_frame,
+            text="瀏覽",
+            command=self._browse_combined_tsv_file,
+            width=90,
+            font=FONTS["body"],
+        )
+        self.combined_tsv_btn.grid(row=1, column=2, padx=PADDING["small"], pady=PADDING["small"])
+
+        combined_method_label = ctk.CTkLabel(
+            self.params_frame,
+            text="前處理方法檔",
+            font=FONTS["body"],
+        )
+        self._style_form_label(combined_method_label)
+        combined_method_label.grid(
+            row=2,
+            column=0,
+            padx=PADDING["small"],
+            pady=PADDING["small"],
+            sticky="e",
+        )
+
+        self.combined_method_entry = ctk.CTkEntry(
+            self.params_frame,
+            placeholder_text="選擇 combined TSV 使用的方法檔",
+            font=FONTS["body"],
+        )
+        self.combined_method_entry.grid(
+            row=2,
+            column=1,
+            padx=PADDING["small"],
+            pady=PADDING["small"],
+            sticky="ew",
+        )
+
+        self.combined_method_btn = ctk.CTkButton(
+            self.params_frame,
+            text="瀏覽",
+            command=self._browse_combined_method_file,
+            width=90,
+            font=FONTS["body"],
+        )
+        self.combined_method_btn.grid(row=2, column=2, padx=PADDING["small"], pady=PADDING["small"])
+
+        self.combined_run_btn = ctk.CTkButton(
+            self.params_frame,
+            text="產生 combined_fix",
+            command=self._run_combined_preprocessor,
+            font=FONTS["body"],
+        )
+        self.combined_run_btn.grid(
+            row=3,
+            column=1,
+            padx=PADDING["small"],
+            pady=(PADDING["small"], PADDING["medium"]),
+            sticky="w",
+        )
+
+        normal_title = ctk.CTkLabel(
+            self.params_frame,
+            text="一般 Toolkit 流程",
+            font=FONTS["small"],
+            text_color="#9fb8d0",
+        )
+        normal_title.grid(
+            row=4,
+            column=0,
+            columnspan=3,
+            padx=PADDING["small"],
+            pady=(PADDING["small"], 2),
             sticky="w",
         )
 
         method_label = ctk.CTkLabel(self.params_frame, text="方法檔案 (.docx)", font=FONTS["body"])
         self._style_form_label(method_label)
-        method_label.grid(row=1, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
+        method_label.grid(row=5, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
 
         self.method_entry = ctk.CTkEntry(
             self.params_frame,
             placeholder_text="選填方法檔案 (.docx)",
             font=FONTS["body"],
         )
-        self.method_entry.grid(row=1, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="ew")
+        self.method_entry.grid(row=5, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="ew")
 
         self.method_btn = ctk.CTkButton(
             self.params_frame,
@@ -78,7 +177,32 @@ class DataOrganizerWidget(BaseProcessingWidget):
             width=90,
             font=FONTS["body"],
         )
-        self.method_btn.grid(row=1, column=2, padx=PADDING["small"], pady=PADDING["small"])
+        self.method_btn.grid(row=5, column=2, padx=PADDING["small"], pady=PADDING["small"])
+
+    def _set_entry_value(self, entry: ctk.CTkEntry, value: str) -> None:
+        entry.delete(0, "end")
+        entry.insert(0, value)
+
+    def _browse_combined_tsv_file(self) -> None:
+        filepath = filedialog.askopenfilename(
+            title="選擇 combined TSV",
+            filetypes=[("TSV files", "*.tsv *.txt"), ("All files", "*.*")],
+        )
+        if filepath:
+            self._set_entry_value(self.combined_tsv_entry, filepath)
+
+    def _browse_combined_method_file(self) -> None:
+        filepath = filedialog.askopenfilename(
+            title="選擇 combined TSV 方法檔案",
+            filetypes=[("Word files", "*.docx *.doc"), ("All files", "*.*")],
+        )
+        if filepath:
+            self._set_entry_value(self.combined_method_entry, filepath)
+            self.prefill_normal_method_from_combined()
+
+    def _run_combined_preprocessor(self) -> None:
+        if self._on_run_combined_preprocessor is not None:
+            self._on_run_combined_preprocessor()
 
     def _browse_method_file(self) -> None:
         """Open file dialog to select method file."""
@@ -87,17 +211,30 @@ class DataOrganizerWidget(BaseProcessingWidget):
             filetypes=[("Word files", "*.docx *.doc"), ("All files", "*.*")],
         )
         if filepath:
-            self.method_entry.delete(0, "end")
-            self.method_entry.insert(0, filepath)
+            self._set_entry_value(self.method_entry, filepath)
+
+    def get_combined_preprocessor_paths(self) -> dict:
+        """Return paths selected for the optional combined TSV preprocessor."""
+        return {
+            "combined_tsv": self.combined_tsv_entry.get().strip(),
+            "method_file": self.combined_method_entry.get().strip(),
+        }
+
+    def prefill_normal_method_from_combined(self) -> None:
+        method_file = self.combined_method_entry.get().strip()
+        if method_file:
+            self._set_entry_value(self.method_entry, method_file)
 
     def get_parameters(self) -> dict:
         """Get current parameter values."""
         params = {
-            "mode": self.mode_var.get(),
+            "mode": "normalization",
             "auto_detect": True,
         }
 
         method_file = self.method_entry.get().strip()
+        if not method_file:
+            method_file = self.combined_method_entry.get().strip()
         if method_file:
             params["method_file"] = method_file
 
@@ -105,20 +242,25 @@ class DataOrganizerWidget(BaseProcessingWidget):
 
     def apply_parameters(self, params: dict) -> None:
         """Apply a pipeline profile to the Step 1 controls."""
-        mode = params.get("mode")
-        if mode in {"normalization", "statistics"}:
-            self.mode_var.set(mode)
-
         method_file = params.get("method_file")
         if method_file is not None:
-            self.method_entry.delete(0, "end")
-            self.method_entry.insert(0, str(method_file))
+            self._set_entry_value(self.method_entry, str(method_file))
+
+    def _looks_like_raw_combined_tsv(self, df: pd.DataFrame) -> bool:
+        for idx, col in enumerate(df.columns):
+            compact = re.sub(r"[^a-z0-9]+", "", str(col).strip().lower())
+            if compact == "mzmineid":
+                return 2 < idx < len(df.columns) - 1
+        return False
 
     def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
         """Run the data organization step."""
+        if self._looks_like_raw_combined_tsv(data):
+            raise Exception("Combined TSV 請先使用上方 Combined TSV 前處理產生 combined_fix 檔案。")
+
         result = data_organizer_adapter.run_from_df(
             data,
-            mode=params.get("mode", "normalization"),
+            mode="normalization",
             sample_type_mapping=params.get("sample_type_mapping"),
             auto_detect=True,
             method_file=params.get("method_file"),
