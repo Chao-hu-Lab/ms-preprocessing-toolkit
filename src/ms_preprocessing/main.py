@@ -15,6 +15,7 @@ def _resolve_cli_step_parameters(args):
     """Resolve CLI step parameters from the selected profile plus explicit overrides."""
     from ms_preprocessing.config import get_pipeline_profile
 
+    merge_mode = getattr(args, "merge_mode", None)
     enable_degeneracy_annotation = bool(getattr(args, "enable_degeneracy_annotation", False))
     degeneracy_ppm_tol = getattr(args, "degeneracy_ppm_tol", None)
     degeneracy_rt_tol = getattr(args, "degeneracy_rt_tol", None)
@@ -50,6 +51,7 @@ def _resolve_cli_step_parameters(args):
         "step3": {
             "mz_tolerance_ppm": args.mz_tol if args.mz_tol is not None else step3.get("mz_tolerance_ppm"),
             "rt_tolerance": args.rt_tol if args.rt_tol is not None else step3.get("rt_tolerance"),
+            "merge_mode": merge_mode if merge_mode is not None else step3.get("merge_mode", "per_sample_max"),
             "preserve_red_font": step3.get("preserve_red_font"),
             "top_n": step3.get("top_n"),
             "enable_degeneracy_annotation": (
@@ -191,6 +193,14 @@ Examples:
         type=float,
         default=None,
         help="RT tolerance in minutes (overrides Step 2/3 profile values)",
+    )
+
+    parser.add_argument(
+        "--merge-mode",
+        type=str,
+        choices=["per_sample_max", "fill_gaps"],
+        default=None,
+        help="Step 3 duplicate merge policy (overrides profile value)",
     )
 
     parser.add_argument(

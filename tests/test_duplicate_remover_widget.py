@@ -19,6 +19,7 @@ def test_duplicate_remover_widget_keeps_controls_in_aligned_columns(widget) -> N
     assert widget.params_frame.grid_columnconfigure(0)["minsize"] == 180
     assert widget.mz_entry.grid_info()["column"] == 1
     assert widget.rt_entry.grid_info()["column"] == 1
+    assert widget.merge_mode_menu.grid_info()["column"] == 1
     assert widget.topn_entry.grid_info()["column"] == 1
     assert widget.degeneracy_ppm_entry.grid_info()["column"] == 1
     assert widget.degeneracy_rt_entry.grid_info()["column"] == 1
@@ -35,6 +36,7 @@ def test_duplicate_remover_widget_hides_preserve_red_toggle_but_keeps_it_true(wi
 
     assert not hasattr(widget, "preserve_red_var")
     assert params["preserve_red_font"] is True
+    assert params["merge_mode"] == "per_sample_max"
     assert params["enable_degeneracy_annotation"] is False
     assert params["degeneracy_correlation_threshold"] == pytest.approx(0.8)
     assert params["degeneracy_min_correlation_points"] == 3
@@ -59,6 +61,7 @@ def test_duplicate_remover_widget_run_processing_forwards_parameters(widget, mon
     widget.mz_entry.insert(0, "15")
     widget.rt_entry.delete(0, "end")
     widget.rt_entry.insert(0, "0.8")
+    widget.merge_mode_menu.set("fill_gaps")
     widget.topn_entry.insert(0, "5")
     widget.enable_degeneracy_var.set(True)
     widget.degeneracy_ppm_entry.delete(0, "end")
@@ -83,6 +86,7 @@ def test_duplicate_remover_widget_run_processing_forwards_parameters(widget, mon
     assert result.equals(input_df)
     assert captured["mz_tolerance_ppm"] == pytest.approx(15.0)
     assert captured["rt_tolerance"] == pytest.approx(0.8)
+    assert captured["merge_mode"] == "fill_gaps"
     assert captured["top_n"] == 5
     assert captured["enable_degeneracy_annotation"] is True
     assert captured["degeneracy_ppm_tolerance"] == pytest.approx(12.0)

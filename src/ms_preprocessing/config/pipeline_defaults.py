@@ -18,6 +18,7 @@ from typing import Any
 
 METHOD_FILE_ENV = "MSPTK_METHOD_FILE"
 ISTD_RECORD_FILE_ENV = "MSPTK_ISTD_RECORD_FILE"
+ISTD_RECORD_DATE_ENV = "MSPTK_ISTD_RECORD_DATE"
 LOCAL_REFERENCE_CONFIG_ENV = "MSPTK_LOCAL_REFERENCE_CONFIG"
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -50,6 +51,15 @@ def _stringify_path(path_value: Path | None) -> str:
     return "" if path_value is None else str(path_value)
 
 
+def _resolve_text(env_var: str, local_value: Any, default_value: str) -> str:
+    override = os.getenv(env_var)
+    if override:
+        return str(override)
+    if local_value:
+        return str(local_value)
+    return default_value
+
+
 _LOCAL_REFERENCE_CONFIG = _load_local_reference_config()
 
 DEFAULT_METHOD_FILE = _resolve_path(
@@ -59,6 +69,11 @@ DEFAULT_METHOD_FILE = _resolve_path(
 DEFAULT_ISTD_RECORD_FILE = _resolve_path(
     ISTD_RECORD_FILE_ENV,
     _LOCAL_REFERENCE_CONFIG.get("istd_record_file"),
+)
+DEFAULT_ISTD_RECORD_DATE = _resolve_text(
+    ISTD_RECORD_DATE_ENV,
+    _LOCAL_REFERENCE_CONFIG.get("istd_record_date"),
+    "20260106",
 )
 
 STEP1_PARAMS: dict = {
@@ -72,12 +87,13 @@ STEP2_PARAMS: dict = {
     "rt_tolerance": 1.5,
     "istd_mz_list": [261.1273, 245.1324, 289.0841, 300.1605, 269.1436, 482.2087, 303.0913],
     "istd_record_file": _stringify_path(DEFAULT_ISTD_RECORD_FILE),
-    "istd_record_date": "20260106",
+    "istd_record_date": DEFAULT_ISTD_RECORD_DATE,
 }
 
 STEP3_PARAMS: dict = {
     "mz_tolerance_ppm": 20.0,
     "rt_tolerance": 0.1,
+    "merge_mode": "per_sample_max",
     "preserve_red_font": True,
     "top_n": None,
     "enable_degeneracy_annotation": False,

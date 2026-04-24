@@ -80,7 +80,8 @@ Thumbs.db
 *.csv
 !tests/fixtures/*.csv
 !tests/fixtures/*.xlsx
-config/local_reference_paths.json
+config/local_reference_paths*.json
+!config/local_reference_paths.example.json
 output/
 logs/
 *.log
