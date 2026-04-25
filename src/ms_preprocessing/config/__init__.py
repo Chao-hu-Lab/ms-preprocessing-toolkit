@@ -8,6 +8,7 @@ from ms_preprocessing.config.feature_filter_presets import (
     get_step4_preset,
 )
 from ms_preprocessing.config.pipeline_defaults import (
+    DEFAULT_ISTD_RECORD_DATE,
     DEFAULT_ISTD_RECORD_FILE,
     DEFAULT_METHOD_FILE,
     STEP1_PARAMS,
@@ -33,6 +34,7 @@ __all__ = [
     "STEP3_PARAMS",
     "DEFAULT_METHOD_FILE",
     "DEFAULT_ISTD_RECORD_FILE",
+    "DEFAULT_ISTD_RECORD_DATE",
     # Integrated Step 1-4 profiles
     "PipelineProfile",
     "PipelineProfileName",

@@ -77,9 +77,30 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
         self.rt_entry.insert(0, "0.1")
         self.rt_entry.grid(row=1, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
 
+        merge_mode_label = ctk.CTkLabel(self.params_frame, text="合併策略", font=FONTS["body"])
+        self._style_form_label(merge_mode_label)
+        merge_mode_label.grid(row=2, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
+
+        self.merge_mode_menu = ctk.CTkOptionMenu(
+            self.params_frame,
+            values=["per_sample_max", "fill_gaps"],
+            font=FONTS["body"],
+            width=180,
+        )
+        self.merge_mode_menu.set("per_sample_max")
+        self.merge_mode_menu.grid(row=2, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+
+        merge_mode_hint = ctk.CTkLabel(
+            self.params_frame,
+            text="per_sample_max 會保留各 sample 最大值；protected 只保留代表列，不鎖住原始 sample 值。",
+            font=FONTS["small"],
+            text_color="#a0a0a0",
+        )
+        merge_mode_hint.grid(row=2, column=2, columnspan=2, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+
         topn_label = ctk.CTkLabel(self.params_frame, text="限制輸出 Top N", font=FONTS["body"])
         self._style_form_label(topn_label)
-        topn_label.grid(row=2, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
+        topn_label.grid(row=3, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
 
         self.topn_entry = ctk.CTkEntry(
             self.params_frame,
@@ -87,7 +108,7 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
             font=FONTS["body"],
         )
         self._style_numeric_entry(self.topn_entry)
-        self.topn_entry.grid(row=2, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        self.topn_entry.grid(row=3, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
 
         self.degeneracy_switch = ctk.CTkSwitch(
             self.params_frame,
@@ -98,7 +119,7 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
             font=FONTS["body"],
         )
         self._style_form_switch(self.degeneracy_switch)
-        self.degeneracy_switch.grid(row=3, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        self.degeneracy_switch.grid(row=4, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
 
         degeneracy_hint = ctk.CTkLabel(
             self.params_frame,
@@ -106,7 +127,7 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
             font=FONTS["small"],
             text_color="#a0a0a0",
         )
-        degeneracy_hint.grid(row=3, column=1, columnspan=3, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        degeneracy_hint.grid(row=4, column=1, columnspan=3, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
 
         degeneracy_ppm_label = ctk.CTkLabel(
             self.params_frame,
@@ -114,7 +135,7 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
             font=FONTS["body"],
         )
         self._style_form_label(degeneracy_ppm_label)
-        degeneracy_ppm_label.grid(row=4, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
+        degeneracy_ppm_label.grid(row=5, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
 
         self.degeneracy_ppm_entry = ctk.CTkEntry(
             self.params_frame,
@@ -123,7 +144,7 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
         )
         self._style_numeric_entry(self.degeneracy_ppm_entry)
         self.degeneracy_ppm_entry.insert(0, "20")
-        self.degeneracy_ppm_entry.grid(row=4, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        self.degeneracy_ppm_entry.grid(row=5, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
 
         degeneracy_rt_label = ctk.CTkLabel(
             self.params_frame,
@@ -131,7 +152,7 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
             font=FONTS["body"],
         )
         self._style_form_label(degeneracy_rt_label)
-        degeneracy_rt_label.grid(row=5, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
+        degeneracy_rt_label.grid(row=6, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
 
         self.degeneracy_rt_entry = ctk.CTkEntry(
             self.params_frame,
@@ -140,7 +161,7 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
         )
         self._style_numeric_entry(self.degeneracy_rt_entry)
         self.degeneracy_rt_entry.insert(0, "0.05")
-        self.degeneracy_rt_entry.grid(row=5, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        self.degeneracy_rt_entry.grid(row=6, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
 
         degeneracy_corr_label = ctk.CTkLabel(
             self.params_frame,
@@ -148,7 +169,7 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
             font=FONTS["body"],
         )
         self._style_form_label(degeneracy_corr_label)
-        degeneracy_corr_label.grid(row=6, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
+        degeneracy_corr_label.grid(row=7, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
 
         self.degeneracy_corr_entry = ctk.CTkEntry(
             self.params_frame,
@@ -157,7 +178,7 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
         )
         self._style_numeric_entry(self.degeneracy_corr_entry)
         self.degeneracy_corr_entry.insert(0, "0.80")
-        self.degeneracy_corr_entry.grid(row=6, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        self.degeneracy_corr_entry.grid(row=7, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
 
         degeneracy_min_points_label = ctk.CTkLabel(
             self.params_frame,
@@ -165,7 +186,7 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
             font=FONTS["body"],
         )
         self._style_form_label(degeneracy_min_points_label)
-        degeneracy_min_points_label.grid(row=7, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
+        degeneracy_min_points_label.grid(row=8, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
 
         self.degeneracy_min_points_entry = ctk.CTkEntry(
             self.params_frame,
@@ -174,7 +195,7 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
         )
         self._style_numeric_entry(self.degeneracy_min_points_entry)
         self.degeneracy_min_points_entry.insert(0, "3")
-        self.degeneracy_min_points_entry.grid(row=7, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
+        self.degeneracy_min_points_entry.grid(row=8, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="w")
 
         adduct_table_label = ctk.CTkLabel(
             self.params_frame,
@@ -182,14 +203,14 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
             font=FONTS["body"],
         )
         self._style_form_label(adduct_table_label)
-        adduct_table_label.grid(row=8, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
+        adduct_table_label.grid(row=9, column=0, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
 
         self.adduct_table_entry = ctk.CTkEntry(
             self.params_frame,
             placeholder_text="留空則使用內建規則表",
             font=FONTS["body"],
         )
-        self.adduct_table_entry.grid(row=8, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="ew")
+        self.adduct_table_entry.grid(row=9, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="ew")
 
         self.adduct_table_button = ctk.CTkButton(
             self.params_frame,
@@ -198,13 +219,14 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
             width=120,
             font=FONTS["body"],
         )
-        self.adduct_table_button.grid(row=8, column=2, padx=PADDING["small"], pady=PADDING["small"])
+        self.adduct_table_button.grid(row=9, column=2, padx=PADDING["small"], pady=PADDING["small"])
 
     def get_parameters(self) -> dict:
         """Get current parameter values."""
         params = {
             "mz_tolerance_ppm": float(self.mz_entry.get() or "20"),
             "rt_tolerance": float(self.rt_entry.get() or "0.1"),
+            "merge_mode": self.merge_mode_menu.get(),
             "preserve_red_font": True,
             "enable_degeneracy_annotation": bool(self.enable_degeneracy_var.get()),
             "degeneracy_ppm_tolerance": float(self.degeneracy_ppm_entry.get() or self.mz_entry.get() or "20"),
@@ -235,6 +257,9 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
         if "rt_tolerance" in params:
             self.rt_entry.delete(0, "end")
             self.rt_entry.insert(0, str(params["rt_tolerance"]))
+
+        if "merge_mode" in params:
+            self.merge_mode_menu.set(str(params["merge_mode"]))
 
         top_n = params.get("top_n")
         self.topn_entry.delete(0, "end")
@@ -274,6 +299,7 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
             data,
             mz_tolerance_ppm=params.get("mz_tolerance_ppm"),
             rt_tolerance=params.get("rt_tolerance"),
+            merge_mode=params.get("merge_mode"),
             top_n=params.get("top_n"),
             protected_rows=protected_rows,
             enable_degeneracy_annotation=params.get("enable_degeneracy_annotation", False),

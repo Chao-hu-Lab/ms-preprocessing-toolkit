@@ -152,7 +152,7 @@ class TestDuplicateRemover:
         )
 
     def test_istd_duplicates_are_deduplicated_keeping_highest_occurrence(self, remover):
-        """ISTD (protected) rows 之間也要去重，保留檢出率最高的那一個。"""
+        """ISTD (protected) rows 之間也要去重，保留檢出率最高的代表列。"""
         data = {
             "Mz/RT": [
                 "Sample_Type",
@@ -181,6 +181,47 @@ class TestDuplicateRemover:
         assert "261.1273/5.10" in result_mz_rt, "Higher-occurrence ISTD-A should be kept"
         assert "261.1274/5.11" not in result_mz_rt, "Lower-occurrence ISTD-B should be removed"
         assert "400.0000/15.00" in result_mz_rt, "Unrelated feature should be untouched"
+
+    def test_protected_rows_keep_representative_but_allow_per_sample_max_upgrade(self, remover):
+        """Protected rows lock representative selection, not original sample intensities."""
+        data = {
+            "Mz/RT": [
+                "Sample_Type",
+                "261.1273/5.10",  # Protected representative
+                "261.1274/5.11",  # Donor has stronger overlap on Sample1
+            ],
+            "Sample1": ["case", 1000, 4500],
+            "Sample2": ["case", 800, 700],
+            "Sample3": ["case", 600, 0],
+        }
+        df = pd.DataFrame(data)
+        result = remover.process(
+            df,
+            mz_tolerance_ppm=20,
+            rt_tolerance=0.1,
+            protected_rows={1},
+        )
+
+        assert result.success
+        assert len(result.data) - 1 == 1
+
+        merged_row = result.data.iloc[1]
+        assert merged_row["Mz/RT"] == "261.1273/5.10", "Protected row should remain the representative"
+        assert float(merged_row["Sample1"]) == 4500, "per_sample_max may upgrade protected representative values"
+        assert float(merged_row["Sample2"]) == 800
+        assert float(merged_row["Sample3"]) == 600
+        assert result.statistics["data_points_upgraded"] == 1
+
+    def test_invalid_merge_mode_raises_value_error(self, remover):
+        """Invalid merge mode should fail fast for direct API callers."""
+        data = {
+            "Mz/RT": ["Sample_Type", "250.080914/8.571", "250.080914/8.571"],
+            "Sample1": ["case", 1000, 2000],
+        }
+        df = pd.DataFrame(data)
+
+        with pytest.raises(ValueError, match="Unsupported merge_mode"):
+            remover.process(df, mz_tolerance_ppm=20, rt_tolerance=0.1, merge_mode="sum")
 
     def test_merge_recovers_complementary_data_points(self, remover):
         """Duplicate rows with complementary sample coverage should be merged, not discarded."""
@@ -211,6 +252,65 @@ class TestDuplicateRemover:
 
         assert result.statistics["data_points_recovered"] == 2
         assert result.statistics["groups_merged"] >= 1
+
+    def test_merge_uses_per_sample_max_by_default(self, remover):
+        """Default merge policy should keep the highest overlapping sample value."""
+        data = {
+            "Mz/RT": [
+                "Sample_Type",
+                "250.080914/8.571",  # Representative row chosen by higher occurrence
+                "250.080914/8.571",  # Donor row has stronger overlapping Sample2 value
+            ],
+            "Sample1": ["case", 1000, 0],
+            "Sample2": ["case", 2000, 4500],
+            "Sample3": ["case", 3000, 2800],
+        }
+        df = pd.DataFrame(data)
+        result = remover.process(df, mz_tolerance_ppm=20, rt_tolerance=0.1)
+
+        assert result.success
+        assert len(result.data) - 1 == 1
+
+        merged_row = result.data.iloc[1]
+        assert float(merged_row["Sample1"]) == 1000
+        assert float(merged_row["Sample2"]) == 4500, "Overlapping sample should keep donor max"
+        assert float(merged_row["Sample3"]) == 3000, "Lower donor overlap should not overwrite best row"
+        assert result.statistics["data_points_recovered"] == 0
+        assert result.statistics["data_points_upgraded"] == 1
+
+    def test_merge_fill_gaps_mode_preserves_legacy_overlap_behavior(self, remover):
+        """Legacy fill_gaps mode should only recover missing values, not overwrite overlaps."""
+        data = {
+            "Mz/RT": [
+                "Sample_Type",
+                "250.080914/8.571",
+                "250.080914/8.571",
+            ],
+            "Sample1": ["case", 1000, 0],
+            "Sample2": ["case", 2000, 4500],
+            "Sample3": ["case", 1800, 2800],
+            "Sample4": ["case", 0, 900],
+            "Sample5": ["case", 700, 0],
+        }
+        df = pd.DataFrame(data)
+        result = remover.process(
+            df,
+            mz_tolerance_ppm=20,
+            rt_tolerance=0.1,
+            merge_mode="fill_gaps",
+        )
+
+        assert result.success
+        assert len(result.data) - 1 == 1
+
+        merged_row = result.data.iloc[1]
+        assert float(merged_row["Sample1"]) == 1000
+        assert float(merged_row["Sample2"]) == 2000, "Legacy mode should keep original overlap value"
+        assert float(merged_row["Sample3"]) == 1800, "Legacy mode should keep original overlap value"
+        assert float(merged_row["Sample4"]) == 900, "Legacy mode should still fill missing values"
+        assert float(merged_row["Sample5"]) == 700
+        assert result.statistics["data_points_recovered"] == 1
+        assert result.statistics["data_points_upgraded"] == 0
 
     def test_merge_four_way_duplicate_union(self, remover):
         """Four-way duplicate (like FH multi-trigger) should merge all coverage."""

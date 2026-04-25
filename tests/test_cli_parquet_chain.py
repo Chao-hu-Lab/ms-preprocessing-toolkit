@@ -46,6 +46,7 @@ def _make_cli_args(input_path: Path, output_path: Path | None, step: str) -> Sim
         istd_record_file=None,
         istd_record_date=None,
         rt_tol=None,
+        merge_mode=None,
         enable_degeneracy_annotation=False,
         degeneracy_ppm_tol=None,
         degeneracy_rt_tol=None,
@@ -315,6 +316,7 @@ def test_cli_default_profile_uses_integrated_step_parameters(monkeypatch, projec
         assert captured["step2"]["istd_record_date"] == "20260106"
         assert captured["step3"]["mz_tolerance_ppm"] == 20.0
         assert captured["step3"]["rt_tolerance"] == 0.1
+        assert captured["step3"]["merge_mode"] == "per_sample_max"
         assert captured["step3"]["enable_degeneracy_annotation"] is False
         assert captured["step3"]["degeneracy_ppm_tolerance"] == 20.0
         assert captured["step3"]["degeneracy_rt_tolerance"] == 0.05
@@ -329,3 +331,48 @@ def test_cli_default_profile_uses_integrated_step_parameters(monkeypatch, projec
         assert captured["step4"]["enable_background_threshold"] is True
         assert captured["step4"]["enable_qc_ratio_threshold"] is True
         assert captured["step4"]["enable_intensity_fc_threshold"] is False
+
+
+def test_cli_merge_mode_override_reaches_step3(monkeypatch, project_temp_dir) -> None:
+    with project_temp_dir() as temp_dir:
+        base = Path(temp_dir)
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.1/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 1000],
+                "Control1": ["control", 1200],
+                "QC1": ["qc", 1100],
+            }
+        )
+        input_path = base / "input.csv"
+        df.to_csv(input_path, index=False)
+        output_path = base / "final.xlsx"
+
+        fake_handler = _FakeFileHandler(input_df=df)
+        _patch_cli_dependencies(monkeypatch, fake_handler)
+
+        import ms_preprocessing.adapters.duplicate_remover as duplicate_module
+
+        captured: dict[str, dict] = {}
+        monkeypatch.setattr(
+            duplicate_module,
+            "run_from_df",
+            lambda data, **kwargs: (
+                captured.setdefault("step3", dict(kwargs)),
+                ProcessingResult(
+                    success=True,
+                    step="duplicate_remover",
+                    output_path=None,
+                    data=data.copy(),
+                    metadata=ProcessingMetadata(red_font_rows=set(), protected_rows=set()),
+                ),
+            )[1],
+        )
+
+        args = _make_cli_args(input_path=input_path, output_path=output_path, step="duplicate-removal")
+        args.merge_mode = "fill_gaps"
+        rc = run_cli(args)
+
+        assert rc == 0
+        assert captured["step3"]["merge_mode"] == "fill_gaps"

@@ -109,6 +109,7 @@ def test_duplicate_remover_run_from_df_forwards_protected_rows(monkeypatch) -> N
         df,
         mz_tolerance_ppm=10.0,
         rt_tolerance=0.4,
+        merge_mode="fill_gaps",
         top_n=2,
         protected_rows={1, 2},
         enable_degeneracy_annotation=True,
@@ -124,6 +125,7 @@ def test_duplicate_remover_run_from_df_forwards_protected_rows(monkeypatch) -> N
     assert calls["kwargs"] == {
         "mz_tolerance_ppm": 10.0,
         "rt_tolerance": 0.4,
+        "merge_mode": "fill_gaps",
         "top_n": 2,
         "protected_rows": {1, 2},
         "enable_degeneracy_annotation": True,
