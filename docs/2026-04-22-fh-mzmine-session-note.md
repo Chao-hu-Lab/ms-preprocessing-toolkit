@@ -24,12 +24,12 @@
 ### 3. `metabCombiner` 不是完全黑箱
 
 - 本機安裝版本：`metabCombiner 1.20.0`
-- 已抓 source 到：
-  - [metabCombiner-source](</C:/Users/user/Desktop/MS Data process package/metabCombiner-source>)
+- 已抓 source 到本機外部目錄：
+  - `metabCombiner-source`
 - 已對齊安裝版本 commit：
   - `32c5536b9565794b11f31557760577acf8e9e86d`
 - 已整理中文導讀：
-  - [GUIDE.zh-TW.md](</C:/Users/user/Desktop/MS Data process package/metabCombiner-source/GUIDE.zh-TW.md:1>)
+  - `metabCombiner-source/GUIDE.zh-TW.md`
 
 ### 4. 目前 Python bridge 沒有跑到 upstream 的最終 row reduction
 
@@ -45,7 +45,7 @@
 
 核心檔案：
 
-- [duplicate_remover.py](</C:/Users/user/Desktop/MS Data process package/ms-preprocessing-toolkit/ms-core/src/ms_core/preprocessing/duplicate_remover.py:449>)
+- [duplicate_remover.py](../ms-core/src/ms_core/preprocessing/duplicate_remover.py#L449)
 
 目前規則：
 
@@ -79,7 +79,7 @@
 
 測試資料：
 
-- [MZmine_aligment_both_DNA_AfterVBA.xlsx](</C:/Users/user/Desktop/NTU cancer/Processed Data/DNA/Mzmine/new_test/20260106 tissue old version/test1/MZmine_aligment_both_DNA_AfterVBA.xlsx>)
+- `MZmine_aligment_both_DNA_AfterVBA.xlsx`（本機實驗資料，未納入 repo）
 
 比較結果：
 
@@ -115,6 +115,6 @@
 
 ## 下次回來建議先看
 
-- [duplicate_remover.py](</C:/Users/user/Desktop/MS Data process package/ms-preprocessing-toolkit/ms-core/src/ms_core/preprocessing/duplicate_remover.py:449>)
-- [metabcombiner_bridge.py](</C:/Users/user/Desktop/MS Data process package/metabcombiner/metabcombiner_bridge.py:1>)
-- [GUIDE.zh-TW.md](</C:/Users/user/Desktop/MS Data process package/metabCombiner-source/GUIDE.zh-TW.md:1>)
+- [duplicate_remover.py](../ms-core/src/ms_core/preprocessing/duplicate_remover.py#L449)
+- `metabcombiner/metabcombiner_bridge.py`（本機外部專案）
+- `metabCombiner-source/GUIDE.zh-TW.md`（本機外部導讀）

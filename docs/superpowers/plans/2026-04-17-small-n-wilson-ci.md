@@ -20,7 +20,7 @@
 - [ ] **建立 ms-core feature branch**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\ms-core"
+cd "<repo_root>\ms-core"
 git checkout master
 git pull
 git checkout -b feat/small-n-wilson-ci
@@ -29,7 +29,7 @@ git checkout -b feat/small-n-wilson-ci
 - [ ] **建立 toolkit worktree**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit"
+cd "<repo_root>"
 git worktree add .worktrees/small-n-wilson-ci -b feat/small-n-wilson-ci
 ```
 
@@ -110,7 +110,7 @@ def test_wilson_lower_zero_n_returns_zeros() -> None:
 - [ ] **Step 2: 執行測試確認失敗**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\ms-core"
+cd "<repo_root>\ms-core"
 uv run pytest tests/test_feature_filter_small_n.py -v
 ```
 
@@ -135,7 +135,7 @@ def _wilson_lower_vec(p: np.ndarray, n: int, z: float = 1.96) -> np.ndarray:
 - [ ] **Step 4: 執行 Wilson CI helper 測試確認通過**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\ms-core"
+cd "<repo_root>\ms-core"
 uv run pytest tests/test_feature_filter_small_n.py -v
 ```
 
@@ -216,7 +216,7 @@ def test_stable_gate_large_n_accepts_80_percent() -> None:
 - [ ] **Step 6: 執行測試確認失敗（stable gate 尚未有 Wilson CI）**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\ms-core"
+cd "<repo_root>\ms-core"
 uv run pytest tests/test_feature_filter_small_n.py::test_stable_gate_small_n_rejects_4_of_5 -v
 ```
 
@@ -269,7 +269,7 @@ mnar_keep = (
 - [ ] **Step 8: 執行 stable gate 測試確認通過**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\ms-core"
+cd "<repo_root>\ms-core"
 uv run pytest tests/test_feature_filter_small_n.py -v
 ```
 
@@ -295,7 +295,7 @@ stats = {
 - [ ] **Step 10: 執行完整 ms-core 測試**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\ms-core"
+cd "<repo_root>\ms-core"
 uv run pytest tests/ -v --tb=short
 ```
 
@@ -304,7 +304,7 @@ uv run pytest tests/ -v --tb=short
 - [ ] **Step 11: 在 ms-core commit**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\ms-core"
+cd "<repo_root>\ms-core"
 git add src/ms_core/preprocessing/ms_quality_filter.py tests/test_feature_filter_small_n.py
 git commit -m "feat: Wilson CI correction for small biological groups (N<10)
 
@@ -317,7 +317,7 @@ git commit -m "feat: Wilson CI correction for small biological groups (N<10)
 - [ ] **Step 12: push ms-core feature branch**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\ms-core"
+cd "<repo_root>\ms-core"
 git push origin feat/small-n-wilson-ci
 ```
 
@@ -328,7 +328,7 @@ git push origin feat/small-n-wilson-ci
 - [ ] **開 ms-core PR**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\ms-core"
+cd "<repo_root>\ms-core"
 gh pr create \
   --title "feat: Wilson CI correction for small biological groups (N<10)" \
   --body "## Summary
@@ -363,7 +363,7 @@ When a biological group has small N (e.g., N=5), a ratio of 4/5=80% passes the t
 確認 ms-core PR 已 merge 並打 tag：
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\ms-core"
+cd "<repo_root>\ms-core"
 git checkout master && git pull
 # 查看最新 tag：
 git tag --sort=-version:refname | head -5
@@ -380,7 +380,7 @@ git push origin v0.X.Y+1
 - [ ] **在 toolkit worktree 更新 submodule**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\.worktrees\small-n-wilson-ci"
+cd "<repo_root>\.worktrees\small-n-wilson-ci"
 cd ms-core
 git fetch --tags
 git checkout v0.X.Y+1  # 替換為實際 tag
@@ -424,7 +424,7 @@ def test_adapter_get_group_summary_returns_correct_n(monkeypatch) -> None:
 - [ ] **Step 2: 執行測試確認失敗**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\.worktrees\small-n-wilson-ci"
+cd "<repo_root>\.worktrees\small-n-wilson-ci"
 PYTHONPATH=ms-core/src uv run pytest tests/test_feature_filter_widget.py::test_adapter_get_group_summary_returns_correct_n -v
 ```
 
@@ -452,7 +452,7 @@ def get_group_summary(df: pd.DataFrame) -> dict:
 - [ ] **Step 4: 執行測試確認通過**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\.worktrees\small-n-wilson-ci"
+cd "<repo_root>\.worktrees\small-n-wilson-ci"
 PYTHONPATH=ms-core/src uv run pytest tests/test_feature_filter_widget.py::test_adapter_get_group_summary_returns_correct_n -v
 ```
 
@@ -461,7 +461,7 @@ PYTHONPATH=ms-core/src uv run pytest tests/test_feature_filter_widget.py::test_a
 - [ ] **Step 5: commit**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\.worktrees\small-n-wilson-ci"
+cd "<repo_root>\.worktrees\small-n-wilson-ci"
 git add src/ms_preprocessing/adapters/feature_filter.py tests/test_feature_filter_widget.py
 git commit -m "feat(adapter): expose get_group_summary for pre-run N check"
 ```
@@ -538,7 +538,7 @@ def test_on_run_clicked_skips_small_group_dialog_when_all_groups_gte10(
 - [ ] **Step 2: 執行測試確認失敗**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\.worktrees\small-n-wilson-ci"
+cd "<repo_root>\.worktrees\small-n-wilson-ci"
 PYTHONPATH=ms-core/src uv run pytest tests/test_feature_filter_widget.py::test_on_run_clicked_shows_small_group_dialog_when_any_group_lt10 tests/test_feature_filter_widget.py::test_on_run_clicked_skips_small_group_dialog_when_all_groups_gte10 -v
 ```
 
@@ -607,7 +607,7 @@ def _on_run_clicked(self) -> None:
 - [ ] **Step 4: 執行測試確認通過**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\.worktrees\small-n-wilson-ci"
+cd "<repo_root>\.worktrees\small-n-wilson-ci"
 PYTHONPATH=ms-core/src uv run pytest tests/test_feature_filter_widget.py::test_on_run_clicked_shows_small_group_dialog_when_any_group_lt10 tests/test_feature_filter_widget.py::test_on_run_clicked_skips_small_group_dialog_when_all_groups_gte10 -v
 ```
 
@@ -616,7 +616,7 @@ PYTHONPATH=ms-core/src uv run pytest tests/test_feature_filter_widget.py::test_o
 - [ ] **Step 5: commit**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\.worktrees\small-n-wilson-ci"
+cd "<repo_root>\.worktrees\small-n-wilson-ci"
 git add src/ms_preprocessing/gui/widgets/feature_filter_widget.py tests/test_feature_filter_widget.py
 git commit -m "feat(widget): pre-run Wilson CI warning for biological groups N<10"
 ```
@@ -712,7 +712,7 @@ def test_run_processing_no_qc_note_when_qc_n_gte10(widget, monkeypatch) -> None:
 - [ ] **Step 2: 執行測試確認失敗**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\.worktrees\small-n-wilson-ci"
+cd "<repo_root>\.worktrees\small-n-wilson-ci"
 PYTHONPATH=ms-core/src uv run pytest tests/test_feature_filter_widget.py::test_run_processing_logs_qc_small_n_note tests/test_feature_filter_widget.py::test_run_processing_no_qc_note_when_qc_n_gte10 -v
 ```
 
@@ -737,7 +737,7 @@ if result.statistics:
 - [ ] **Step 4: 執行測試確認通過**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\.worktrees\small-n-wilson-ci"
+cd "<repo_root>\.worktrees\small-n-wilson-ci"
 PYTHONPATH=ms-core/src uv run pytest tests/test_feature_filter_widget.py::test_run_processing_logs_qc_small_n_note tests/test_feature_filter_widget.py::test_run_processing_no_qc_note_when_qc_n_gte10 -v
 ```
 
@@ -746,7 +746,7 @@ PYTHONPATH=ms-core/src uv run pytest tests/test_feature_filter_widget.py::test_r
 - [ ] **Step 5: commit**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\.worktrees\small-n-wilson-ci"
+cd "<repo_root>\.worktrees\small-n-wilson-ci"
 git add src/ms_preprocessing/gui/widgets/feature_filter_widget.py tests/test_feature_filter_widget.py
 git commit -m "feat(widget): log QC N<10 per-sample impact note after run"
 ```
@@ -758,7 +758,7 @@ git commit -m "feat(widget): log QC N<10 per-sample impact note after run"
 - [ ] **Step 1: 執行完整 toolkit 測試套件**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\.worktrees\small-n-wilson-ci"
+cd "<repo_root>\.worktrees\small-n-wilson-ci"
 PYTHONPATH=ms-core/src uv run pytest tests/ -v --tb=short -x
 ```
 
@@ -767,14 +767,14 @@ PYTHONPATH=ms-core/src uv run pytest tests/ -v --tb=short -x
 - [ ] **Step 2: push toolkit feature branch**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\.worktrees\small-n-wilson-ci"
+cd "<repo_root>\.worktrees\small-n-wilson-ci"
 git push origin feat/small-n-wilson-ci
 ```
 
 - [ ] **Step 3: 開 toolkit PR**
 
 ```bash
-cd "C:\Users\user\Desktop\MS Data process package\ms-preprocessing-toolkit\.worktrees\small-n-wilson-ci"
+cd "<repo_root>\.worktrees\small-n-wilson-ci"
 gh pr create \
   --title "feat(step4): Wilson CI correction for small N + QC N warning" \
   --body "## Summary

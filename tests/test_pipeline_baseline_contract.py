@@ -87,6 +87,9 @@ def test_pipeline_defaults_follow_local_reference_config(tmp_path, monkeypatch) 
         encoding="utf-8",
     )
 
+    monkeypatch.delenv("MSPTK_METHOD_FILE", raising=False)
+    monkeypatch.delenv("MSPTK_ISTD_RECORD_FILE", raising=False)
+    monkeypatch.delenv("MSPTK_ISTD_RECORD_DATE", raising=False)
     monkeypatch.setenv("MSPTK_LOCAL_REFERENCE_CONFIG", str(config_path))
     defaults = importlib.import_module("ms_preprocessing.config.pipeline_defaults")
     benchmark = importlib.import_module("scripts.benchmark_pipeline_io")
@@ -104,6 +107,9 @@ def test_pipeline_defaults_follow_local_reference_config(tmp_path, monkeypatch) 
         assert result["istd_record_file"] == "local-istd.xlsx"
     finally:
         monkeypatch.delenv("MSPTK_LOCAL_REFERENCE_CONFIG", raising=False)
+        monkeypatch.delenv("MSPTK_METHOD_FILE", raising=False)
+        monkeypatch.delenv("MSPTK_ISTD_RECORD_FILE", raising=False)
+        monkeypatch.delenv("MSPTK_ISTD_RECORD_DATE", raising=False)
         importlib.reload(defaults)
         importlib.reload(benchmark)
 
@@ -114,6 +120,7 @@ def test_pipeline_defaults_are_empty_without_local_or_env_overrides(tmp_path, mo
     monkeypatch.setenv("MSPTK_LOCAL_REFERENCE_CONFIG", str(missing_config_path))
     monkeypatch.delenv("MSPTK_METHOD_FILE", raising=False)
     monkeypatch.delenv("MSPTK_ISTD_RECORD_FILE", raising=False)
+    monkeypatch.delenv("MSPTK_ISTD_RECORD_DATE", raising=False)
 
     defaults = importlib.import_module("ms_preprocessing.config.pipeline_defaults")
     benchmark = importlib.import_module("scripts.benchmark_pipeline_io")
@@ -131,5 +138,8 @@ def test_pipeline_defaults_are_empty_without_local_or_env_overrides(tmp_path, mo
         assert result["istd_record_file"] == ""
     finally:
         monkeypatch.delenv("MSPTK_LOCAL_REFERENCE_CONFIG", raising=False)
+        monkeypatch.delenv("MSPTK_METHOD_FILE", raising=False)
+        monkeypatch.delenv("MSPTK_ISTD_RECORD_FILE", raising=False)
+        monkeypatch.delenv("MSPTK_ISTD_RECORD_DATE", raising=False)
         importlib.reload(defaults)
         importlib.reload(benchmark)
