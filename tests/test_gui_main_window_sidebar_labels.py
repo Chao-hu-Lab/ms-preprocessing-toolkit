@@ -148,6 +148,7 @@ def test_main_window_startup_logs_default_profile_details(ctk_root, tmp_path) ->
         assert "Applied Run All preset: default" in log_text
         assert "Preset parameters:" in log_text
         assert "QC_ratio: 0.25" in log_text
+        assert all(line.startswith("[") for line in log_text.splitlines() if line.strip())
     finally:
         app.destroy()
 

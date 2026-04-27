@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
+
+from ms_preprocessing.gui.path_display import display_basename
 
 
 def _value_from(*sources: dict[str, Any], keys: tuple[str, ...]) -> Any:
@@ -21,7 +22,7 @@ def _append_value(lines: list[str], label: str, value: Any) -> None:
 
 
 def _basename(value: Any) -> str:
-    return Path(str(value)).name
+    return display_basename(value)
 
 
 def _format_bool_enabled(value: Any) -> str:

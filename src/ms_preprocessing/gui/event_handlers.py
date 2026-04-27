@@ -20,6 +20,7 @@ from ms_preprocessing.adapters import data_organizer as data_organizer_adapter
 from ms_preprocessing.bootstrap_paths import ensure_dnp_bridge_on_path, find_dnp_main_module
 from ms_preprocessing.config import format_pipeline_profile_preview, get_pipeline_profile
 from ms_preprocessing.config.settings import Settings
+from ms_preprocessing.gui.path_display import display_basename
 from ms_preprocessing.gui.pipeline_session import PipelineSession
 from ms_preprocessing.gui.styles import COLORS
 from ms_preprocessing.gui.step_summary import summarize_step_result
@@ -76,7 +77,7 @@ class MainWindowEventHandlersMixin:
     def _display_name(self: "_MainWindowEventHost", value: Any) -> str:
         if not value:
             return "not selected"
-        return Path(str(value)).name
+        return display_basename(value)
 
     def _safe_step_params(self: "_MainWindowEventHost", step_index: int) -> dict[str, Any]:
         session_params = getattr(self._pipeline_session, "step_parameters", {}).get(step_index)
@@ -378,7 +379,7 @@ class MainWindowEventHandlersMixin:
 
         if log:
             self._log(f"Applied Run All preset: {profile_name}")
-            self._log(f"Preset parameters: {format_pipeline_profile_preview(profile_name)}")
+            self._log_pipeline_profile_preview(profile_name)
 
     def _has_active_processing(self: "_MainWindowEventHost") -> bool:
         self._ensure_async_state()
@@ -726,7 +727,7 @@ class MainWindowEventHandlersMixin:
             except Exception:
                 profile_name = "default"
         self._log(f"Run All preset: {profile_name}")
-        self._log(f"Preset parameters: {format_pipeline_profile_preview(profile_name)}")
+        self._log_pipeline_profile_preview(profile_name)
 
         validation_warnings = self._collect_run_all_validation_warnings(params_by_step)
         if validation_warnings:
@@ -1211,6 +1212,12 @@ class MainWindowEventHandlersMixin:
 
     def _log(self: "_MainWindowEventHost", message: str) -> None:
         self._dispatch_to_ui(self._append_log_entry, message)
+
+    def _log_pipeline_profile_preview(self: "_MainWindowEventHost", profile_name: str) -> None:
+        self._log("Preset parameters:")
+        preview_lines = format_pipeline_profile_preview(profile_name).splitlines() or ["(none)"]
+        for preview_line in preview_lines:
+            self._log(f"  {preview_line}")
 
     def _append_log_entry(self: "_MainWindowEventHost", message: str) -> None:
         timestamp = datetime.now().strftime("%H:%M:%S")

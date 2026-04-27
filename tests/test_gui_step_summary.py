@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from pathlib import PurePosixPath
+
+import ms_preprocessing.gui.path_display as path_display_module
 from ms_preprocessing.gui.step_summary import summarize_step_result
 
 
@@ -17,6 +20,20 @@ def test_step1_summary_reports_data_shape_and_method_file() -> None:
     assert any("Samples: 18" in line for line in lines)
     assert any("SampleInfo: available" in line for line in lines)
     assert any("Method: method.docx" in line for line in lines)
+
+
+def test_step_summary_shortens_windows_paths_when_running_on_posix(monkeypatch) -> None:
+    monkeypatch.setattr(path_display_module, "PurePath", PurePosixPath)
+
+    lines = summarize_step_result(
+        "data_organizer",
+        statistics={},
+        metadata={},
+        parameters={"method_file": r"C:\data\method.docx"},
+    )
+
+    assert "Method: method.docx" in lines
+    assert all(r"C:\data\method.docx" not in line for line in lines)
 
 
 def test_step2_summary_accepts_future_xic_metadata() -> None:

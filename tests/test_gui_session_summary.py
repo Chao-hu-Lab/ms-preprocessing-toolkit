@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from pathlib import PurePosixPath
 
 import customtkinter as ctk
 import pandas as pd
 
+import ms_preprocessing.gui.path_display as path_display_module
 from ms_preprocessing.gui.event_handlers import MainWindowEventHandlersMixin
 from ms_preprocessing.gui.layout import MainWindowLayoutMixin
 from ms_preprocessing.gui.pipeline_session import PipelineSession
@@ -137,6 +139,21 @@ def test_run_context_summary_includes_source_method_istd_and_latest_output(ctk_r
         assert "Latest output: ALL_input.xlsx" in text
         assert "\nFiles:" in text
         assert "\nOutput:" in text
+    finally:
+        app.destroy()
+
+
+def test_display_name_shortens_windows_paths_when_running_on_posix(
+    ctk_root,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(path_display_module, "PurePath", PurePosixPath)
+    app = _SummaryHarness(ctk_root, tmp_path)
+    app.pack()
+    ctk_root.update_idletasks()
+    try:
+        assert app._display_name(r"C:\data\method.docx") == "method.docx"
     finally:
         app.destroy()
 

@@ -368,21 +368,23 @@ The preview should show:
 - Step 4 QC_ratio threshold.
 - Intensity FC gate is off by default.
 
-### Step 1: Write failing sidebar test
+### Step 1: Write failing log-preview test
 
 Add assertions that:
 
-- `run_all_profile_preview_label` exists.
-- Default preview mentions `QC_ratio`.
-- Default preview mentions `Intensity FC: off`.
+- `run_all_profile_preview_label` does not exist.
+- Startup or preset selection logs `Preset parameters:`.
+- Default preview log mentions `QC_ratio`.
+- Default preview log mentions `Intensity FC: off`.
+- Each preview line is logged as its own timestamped log entry.
 
 Expected: FAIL.
 
-### Step 2: Implement preview label
+### Step 2: Implement log-only preview
 
-Add a compact label under the Run All preset dropdown.
-
-Use `wraplength` so it fits the sidebar.
+Do not add another persistent sidebar label. Log the selected Run All preset as
+one header line followed by one log entry per preview line. This keeps the
+sidebar stable and avoids the left action area shifting when preset copy changes.
 
 ### Step 3: Add preview formatter
 
@@ -401,9 +403,9 @@ Expected preview content should include:
 - `QC_ratio: 0.25` or selected preset value
 - `Intensity FC: off`
 
-### Step 4: Update preview on preset selection
+### Step 4: Log preview on startup and preset selection
 
-In `_apply_pipeline_profile_to_widgets()`, update the preview label after setting the profile variable.
+In `_apply_pipeline_profile_to_widgets()`, emit the preview when the profile is applied with logging enabled.
 
 ### Step 5: Run focused tests
 
