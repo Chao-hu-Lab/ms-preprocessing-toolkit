@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import pandas as pd
-
 from ms_core.preprocessing import DataOrganizer as _DataOrganizer
 from ms_core.preprocessing import Settings as _CoreSettings
 

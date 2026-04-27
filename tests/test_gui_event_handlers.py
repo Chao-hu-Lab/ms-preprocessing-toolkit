@@ -16,8 +16,6 @@ from ms_preprocessing.gui.main_window import MainWindow
 from ms_preprocessing.gui.pipeline_session import PipelineSession
 from ms_preprocessing.gui.validation import ValidationWarning
 from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
-
-
 from tests.conftest import spin_until
 
 

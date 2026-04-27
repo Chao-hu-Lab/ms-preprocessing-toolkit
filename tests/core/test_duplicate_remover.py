@@ -1,9 +1,7 @@
 """Tests for DuplicateRemover module."""
 
-import pytest
 import pandas as pd
-import numpy as np
-
+import pytest
 from ms_core.preprocessing.duplicate_remover import DuplicateRemover
 
 

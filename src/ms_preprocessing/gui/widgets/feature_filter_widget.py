@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from typing import Callable, Optional
+from collections.abc import Callable
 
 import customtkinter as ctk
 import pandas as pd
@@ -21,10 +21,10 @@ class FeatureFilterWidget(BaseProcessingWidget):
         self,
         parent: ctk.CTkFrame,
         step_index: int,
-        on_load_file: Optional[Callable[[int], None]] = None,
-        on_complete: Optional[Callable[[pd.DataFrame], None]] = None,
-        on_log: Optional[Callable[[str], None]] = None,
-        on_progress: Optional[Callable[[float, str], None]] = None,
+        on_load_file: Callable[[int], None] | None = None,
+        on_complete: Callable[[pd.DataFrame], None] | None = None,
+        on_log: Callable[[str], None] | None = None,
+        on_progress: Callable[[float, str], None] | None = None,
     ):
         self._threshold_controls: dict[str, tuple[tk.BooleanVar, ctk.CTkSlider, ctk.CTkEntry]] = {}
         self._allow_single_group_stable: bool = False

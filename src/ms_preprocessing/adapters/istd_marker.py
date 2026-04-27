@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import pandas as pd
-
 from ms_core.preprocessing import ISTDMarker as _ISTDMarker
 from ms_core.preprocessing import Settings as _CoreSettings
 

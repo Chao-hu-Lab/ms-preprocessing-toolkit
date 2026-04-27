@@ -12,7 +12,7 @@ import threading
 from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox
-from typing import TYPE_CHECKING, Any, Optional, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 import pandas as pd
 
@@ -22,14 +22,13 @@ from ms_preprocessing.config import format_pipeline_profile_preview, get_pipelin
 from ms_preprocessing.config.settings import Settings
 from ms_preprocessing.gui.path_display import display_basename
 from ms_preprocessing.gui.pipeline_session import PipelineSession
-from ms_preprocessing.gui.styles import COLORS
 from ms_preprocessing.gui.step_summary import summarize_step_result
+from ms_preprocessing.gui.styles import COLORS
 from ms_preprocessing.gui.validation import (
     ValidationWarning,
     format_validation_warnings,
     has_blocking_warnings,
 )
-
 
 if TYPE_CHECKING:
     class _MainWindowEventHost(Protocol):
@@ -71,15 +70,15 @@ class MainWindowEventHandlersMixin:
     ``_MainWindowEventHost`` above.
     """
 
-    def _new_pipeline_session(self: "_MainWindowEventHost", source_file: Path | None) -> PipelineSession:
+    def _new_pipeline_session(self: _MainWindowEventHost, source_file: Path | None) -> PipelineSession:
         return PipelineSession(output_dir=self._output_dir, source_file=source_file)
 
-    def _display_name(self: "_MainWindowEventHost", value: Any) -> str:
+    def _display_name(self: _MainWindowEventHost, value: Any) -> str:
         if not value:
             return "not selected"
         return display_basename(value)
 
-    def _safe_step_params(self: "_MainWindowEventHost", step_index: int) -> dict[str, Any]:
+    def _safe_step_params(self: _MainWindowEventHost, step_index: int) -> dict[str, Any]:
         session_params = getattr(self._pipeline_session, "step_parameters", {}).get(step_index)
         if session_params:
             return dict(session_params)
@@ -94,7 +93,7 @@ class MainWindowEventHandlersMixin:
         except Exception:
             return {}
 
-    def _combined_tsv_state(self: "_MainWindowEventHost") -> str:
+    def _combined_tsv_state(self: _MainWindowEventHost) -> str:
         widgets = self.__dict__.get("step_widgets", [])
         if not widgets:
             return "not selected"
@@ -107,7 +106,7 @@ class MainWindowEventHandlersMixin:
             return "not selected"
         return "selected" if str(paths.get("combined_tsv") or "").strip() else "not selected"
 
-    def _latest_output_name(self: "_MainWindowEventHost") -> str:
+    def _latest_output_name(self: _MainWindowEventHost) -> str:
         materialized = self.__dict__.get("_last_materialized_export_path")
         if materialized:
             return Path(materialized).name
@@ -117,7 +116,7 @@ class MainWindowEventHandlersMixin:
             return Path(step_paths[last_step]).name
         return "not available"
 
-    def _update_run_context_summary(self: "_MainWindowEventHost") -> None:
+    def _update_run_context_summary(self: _MainWindowEventHost) -> None:
         label = self.__dict__.get("run_context_label")
         if label is None:
             return
@@ -146,7 +145,7 @@ class MainWindowEventHandlersMixin:
         label.configure(text="\n".join(lines))
 
     def _update_latest_result_summary(
-        self: "_MainWindowEventHost",
+        self: _MainWindowEventHost,
         lines: list[str],
     ) -> None:
         label = self.__dict__.get("latest_result_label")
@@ -161,7 +160,7 @@ class MainWindowEventHandlersMixin:
         label.configure(text=text)
 
     def _summarize_widget_result(
-        self: "_MainWindowEventHost",
+        self: _MainWindowEventHost,
         step_index: int,
         widget: Any,
         params: dict[str, Any] | None = None,
@@ -192,7 +191,7 @@ class MainWindowEventHandlersMixin:
         return summarize_step_result(step_name, stats, metadata, parameters)
 
     def _confirm_validation_warnings(
-        self: "_MainWindowEventHost",
+        self: _MainWindowEventHost,
         warnings: list[ValidationWarning],
     ) -> bool:
         try:
@@ -206,7 +205,7 @@ class MainWindowEventHandlersMixin:
             return True
 
     def _collect_run_all_validation_warnings(
-        self: "_MainWindowEventHost",
+        self: _MainWindowEventHost,
         params_by_step: list[dict[str, Any]],
     ) -> list[ValidationWarning]:
         warnings: list[ValidationWarning] = []
@@ -229,10 +228,10 @@ class MainWindowEventHandlersMixin:
                 )
         return warnings
 
-    def _on_pipeline_profile_selected(self: "_MainWindowEventHost", profile_name: str) -> None:
+    def _on_pipeline_profile_selected(self: _MainWindowEventHost, profile_name: str) -> None:
         self._apply_pipeline_profile_to_widgets(profile_name)
 
-    def _ensure_async_state(self: "_MainWindowEventHost") -> None:
+    def _ensure_async_state(self: _MainWindowEventHost) -> None:
         if "_ui_thread_id" not in self.__dict__:
             self._ui_thread_id = threading.get_ident()
         if "_ui_queue" not in self.__dict__:
@@ -246,13 +245,13 @@ class MainWindowEventHandlersMixin:
         if "_step_output_save_threads" not in self.__dict__:
             self._step_output_save_threads = []
 
-    def _can_schedule_ui_callbacks(self: "_MainWindowEventHost") -> bool:
+    def _can_schedule_ui_callbacks(self: _MainWindowEventHost) -> bool:
         after = getattr(self, "after", None)
         winfo_exists = getattr(self, "winfo_exists", None)
         return "tk" in self.__dict__ and callable(after) and callable(winfo_exists)
 
     def _dispatch_to_ui(
-        self: "_MainWindowEventHost",
+        self: _MainWindowEventHost,
         callback: Any,
         *args: Any,
     ) -> None:
@@ -262,7 +261,7 @@ class MainWindowEventHandlersMixin:
             return
         self._ui_queue.put((callback, args))
 
-    def _schedule_ui_queue_drain(self: "_MainWindowEventHost") -> None:
+    def _schedule_ui_queue_drain(self: _MainWindowEventHost) -> None:
         self._ensure_async_state()
         if not self._can_schedule_ui_callbacks():
             return
@@ -275,7 +274,7 @@ class MainWindowEventHandlersMixin:
             return
         self._ui_queue_after_id = self.after(16, self._drain_ui_queue)
 
-    def _drain_ui_queue(self: "_MainWindowEventHost") -> None:
+    def _drain_ui_queue(self: _MainWindowEventHost) -> None:
         self._ui_queue_after_id = None
         if not self._can_schedule_ui_callbacks():
             return
@@ -304,7 +303,7 @@ class MainWindowEventHandlersMixin:
         if worker_alive or not self._ui_queue.empty():
             self._schedule_ui_queue_drain()
 
-    def _iter_pipeline_controls(self: "_MainWindowEventHost") -> list[Any]:
+    def _iter_pipeline_controls(self: _MainWindowEventHost) -> list[Any]:
         controls: list[Any] = []
         for attr_name in (
             "run_step_btn",
@@ -335,7 +334,7 @@ class MainWindowEventHandlersMixin:
 
         return controls
 
-    def _set_pipeline_busy_state(self: "_MainWindowEventHost", processing: bool) -> None:
+    def _set_pipeline_busy_state(self: _MainWindowEventHost, processing: bool) -> None:
         self._ensure_async_state()
         self._pipeline_is_processing = processing
         state = "disabled" if processing else "normal"
@@ -350,7 +349,7 @@ class MainWindowEventHandlersMixin:
             pass
 
     def _safe_update_action_bar_progress(
-        self: "_MainWindowEventHost",
+        self: _MainWindowEventHost,
         value: float,
         status: str = "",
     ) -> None:
@@ -360,7 +359,7 @@ class MainWindowEventHandlersMixin:
             pass
 
     def _apply_pipeline_profile_to_widgets(
-        self: "_MainWindowEventHost",
+        self: _MainWindowEventHost,
         profile_name: str,
         *,
         log: bool = True,
@@ -381,7 +380,7 @@ class MainWindowEventHandlersMixin:
             self._log(f"Applied Run All preset: {profile_name}")
             self._log_pipeline_profile_preview(profile_name)
 
-    def _has_active_processing(self: "_MainWindowEventHost") -> bool:
+    def _has_active_processing(self: _MainWindowEventHost) -> bool:
         self._ensure_async_state()
         if self._pipeline_is_processing:
             return True
@@ -401,7 +400,7 @@ class MainWindowEventHandlersMixin:
 
         return False
 
-    def _auto_export_final_results(self: "_MainWindowEventHost") -> Optional[Path]:
+    def _auto_export_final_results(self: _MainWindowEventHost) -> Path | None:
         final_step_index = len(self.__dict__.get("step_widgets", [])) - 1
         if final_step_index < 0:
             return None
@@ -410,16 +409,16 @@ class MainWindowEventHandlersMixin:
         self._log("Final step complete. Auto-exporting results...")
         return self._export_results()
 
-    def _attach_pipeline_session(self: "_MainWindowEventHost", session: PipelineSession) -> None:
+    def _attach_pipeline_session(self: _MainWindowEventHost, session: PipelineSession) -> None:
         self._pipeline_session = session
         self._step_output_paths = session.step_output_paths
         self._context = session.context
 
-    def _snapshot_context(self: "_MainWindowEventHost", context: dict[str, Any]) -> dict[str, Any]:
+    def _snapshot_context(self: _MainWindowEventHost, context: dict[str, Any]) -> dict[str, Any]:
         """Copy source metadata so reruns can rebuild a clean pipeline session."""
         return copy.deepcopy(context)
 
-    def _reset_pipeline_for_run_all(self: "_MainWindowEventHost") -> None:
+    def _reset_pipeline_for_run_all(self: _MainWindowEventHost) -> None:
         """Start Run All from the originally loaded source metadata, not prior run state."""
         self._completed_steps = set()
         self._last_completed_step = None
@@ -438,9 +437,9 @@ class MainWindowEventHandlersMixin:
         self._context = session.context
 
     def _load_file_for_step(
-        self: "_MainWindowEventHost",
+        self: _MainWindowEventHost,
         step_index: int,
-        path: Optional[Path] = None,
+        path: Path | None = None,
     ) -> None:
         if self._has_active_processing():
             self._log("Busy: wait for the current step to finish before loading another file.")
@@ -519,7 +518,7 @@ class MainWindowEventHandlersMixin:
             self._show_error(f"Failed to load file:\n{exc}")
 
     def _build_combined_fix_output_path(
-        self: "_MainWindowEventHost",
+        self: _MainWindowEventHost,
         raw_path: Path,
     ) -> Path:
         output_dir = self._output_dir / "combined_fix"
@@ -535,7 +534,7 @@ class MainWindowEventHandlersMixin:
                 return candidate
             counter += 1
 
-    def _run_combined_tsv_preprocessor(self: "_MainWindowEventHost") -> None:
+    def _run_combined_tsv_preprocessor(self: _MainWindowEventHost) -> None:
         if self._has_active_processing():
             self._log("Busy: wait for the current task to finish before creating combined_fix.")
             return
@@ -609,14 +608,14 @@ class MainWindowEventHandlersMixin:
         self._update_run_context_summary()
         self._log("Ready: review Step 1 settings, then run Step 1 or Run All.")
 
-    def _show_error(self: "_MainWindowEventHost", message: str) -> None:
+    def _show_error(self: _MainWindowEventHost, message: str) -> None:
         self._log(f"ERROR: {message}")
         try:
             messagebox.showerror("Error", message)
         except Exception:
             pass
 
-    def _switch_step(self: "_MainWindowEventHost", step_index: int) -> None:
+    def _switch_step(self: _MainWindowEventHost, step_index: int) -> None:
         if step_index < 0 or step_index >= len(self.step_widgets):
             return
         if self._has_active_processing() and step_index != self._current_step:
@@ -627,7 +626,9 @@ class MainWindowEventHandlersMixin:
         self._show_step(step_index)
         self.step_widgets[step_index].set_context(self._context)
 
-        for index, (button, status_label) in enumerate(zip(self.step_buttons, self._step_status_labels)):
+        for index, (button, status_label) in enumerate(
+            zip(self.step_buttons, self._step_status_labels, strict=True)
+        ):
             if index == step_index:
                 button.configure(fg_color=COLORS["primary"])
                 status_label.configure(text=">", text_color="#52b788")
@@ -639,14 +640,14 @@ class MainWindowEventHandlersMixin:
                 status_label.configure(text="-", text_color="#4a6fa5")
         self._update_run_context_summary()
 
-    def _run_current_step(self: "_MainWindowEventHost") -> None:
+    def _run_current_step(self: _MainWindowEventHost) -> None:
         if 0 <= self._current_step < len(self.step_widgets):
             if getattr(self.step_widgets[self._current_step], "is_processing", lambda: False)():
                 self._log("Busy: the current step is already processing.")
                 return
             self.step_widgets[self._current_step]._on_run_clicked()
 
-    def _reset_current_step(self: "_MainWindowEventHost") -> None:
+    def _reset_current_step(self: _MainWindowEventHost) -> None:
         if 0 <= self._current_step < len(self.step_widgets):
             if getattr(self.step_widgets[self._current_step], "is_processing", lambda: False)():
                 self._log("Busy: wait for processing to finish before resetting the current step.")
@@ -654,9 +655,9 @@ class MainWindowEventHandlersMixin:
             self.step_widgets[self._current_step]._on_reset_clicked()
 
     def _on_step_complete(
-        self: "_MainWindowEventHost",
+        self: _MainWindowEventHost,
         result_data: pd.DataFrame,
-        metadata: Optional[dict] = None,
+        metadata: dict | None = None,
     ) -> None:
         step_index = self._current_step
         next_step = step_index + 1
@@ -702,7 +703,7 @@ class MainWindowEventHandlersMixin:
         self._auto_export_final_results()
         self._update_run_context_summary()
 
-    def _run_all_steps(self: "_MainWindowEventHost") -> None:
+    def _run_all_steps(self: _MainWindowEventHost) -> None:
         if self._has_active_processing():
             self._log("Busy: wait for the current step to finish before running the full pipeline.")
             return
@@ -758,7 +759,7 @@ class MainWindowEventHandlersMixin:
         self._run_all_steps_worker(original_step, data, params_by_step)
 
     def _run_all_steps_worker(
-        self: "_MainWindowEventHost",
+        self: _MainWindowEventHost,
         original_step: int,
         data: pd.DataFrame,
         params_by_step: list[dict[str, Any]],
@@ -825,7 +826,7 @@ class MainWindowEventHandlersMixin:
             self._dispatch_to_ui(self._finish_run_all_steps, original_step, success)
 
     def _finish_run_all_steps(
-        self: "_MainWindowEventHost",
+        self: _MainWindowEventHost,
         original_step: int,
         success: bool,
     ) -> None:
@@ -842,7 +843,7 @@ class MainWindowEventHandlersMixin:
             self._update_run_context_summary()
         self._switch_step(min(original_step, len(self.step_widgets) - 1))
 
-    def _export_results(self: "_MainWindowEventHost") -> Optional[Path]:
+    def _export_results(self: _MainWindowEventHost) -> Path | None:
         if self._has_active_processing():
             self._log("Busy: wait for processing to finish before exporting results.")
             return None
@@ -889,7 +890,7 @@ class MainWindowEventHandlersMixin:
             self._log(f"Export error: {exc}")
             return None
 
-    def _update_export_dnp_btn(self: "_MainWindowEventHost") -> None:
+    def _update_export_dnp_btn(self: _MainWindowEventHost) -> None:
         ready = self._last_completed_step is not None and self._last_completed_step >= 3
         if ready:
             self.export_dnp_btn.configure(
@@ -906,7 +907,7 @@ class MainWindowEventHandlersMixin:
             if hasattr(self, "_apply_action_button_theme"):
                 self._apply_action_button_theme(self.export_dnp_btn, "disabled")
 
-    def _export_to_dnp(self: "_MainWindowEventHost") -> None:
+    def _export_to_dnp(self: _MainWindowEventHost) -> None:
         if self._has_active_processing():
             self._log("Busy: wait for processing to finish before exporting to DNP.")
             return
@@ -973,7 +974,7 @@ class MainWindowEventHandlersMixin:
             self.export_dnp_btn.configure(text=original_text, state="normal")
             self._update_export_dnp_btn()
 
-    def _sample_info_requires_user_completion(self, bridge_path: "str | Path") -> bool:
+    def _sample_info_requires_user_completion(self, bridge_path: str | Path) -> bool:
         """Return True when SampleInfo sheet is missing Batch or DNA_mg/20uL values."""
         try:
             sample_info = pd.read_excel(Path(bridge_path), sheet_name="SampleInfo")
@@ -986,7 +987,7 @@ class MainWindowEventHandlersMixin:
                 return True
         return False
 
-    def _open_file_in_system_app(self, target: "str | Path") -> None:
+    def _open_file_in_system_app(self, target: str | Path) -> None:
         """Open a file using the system default application."""
         try:
             target_path = Path(target)
@@ -1000,7 +1001,7 @@ class MainWindowEventHandlersMixin:
         except Exception as exc:
             self._log(f"Open file error: {exc}")
 
-    def _materialize_final_xlsx_from_latest_step(self: "_MainWindowEventHost") -> Optional[Path]:
+    def _materialize_final_xlsx_from_latest_step(self: _MainWindowEventHost) -> Path | None:
         if self._last_completed_step is None:
             return None
         source_path = self._step_output_paths.get(self._last_completed_step)
@@ -1054,7 +1055,7 @@ class MainWindowEventHandlersMixin:
             self._log(f"Materialization error: {exc}")
             return None
 
-    def _launch_dnp(self: "_MainWindowEventHost") -> None:
+    def _launch_dnp(self: _MainWindowEventHost) -> None:
         main_py = find_dnp_main_module(self._project_root)
         if main_py is not None:
             self._log(f"Launching DNP: {main_py}")
@@ -1069,10 +1070,10 @@ class MainWindowEventHandlersMixin:
         )
 
     def _save_step_output(
-        self: "_MainWindowEventHost",
+        self: _MainWindowEventHost,
         step_index: int,
         data: pd.DataFrame,
-    ) -> Optional[Path]:
+    ) -> Path | None:
         if data is None:
             return None
         try:
@@ -1089,7 +1090,7 @@ class MainWindowEventHandlersMixin:
             return None
 
     def _schedule_step_output_save(
-        self: "_MainWindowEventHost",
+        self: _MainWindowEventHost,
         step_index: int,
         data: pd.DataFrame,
         *,
@@ -1131,7 +1132,7 @@ class MainWindowEventHandlersMixin:
         worker.start()
 
     def _run_step_output_save_worker(
-        self: "_MainWindowEventHost",
+        self: _MainWindowEventHost,
         step_index: int,
         data: pd.DataFrame,
         next_step_index: int | None,
@@ -1173,7 +1174,7 @@ class MainWindowEventHandlersMixin:
         )
 
     def _finish_deferred_step_output_save(
-        self: "_MainWindowEventHost",
+        self: _MainWindowEventHost,
         *,
         step_index: int,
         next_step_index: int | None,
@@ -1197,7 +1198,7 @@ class MainWindowEventHandlersMixin:
         self._log(f"Auto-saved: {path}")
         self._update_run_context_summary()
 
-    def _open_output_folder(self: "_MainWindowEventHost") -> None:
+    def _open_output_folder(self: _MainWindowEventHost) -> None:
         try:
             self._output_dir.mkdir(parents=True, exist_ok=True)
             system = platform.system()
@@ -1210,26 +1211,26 @@ class MainWindowEventHandlersMixin:
         except Exception as exc:
             self._log(f"Open output folder error: {exc}")
 
-    def _log(self: "_MainWindowEventHost", message: str) -> None:
+    def _log(self: _MainWindowEventHost, message: str) -> None:
         self._dispatch_to_ui(self._append_log_entry, message)
 
-    def _log_pipeline_profile_preview(self: "_MainWindowEventHost", profile_name: str) -> None:
+    def _log_pipeline_profile_preview(self: _MainWindowEventHost, profile_name: str) -> None:
         self._log("Preset parameters:")
         preview_lines = format_pipeline_profile_preview(profile_name).splitlines() or ["(none)"]
         for preview_line in preview_lines:
             self._log(f"  {preview_line}")
 
-    def _append_log_entry(self: "_MainWindowEventHost", message: str) -> None:
+    def _append_log_entry(self: _MainWindowEventHost, message: str) -> None:
         timestamp = datetime.now().strftime("%H:%M:%S")
         self.log_text.insert("end", f"[{timestamp}] {message}\n")
         self.log_text.see("end")
 
-    def _clear_log(self: "_MainWindowEventHost") -> None:
+    def _clear_log(self: _MainWindowEventHost) -> None:
         self.log_text.delete("1.0", "end")
 
     def _update_context_from_metadata(
-        self: "_MainWindowEventHost",
-        metadata: Optional[dict],
+        self: _MainWindowEventHost,
+        metadata: dict | None,
     ) -> None:
         self._pipeline_session.update_context_from_metadata(metadata)
         self._context = self._pipeline_session.context

@@ -2,21 +2,19 @@ import sys
 
 import pytest
 
-from pathlib import Path
-
 from ms_preprocessing.bootstrap_paths import (
-    BootstrapResolution,
-    bootstrap_ms_core,
     DNP_PROJECT_ROOT_ENV,
     DNP_SRC_ENV,
-    ensure_ms_core_src_on_path,
-    find_dnp_bridge_module,
     MS_CORE_PROJECT_ROOT_ENV,
     MS_CORE_SRC_ENV,
-    resolve_ms_core_src,
+    BootstrapResolution,
+    bootstrap_ms_core,
+    ensure_ms_core_src_on_path,
+    find_dnp_bridge_module,
     find_dnp_main_module,
     find_dnp_src,
     find_ms_core_src,
+    resolve_ms_core_src,
 )
 
 

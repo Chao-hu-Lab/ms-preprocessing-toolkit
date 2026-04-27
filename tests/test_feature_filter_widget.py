@@ -15,8 +15,6 @@ from ms_preprocessing.config.feature_filter_presets import get_step4_preset
 from ms_preprocessing.gui.widgets.data_organizer_widget import DataOrganizerWidget
 from ms_preprocessing.gui.widgets.feature_filter_widget import FeatureFilterWidget
 from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
-
-
 from tests.conftest import spin_until
 
 
@@ -463,6 +461,7 @@ def test_on_run_shows_small_group_dialog_when_any_group_lt10(widget, monkeypatch
 def test_on_run_skips_small_group_dialog_when_all_groups_gte10(widget, monkeypatch) -> None:
     """When all biological groups N >= 10, no small-group dialog shown."""
     import pandas as pd
+
     from ms_preprocessing.gui.widgets.base_widget import BaseProcessingWidget
 
     rows: dict = {"feature": ["Sample_Type", "f1"]}
@@ -506,6 +505,7 @@ def test_adapter_get_group_summary_returns_correct_counts() -> None:
 def test_run_processing_logs_qc_small_n_note(widget, monkeypatch) -> None:
     """When QC N < 10, run_processing logs per-sample impact percentage."""
     import pandas as pd
+
     from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
 
     def fake_run(data, **kwargs):
@@ -539,6 +539,7 @@ def test_run_processing_logs_qc_small_n_note(widget, monkeypatch) -> None:
 def test_run_processing_no_qc_note_when_qc_n_gte10(widget, monkeypatch) -> None:
     """When QC N >= 10, no QC note is logged."""
     import pandas as pd
+
     from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
 
     def fake_run(data, **kwargs):

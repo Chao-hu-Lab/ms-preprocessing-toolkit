@@ -1,6 +1,5 @@
 """Configuration module for MS Preprocessing Toolkit."""
 
-from ms_preprocessing.config.settings import Settings
 from ms_preprocessing.config.feature_filter_presets import (
     PRESET_DESCRIPTIONS,
     STEP4_PRESETS,
@@ -21,6 +20,7 @@ from ms_preprocessing.config.pipeline_profiles import (
     format_pipeline_profile_preview,
     get_pipeline_profile,
 )
+from ms_preprocessing.config.settings import Settings
 
 __all__ = [
     "Settings",

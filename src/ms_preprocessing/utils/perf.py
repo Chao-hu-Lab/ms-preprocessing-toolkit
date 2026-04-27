@@ -4,10 +4,8 @@ Performance utilities for timing and memory usage.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Optional
 import time
-
+from dataclasses import dataclass
 
 try:
     import psutil  # type: ignore
@@ -19,10 +17,10 @@ except Exception:
 class PerfSnapshot:
     """Snapshot of timing and memory usage."""
     time: float
-    rss_mb: Optional[float]
+    rss_mb: float | None
 
 
-def _current_rss_mb() -> Optional[float]:
+def _current_rss_mb() -> float | None:
     if psutil is None:
         return None
     try:

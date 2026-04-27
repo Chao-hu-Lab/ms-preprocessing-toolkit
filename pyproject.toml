@@ -8,7 +8,7 @@ version = "1.2.1"
 description = "Mass Spectrometry Data Preprocessing Toolkit - An integrated GUI tool for MS data preprocessing workflow"
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 authors = [
     {name = "Your Name", email = "your.email@example.com"}
 ]
@@ -19,8 +19,6 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
@@ -65,10 +63,11 @@ where = ["src"]
 
 [tool.black]
 line-length = 100
-target-version = ['py39', 'py310', 'py311', 'py312']
+target-version = ['py311', 'py312']
 
 [tool.ruff]
 line-length = 100
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "TID"]
@@ -80,11 +79,19 @@ ignore = ["E501"]
 [tool.ruff.lint.per-file-ignores]
 # adapters/ 是唯一允許直接 import ms_core 的地方
 "src/ms_preprocessing/adapters/**/*.py" = ["TID251"]
+# benchmark scripts 是 local analysis harness，允許直接驗證 ms_core 行為
+"scripts/benchmark_*.py" = ["TID251"]
+# subset/full comparison script 是 local validation harness，允許直接驗證 ms_core 行為
+"scripts/compare_subset_vs_full.py" = ["TID251"]
+# benchmark script 需要在開發環境先補 repo-local src path 再匯入 toolkit config
+"scripts/benchmark_pipeline_io.py" = ["E402"]
+# package bootstrap 需要先調整 ms-core path 再匯出 adapter API
+"src/ms_preprocessing/__init__.py" = ["E402"]
 # tests 允許直接 import ms_core（core unit tests 需要）
 "tests/**/*.py" = ["TID251"]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_ignores = true
 

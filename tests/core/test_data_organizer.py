@@ -1,8 +1,7 @@
 """Tests for DataOrganizer module."""
 
-import pytest
 import pandas as pd
-
+import pytest
 from ms_core.preprocessing.data_organizer import DataOrganizer, InjectionInfo
 
 
@@ -100,7 +99,9 @@ class TestDataOrganizer:
 
         sample_info = result.metadata.get("sample_info")
         assert sample_info is not None
-        sample_type_by_name = dict(zip(sample_info["Sample_Name"], sample_info["Sample_Type"]))
+        sample_type_by_name = dict(
+            zip(sample_info["Sample_Name"], sample_info["Sample_Type"], strict=True)
+        )
         assert sample_type_by_name["Sample1"] == "Exposure"
         assert sample_type_by_name["Sample2"] == "Control"
         assert sample_type_by_name["QC_1"] == "QC"

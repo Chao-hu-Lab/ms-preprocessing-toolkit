@@ -3,7 +3,7 @@ Data Organizer Widget - GUI for Step 1.
 """
 
 import re
-from typing import Callable, Optional
+from collections.abc import Callable
 from tkinter import filedialog
 
 import customtkinter as ctk
@@ -22,11 +22,11 @@ class DataOrganizerWidget(BaseProcessingWidget):
         self,
         parent: ctk.CTkFrame,
         step_index: int,
-        on_load_file: Optional[Callable[[int], None]] = None,
-        on_complete: Optional[Callable[[pd.DataFrame], None]] = None,
-        on_log: Optional[Callable[[str], None]] = None,
-        on_progress: Optional[Callable[[float, str], None]] = None,
-        on_run_combined_preprocessor: Optional[Callable[[], None]] = None,
+        on_load_file: Callable[[int], None] | None = None,
+        on_complete: Callable[[pd.DataFrame], None] | None = None,
+        on_log: Callable[[str], None] | None = None,
+        on_progress: Callable[[float, str], None] | None = None,
+        on_run_combined_preprocessor: Callable[[], None] | None = None,
     ):
         self._on_run_combined_preprocessor = on_run_combined_preprocessor
         super().__init__(

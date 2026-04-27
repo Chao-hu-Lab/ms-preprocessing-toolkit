@@ -9,7 +9,6 @@ import os
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 
 @dataclass
@@ -52,7 +51,7 @@ class DuplicateRemovalConfig:
 
     # Processing options
     preserve_red_font: bool = True
-    top_n_results: Optional[int] = None
+    top_n_results: int | None = None
     enable_degeneracy_annotation: bool = False
     degeneracy_adduct_table_file: str = ""
 
@@ -134,10 +133,10 @@ class Settings:
         ("feature_filter", "特徵篩選", "Feature Filtering"),
     ]
 
-    def __init__(self, config: Optional[ProcessingConfig] = None):
+    def __init__(self, config: ProcessingConfig | None = None):
         """Initialize settings with optional custom configuration."""
         self.config = config or ProcessingConfig()
-        self._config_path: Optional[Path] = None
+        self._config_path: Path | None = None
 
     @classmethod
     def load_from_file(cls, path: Path) -> "Settings":

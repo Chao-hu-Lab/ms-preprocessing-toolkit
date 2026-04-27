@@ -1,9 +1,7 @@
 """Tests for FeatureFilter module."""
 
-import pytest
 import pandas as pd
-import numpy as np
-
+import pytest
 from ms_core.preprocessing.ms_quality_filter import FeatureFilter
 
 

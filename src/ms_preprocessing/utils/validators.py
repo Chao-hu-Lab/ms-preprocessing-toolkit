@@ -6,9 +6,12 @@ to ensure data quality before processing.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Tuple, Optional, Dict, Any
+from typing import TYPE_CHECKING, Any
+
 import pandas as pd
-import numpy as np
+
+if TYPE_CHECKING:
+    from ms_preprocessing.gui.pipeline_session import PipelineSession
 
 
 class ValidationError(Exception):
@@ -20,7 +23,7 @@ class ValidationError(Exception):
 class ValidationWarning:
     """Represents a non-critical validation warning."""
 
-    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+    def __init__(self, message: str, details: dict[str, Any] | None = None):
         self.message = message
         self.details = details or {}
 
@@ -51,8 +54,8 @@ class DataValidator:
 
     def __init__(self):
         """Initialize the DataValidator."""
-        self.warnings: List[ValidationWarning] = []
-        self.errors: List[str] = []
+        self.warnings: list[ValidationWarning] = []
+        self.errors: list[str] = []
 
     def clear(self):
         """Clear all warnings and errors."""
@@ -150,7 +153,7 @@ class DataValidator:
         df: pd.DataFrame,
         start_col: int = 2,
         allow_missing: bool = True,
-    ) -> Tuple[bool, Dict[str, int]]:
+    ) -> tuple[bool, dict[str, int]]:
         """
         Validate that data columns contain numeric values.
 
@@ -199,8 +202,8 @@ class DataValidator:
         self,
         df: pd.DataFrame,
         sample_type_row: int = 0,
-        expected_types: Optional[List[str]] = None,
-    ) -> Tuple[bool, Dict[str, int]]:
+        expected_types: list[str] | None = None,
+    ) -> tuple[bool, dict[str, int]]:
         """
         Validate sample type row and count each type.
 
@@ -237,7 +240,7 @@ class DataValidator:
 
         return True, type_counts
 
-    def _find_column(self, df: pd.DataFrame, patterns: List[str]) -> Optional[str]:
+    def _find_column(self, df: pd.DataFrame, patterns: list[str]) -> str | None:
         """Find a column matching any of the given patterns."""
         for col in df.columns:
             col_lower = str(col).lower().replace(" ", "").replace("_", "")
@@ -331,7 +334,7 @@ class DataValidator:
 _FIXED_COLUMN_NAMES = {"Mz/RT", "FeatureID", "m/z Tolerance( ppm)/RT Tolerance"}
 
 
-def detect_fixed_columns(df: pd.DataFrame) -> Tuple[List[str], int]:
+def detect_fixed_columns(df: pd.DataFrame) -> tuple[list[str], int]:
     """
     Detect leading fixed (non-sample) columns in a DataFrame.
 
@@ -345,7 +348,7 @@ def detect_fixed_columns(df: pd.DataFrame) -> Tuple[List[str], int]:
     Returns:
         Tuple of (list of fixed column names, count of fixed columns).
     """
-    fixed: List[str] = []
+    fixed: list[str] = []
     for col in df.columns:
         if col in _FIXED_COLUMN_NAMES:
             fixed.append(col)

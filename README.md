@@ -44,7 +44,7 @@
 > **注意：** 本專案包含 git submodule（ms-core），clone 時必須加上 `--recurse-submodules`。
 
 #### 環境需求
-- Python 3.9+
+- Python 3.11+
 - Windows / macOS / Linux
 
 #### 安裝步驟
