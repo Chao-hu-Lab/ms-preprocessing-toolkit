@@ -250,7 +250,7 @@ Examples:
         "--bg-threshold",
         type=float,
         default=None,
-        help="Background threshold for feature filtering (overrides profile value)",
+        help="Stable detection-rate threshold for feature filtering (overrides profile value)",
     )
 
     parser.add_argument(
@@ -264,21 +264,21 @@ Examples:
         "--high-det-thresh",
         type=float,
         default=None,
-        help="MNAR high detection rate threshold (0-1, overrides profile value, default 0.8)",
+        help="MNAR present-group detection-rate lower bound (0-1, overrides profile value, default 0.8)",
     )
 
     parser.add_argument(
         "--low-det-thresh",
         type=float,
         default=None,
-        help="MNAR low detection rate threshold (0-1, overrides profile value, default 0.2)",
+        help="MNAR absent-group detection-rate upper bound (0-1, overrides profile value, default 0.2)",
     )
 
     parser.add_argument(
         "--qc-ratio-threshold",
         type=float,
         default=None,
-        help="Minimum QC_ratio to keep a feature (overrides profile value)",
+        help="Minimum QC detection rate to keep a feature (overrides profile value)",
     )
 
     parser.add_argument(

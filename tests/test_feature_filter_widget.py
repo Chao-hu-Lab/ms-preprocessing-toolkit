@@ -185,15 +185,21 @@ def test_feature_filter_widget_omits_redundant_mnar_section_heading(widget) -> N
         if isinstance(child, ctk.CTkLabel)
     ]
 
+    assert "穩定檢出率門檻" in label_texts
+    assert "出現組檢出率下限" in label_texts
+    assert "缺失組檢出率上限" in label_texts
+    assert "QC 檢出率門檻" in label_texts
     assert "存在/缺失標記（MNAR 80/20）" not in label_texts
 
 
 def test_feature_filter_widget_explains_rules_in_plainer_lab_language(widget) -> None:
     criteria_text = widget.criteria_textbox.get("1.0", "end")
 
-    assert "前 3 條是正向保留條件，採 OR 判斷" in criteria_text
-    assert "QC_ratio 則是負向覆寫條件" in criteria_text
-    assert "至少 2 組的 ratio 都大於等於背景比例門檻" in criteria_text
+    assert "穩定檢出、強度倍率、存在/缺失標記是正向保留條件" in criteria_text
+    assert "QC 檢出率是負向覆寫條件" in criteria_text
+    assert "至少 2 個實驗組的檢出率都大於等於此門檻" in criteria_text
+    assert "出現組檢出率下限" in criteria_text
+    assert "缺失組檢出率上限" in criteria_text
     assert "fold-change = 最大組平均強度 / 最小組平均強度" in criteria_text
 
 

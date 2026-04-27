@@ -33,8 +33,10 @@ def test_gui_marker_is_serial_by_default() -> None:
 
 def test_integration_and_perf_markers_can_overlap() -> None:
     markers = classify_test_markers(Path("tests") / "test_pipeline_baseline_contract.py")
+    handoff_markers = classify_test_markers(Path("tests") / "test_final_export_handoff.py")
 
     assert markers == {"integration", "perf"}
+    assert handoff_markers == {"integration"}
 
 
 def test_root_hygiene_is_serial_without_being_gui() -> None:

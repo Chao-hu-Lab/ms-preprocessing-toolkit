@@ -93,7 +93,7 @@ git commit -m "chore: centralize toolkit pytest temp paths"
 
 **Files:**
 - Modify: `tests/test_cli_parquet_chain.py`
-- Modify: `tests/test_export_dnp_bridge.py`
+- Modify: `tests/test_final_export_handoff.py`
 - Modify: `tests/test_final_export_cache_policy.py`
 - Modify: `tests/test_integration_parquet_pipeline.py`
 - Modify: `tests/test_intermediate_store_bridge.py`
@@ -126,13 +126,13 @@ Then replace each `TemporaryDirectory(dir=Path.cwd())` call with `project_temp_d
 
 **Step 4: Run test to verify it passes**
 
-Run: `pytest tests/test_root_hygiene.py tests/test_cli_parquet_chain.py tests/test_export_dnp_bridge.py tests/test_final_export_cache_policy.py tests/test_integration_parquet_pipeline.py tests/test_intermediate_store_bridge.py -v`
+Run: `pytest tests/test_root_hygiene.py tests/test_cli_parquet_chain.py tests/test_final_export_handoff.py tests/test_final_export_cache_policy.py tests/test_integration_parquet_pipeline.py tests/test_intermediate_store_bridge.py -v`
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-git add tests/test_root_hygiene.py tests/conftest.py tests/test_cli_parquet_chain.py tests/test_export_dnp_bridge.py tests/test_final_export_cache_policy.py tests/test_integration_parquet_pipeline.py tests/test_intermediate_store_bridge.py
+git add tests/test_root_hygiene.py tests/conftest.py tests/test_cli_parquet_chain.py tests/test_final_export_handoff.py tests/test_final_export_cache_policy.py tests/test_integration_parquet_pipeline.py tests/test_intermediate_store_bridge.py
 git commit -m "test: keep toolkit temp directories out of repo root"
 ```
 
@@ -233,7 +233,7 @@ git commit -m "docs: add local cleanup workflow"
 
 **Step 1: Run focused toolkit verification**
 
-Run: `PYTHONPATH=ms-core/src pytest tests/test_root_hygiene.py tests/test_cli_parquet_chain.py tests/test_export_dnp_bridge.py tests/test_final_export_cache_policy.py tests/test_integration_parquet_pipeline.py tests/test_intermediate_store_bridge.py -v --tb=short`
+Run: `PYTHONPATH=ms-core/src pytest tests/test_root_hygiene.py tests/test_cli_parquet_chain.py tests/test_final_export_handoff.py tests/test_final_export_cache_policy.py tests/test_integration_parquet_pipeline.py tests/test_intermediate_store_bridge.py -v --tb=short`
 Expected: PASS
 
 **Step 2: Run focused ms-core verification**

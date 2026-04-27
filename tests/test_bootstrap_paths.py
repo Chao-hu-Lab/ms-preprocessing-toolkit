@@ -3,16 +3,11 @@ import sys
 import pytest
 
 from ms_preprocessing.bootstrap_paths import (
-    DNP_PROJECT_ROOT_ENV,
-    DNP_SRC_ENV,
     MS_CORE_PROJECT_ROOT_ENV,
     MS_CORE_SRC_ENV,
     BootstrapResolution,
     bootstrap_ms_core,
     ensure_ms_core_src_on_path,
-    find_dnp_bridge_module,
-    find_dnp_main_module,
-    find_dnp_src,
     find_ms_core_src,
     resolve_ms_core_src,
 )
@@ -165,51 +160,3 @@ def test_ensure_ms_core_src_on_path_allows_preinstalled_module(monkeypatch, tmp_
     monkeypatch.setattr("ms_preprocessing.bootstrap_paths.importlib.util.find_spec", lambda _name: object())
 
     assert ensure_ms_core_src_on_path(tmp_path) is None
-
-
-def test_find_dnp_src_supports_env_override(monkeypatch, tmp_path):
-    dnp_src = tmp_path / "custom-dnp" / "src"
-    (dnp_src / "metabolomics").mkdir(parents=True, exist_ok=True)
-
-    monkeypatch.setenv(DNP_SRC_ENV, str(dnp_src))
-    monkeypatch.delenv(DNP_PROJECT_ROOT_ENV, raising=False)
-
-    assert find_dnp_src(tmp_path) == dnp_src
-
-
-def test_find_dnp_src_finds_sibling_repo_from_toolkit_root(monkeypatch, tmp_path):
-    monkeypatch.delenv(DNP_SRC_ENV, raising=False)
-    monkeypatch.delenv(DNP_PROJECT_ROOT_ENV, raising=False)
-
-    toolkit_root = tmp_path / "MS Data process package" / "ms-preprocessing-toolkit"
-    anchor = toolkit_root / "src" / "ms_preprocessing"
-    anchor.mkdir(parents=True, exist_ok=True)
-
-    dnp_src = tmp_path / "MS Data process package" / "Data_Normalization_project_v2" / "src"
-    (dnp_src / "metabolomics").mkdir(parents=True, exist_ok=True)
-
-    assert find_dnp_src(anchor) == dnp_src
-
-
-def test_find_dnp_main_module_uses_project_root_override(monkeypatch, tmp_path):
-    dnp_root = tmp_path / "external-dnp"
-    main_py = dnp_root / "src" / "metabolomics" / "__main__.py"
-    main_py.parent.mkdir(parents=True, exist_ok=True)
-    main_py.write_text("print('ok')", encoding="utf-8")
-
-    monkeypatch.delenv(DNP_SRC_ENV, raising=False)
-    monkeypatch.setenv(DNP_PROJECT_ROOT_ENV, str(dnp_root))
-
-    assert find_dnp_main_module(tmp_path) == main_py
-
-
-def test_find_dnp_bridge_module_uses_src_override(monkeypatch, tmp_path):
-    dnp_src = tmp_path / "custom-dnp" / "src"
-    bridge_module = dnp_src / "metabolomics" / "adapters" / "preprocessing_to_dnp.py"
-    bridge_module.parent.mkdir(parents=True, exist_ok=True)
-    bridge_module.write_text("def convert_preprocessing_to_dnp(source, target):\n    return target\n", encoding="utf-8")
-
-    monkeypatch.setenv(DNP_SRC_ENV, str(dnp_src))
-    monkeypatch.delenv(DNP_PROJECT_ROOT_ENV, raising=False)
-
-    assert find_dnp_bridge_module(tmp_path) == bridge_module

@@ -36,9 +36,6 @@ class _SidebarHarness(MainWindowLayoutMixin, ctk.CTkFrame):
     def _run_all_steps(self) -> None:
         return None
 
-    def _export_to_dnp(self) -> None:
-        return None
-
 
 class _ContentAreaHarness(MainWindowLayoutMixin, ctk.CTkFrame):
     def __init__(self, master) -> None:
@@ -132,8 +129,7 @@ def test_main_window_sidebar_exposes_run_all_profile_selector(ctk_root) -> None:
         assert app.open_output_folder_btn.cget("text") == "Open Output Folder"
         assert app.open_output_folder_btn.cget("fg_color") == "#333333"
         assert app.open_output_folder_btn.cget("border_width") == 1
-        assert app.export_dnp_btn.cget("state") == "disabled"
-        assert app.export_dnp_btn.cget("fg_color") == "transparent"
+        assert not hasattr(app, "export_dnp_btn")
     finally:
         app.destroy()
 
@@ -147,7 +143,7 @@ def test_main_window_startup_logs_default_profile_details(ctk_root, tmp_path) ->
 
         assert "Applied Run All preset: default" in log_text
         assert "Preset parameters:" in log_text
-        assert "QC_ratio: 0.25" in log_text
+        assert "QC檢出: 0.25" in log_text
         assert all(line.startswith("[") for line in log_text.splitlines() if line.strip())
     finally:
         app.destroy()
@@ -247,10 +243,10 @@ def test_action_button_theme_restores_hover_after_disabled_state(ctk_root) -> No
     app.pack()
     ctk_root.update_idletasks()
     try:
-        app._apply_action_button_theme(app.export_dnp_btn, "disabled")
-        assert app.export_dnp_btn.cget("hover") is False
+        app._apply_action_button_theme(app.open_output_folder_btn, "disabled")
+        assert app.open_output_folder_btn.cget("hover") is False
 
-        app._apply_action_button_theme(app.export_dnp_btn, "secondary")
-        assert app.export_dnp_btn.cget("hover") is True
+        app._apply_action_button_theme(app.open_output_folder_btn, "secondary")
+        assert app.open_output_folder_btn.cget("hover") is True
     finally:
         app.destroy()

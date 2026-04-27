@@ -7,7 +7,6 @@ import os
 import platform
 import queue
 import subprocess
-import sys
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -17,7 +16,6 @@ from typing import TYPE_CHECKING, Any, Protocol
 import pandas as pd
 
 from ms_preprocessing.adapters import data_organizer as data_organizer_adapter
-from ms_preprocessing.bootstrap_paths import ensure_dnp_bridge_on_path, find_dnp_main_module
 from ms_preprocessing.config import format_pipeline_profile_preview, get_pipeline_profile
 from ms_preprocessing.config.settings import Settings
 from ms_preprocessing.gui.path_display import display_basename
@@ -52,14 +50,12 @@ if TYPE_CHECKING:
         step_widgets: list[Any]
         step_buttons: list[Any]
         _step_status_labels: list[Any]
-        export_dnp_btn: Any
         log_text: Any
         run_context_label: Any
         latest_result_label: Any
         run_all_profile_var: Any
 
         def _show_step(self, step_index: int) -> None: ...
-        def update_idletasks(self) -> None: ...
         def configure(self, *args: Any, **kwargs: Any) -> None: ...
 
 
@@ -311,7 +307,6 @@ class MainWindowEventHandlersMixin:
             "export_results_btn",
             "open_output_folder_btn",
             "run_all_btn",
-            "export_dnp_btn",
             "run_all_profile_menu",
         ):
             control = self.__dict__.get(attr_name)
@@ -511,7 +506,6 @@ class MainWindowEventHandlersMixin:
 
             load_format = metadata.get("format", "unknown")
             self._log(f"Loaded successfully: {len(df)} rows, {len(df.columns)} columns (format: {load_format})")
-            self._update_export_dnp_btn()
             self._update_run_context_summary()
         except Exception as exc:
             self._log(f"Error loading file: {exc}")
@@ -692,14 +686,12 @@ class MainWindowEventHandlersMixin:
                 f"Step {step_index + 1} complete. Step {next_step + 1} ready.",
             )
             self._update_latest_result_summary(summary_lines)
-            self._update_export_dnp_btn()
             self._update_run_context_summary()
             self._log(f"Data passed to Step {next_step + 1}")
             self._schedule_step_output_save(step_index, result_data, next_step_index=next_step)
             return
 
         self._update_latest_result_summary(summary_lines)
-        self._update_export_dnp_btn()
         self._auto_export_final_results()
         self._update_run_context_summary()
 
@@ -832,10 +824,6 @@ class MainWindowEventHandlersMixin:
     ) -> None:
         self._pipeline_worker_thread = None
         self._set_pipeline_busy_state(False)
-        try:
-            self._update_export_dnp_btn()
-        except Exception:
-            pass
         if not success:
             self._safe_update_action_bar_progress(0, "Run All failed")
         else:
@@ -884,122 +872,26 @@ class MainWindowEventHandlersMixin:
             )
             self._last_materialized_export_path = filepath
             self._log(f"Exported to: {filepath}")
+            self._log_downstream_handoff_reminder()
             self._update_run_context_summary()
             return filepath
         except Exception as exc:
             self._log(f"Export error: {exc}")
             return None
 
-    def _update_export_dnp_btn(self: _MainWindowEventHost) -> None:
-        ready = self._last_completed_step is not None and self._last_completed_step >= 3
-        if ready:
-            self.export_dnp_btn.configure(
-                state="normal",
-                text="Export DNP",
-            )
-            if hasattr(self, "_apply_action_button_theme"):
-                self._apply_action_button_theme(self.export_dnp_btn, "secondary")
-        else:
-            self.export_dnp_btn.configure(
-                state="disabled",
-                text="Export DNP",
-            )
-            if hasattr(self, "_apply_action_button_theme"):
-                self._apply_action_button_theme(self.export_dnp_btn, "disabled")
-
-    def _export_to_dnp(self: _MainWindowEventHost) -> None:
-        if self._has_active_processing():
-            self._log("Busy: wait for processing to finish before exporting to DNP.")
+    def _log_downstream_handoff_reminder(self: _MainWindowEventHost) -> None:
+        step_widgets = self.__dict__.get("step_widgets", [])
+        if not step_widgets:
             return
-
-        if self._last_completed_step is None or self._last_completed_step < 3:
-            messagebox.showwarning(
-                "Not Ready",
-                "Please complete Step 4 (Feature Filtering) before exporting to DNP.",
-            )
+        final_step_index = len(step_widgets) - 1
+        if self._last_completed_step is None or self._last_completed_step < final_step_index:
             return
-
-        source_path = self._export_results()
-        if source_path is None:
-            messagebox.showerror("Error", "No output file found. Please export first.")
-            return
-
-        output_path = filedialog.asksaveasfilename(
-            title="Save DNP-compatible file",
-            defaultextension=".xlsx",
-            initialfile=f"DNP_import_{Path(source_path).stem}.xlsx",
-            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
+        self._log("Step 4 final xlsx 已完成，可手動交給下游 normalization/statistics 使用。")
+        self._log("Toolkit 不會再另外產生 DNP bridge 檔或啟動 DNP；請直接使用這份 final xlsx。")
+        self._log(
+            "進入下游流程前，請打開 SampleInfo，確認 Batch 已填寫，並補齊本批資料需要的"
+            "校正欄位（例如組織量、肌酐或其他校正因子）與 metadata 欄位。"
         )
-        if not output_path:
-            return
-
-        original_text = self.export_dnp_btn.cget("text")
-        self.export_dnp_btn.configure(text="Exporting...", state="disabled")
-        self.configure(cursor="wait")
-        self.update_idletasks()
-
-        try:
-            dnp_src = ensure_dnp_bridge_on_path(self._project_root)
-            if dnp_src is None:
-                raise ImportError("Data_Normalization_project_v2 src not found")
-            self._log(f"Using DNP bridge source: {dnp_src}")
-
-            from metabolomics.adapters.preprocessing_to_dnp import convert_preprocessing_to_dnp
-
-            self._log(f"Converting to DNP format: {source_path}")
-            result = Path(convert_preprocessing_to_dnp(str(source_path), output_path))
-            self._log(f"DNP export complete: {result}")
-            self._open_file_in_system_app(result)
-            needs_completion = self._sample_info_requires_user_completion(result)
-            message = (
-                "請在 SampleInfo 工作表補齊 Batch 與 DNA_mg/20uL 欄位後，再手動啟動 DNP。"
-                if needs_completion
-                else "Bridge 檔案已可直接匯入 DNP。"
-            )
-            messagebox.showinfo(
-                "匯出完成",
-                f"DNP bridge 檔案已匯出：\n{result}\n\n{message}",
-            )
-        except ImportError:
-            self._log("Error: DNP adapter not found. Ensure Data_Normalization_project_v2 is available.")
-            messagebox.showerror(
-                "Adapter Not Found",
-                "Could not find the DNP adapter module.\nEnsure Data_Normalization_project_v2 is available.",
-            )
-        except Exception as exc:
-            self._log(f"DNP export error: {exc}")
-            messagebox.showerror("Export Failed", f"Conversion error:\n{exc}")
-        finally:
-            self.configure(cursor="")
-            self.export_dnp_btn.configure(text=original_text, state="normal")
-            self._update_export_dnp_btn()
-
-    def _sample_info_requires_user_completion(self, bridge_path: str | Path) -> bool:
-        """Return True when SampleInfo sheet is missing Batch or DNA_mg/20uL values."""
-        try:
-            sample_info = pd.read_excel(Path(bridge_path), sheet_name="SampleInfo")
-        except Exception:
-            return True
-        for column in ("Batch", "DNA_mg/20uL"):
-            if column not in sample_info.columns:
-                return True
-            if sample_info[column].fillna("").astype(str).str.strip().eq("").any():
-                return True
-        return False
-
-    def _open_file_in_system_app(self, target: str | Path) -> None:
-        """Open a file using the system default application."""
-        try:
-            target_path = Path(target)
-            system = platform.system()
-            if system == "Windows":
-                os.startfile(target_path)
-            elif system == "Darwin":
-                subprocess.Popen(["open", str(target_path)])
-            else:
-                subprocess.Popen(["xdg-open", str(target_path)])
-        except Exception as exc:
-            self._log(f"Open file error: {exc}")
 
     def _materialize_final_xlsx_from_latest_step(self: _MainWindowEventHost) -> Path | None:
         if self._last_completed_step is None:
@@ -1011,6 +903,8 @@ class MainWindowEventHandlersMixin:
         source_path = Path(source_path)
         if source_path.suffix.lower() == ".xlsx":
             self._last_materialized_export_path = source_path
+            self._log(f"Final xlsx available: {source_path}")
+            self._log_downstream_handoff_reminder()
             return source_path
 
         self._pipeline_session.set_source_file(self._source_file)
@@ -1049,25 +943,12 @@ class MainWindowEventHandlersMixin:
             self._step_output_paths[self._last_completed_step] = target_path
             self._last_materialized_export_path = target_path
             self._log(f"Materialized final xlsx from parquet: {target_path}")
+            self._log_downstream_handoff_reminder()
             self._update_run_context_summary()
             return target_path
         except Exception as exc:
             self._log(f"Materialization error: {exc}")
             return None
-
-    def _launch_dnp(self: _MainWindowEventHost) -> None:
-        main_py = find_dnp_main_module(self._project_root)
-        if main_py is not None:
-            self._log(f"Launching DNP: {main_py}")
-            subprocess.Popen(
-                [sys.executable, "-m", "metabolomics"],
-                cwd=str(main_py.parent.parent),
-            )
-            return
-        messagebox.showwarning(
-            "Not Found",
-            "Could not find Data_Normalization_project_v2.\nPlease launch it manually.",
-        )
 
     def _save_step_output(
         self: _MainWindowEventHost,

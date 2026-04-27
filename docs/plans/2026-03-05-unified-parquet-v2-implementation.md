@@ -4,7 +4,7 @@
 
 **Goal:** Unify Step1-4 intermediate artifacts to parquet (with metadata sidecar), keep final output as xlsx for compatibility, and implement Step4 zero-as-missing imputation (including QC) by default.
 
-**Architecture:** Build a single intermediate storage contract first (`data + metadata`) in `ms-core`, then migrate CLI and GUI to consume that contract so Step chaining no longer depends on xlsx. Keep final export and DNP bridge on xlsx only. Execute tasks in batches with controlled parallelism after shared contract tasks are complete.
+**Architecture:** Build a single intermediate storage contract first (`data + metadata`) in `ms-core`, then migrate CLI and GUI to consume that contract so Step chaining no longer depends on xlsx. Keep the final downstream handoff on xlsx only; the toolkit does not generate a DNP bridge file. Execute tasks in batches with controlled parallelism after shared contract tasks are complete.
 
 **Tech Stack:** Python 3.14, pandas, numpy, openpyxl, pyarrow parquet, pytest, customtkinter, ms-core + ms-preprocessing-toolkit.
 
@@ -35,7 +35,7 @@ Parallel-eligible batch (after Task 3):
 - Task 6 (Step4 zero-as-missing behavior)
 
 Sequential again:
-- Task 7 (DNP bridge/final export integration)
+- Task 7 (final xlsx export and downstream handoff integration)
 - Task 8 (performance benchmark + regression matrix)
 - Task 9 (docs + release notes)
 
@@ -354,7 +354,7 @@ git commit -m "test: cover zero-as-missing Step4 behavior and stats"
 **Files:**
 - Modify: `C:/Users/user/Desktop/質譜數據工具箱/ms-preprocessing-toolkit/src/ms_preprocessing/gui/main_window.py`
 - Modify: `C:/Users/user/Desktop/質譜數據工具箱/ms-preprocessing-toolkit/src/ms_preprocessing/main.py`
-- Create: `C:/Users/user/Desktop/質譜數據工具箱/ms-preprocessing-toolkit/tests/test_export_dnp_bridge.py`
+- Create: `C:/Users/user/Desktop/質譜數據工具箱/ms-preprocessing-toolkit/tests/test_final_export_handoff.py`
 
 **Step 1: Write failing tests**
 
@@ -371,7 +371,7 @@ def test_final_export_materializes_xlsx_from_parquet_intermediate():
 **Step 2: Run tests to verify they fail**
 
 Run:
-`pytest tests/test_export_dnp_bridge.py -v`
+`pytest tests/test_final_export_handoff.py -v`
 
 Expected:
 - FAIL.
@@ -384,7 +384,7 @@ Expected:
 **Step 4: Run tests to verify they pass**
 
 Run:
-`pytest tests/test_export_dnp_bridge.py -v`
+`pytest tests/test_final_export_handoff.py -v`
 
 Expected:
 - PASS.
@@ -392,8 +392,8 @@ Expected:
 **Step 5: Commit**
 
 ```bash
-git add src/ms_preprocessing/gui/main_window.py src/ms_preprocessing/main.py tests/test_export_dnp_bridge.py
-git commit -m "feat: lock final export and DNP bridge to xlsx materialization"
+git add src/ms_preprocessing/gui/main_window.py src/ms_preprocessing/main.py tests/test_final_export_handoff.py
+git commit -m "feat: lock final export to xlsx materialization"
 ```
 
 ---
@@ -474,7 +474,7 @@ Expected:
 
 - Document:
   - Step1-4 intermediate format = parquet
-  - final export/DNP = xlsx
+  - final export = xlsx; downstream handoff is manual
   - Step4 zero-as-missing default behavior
   - rollback and troubleshooting checklist
 

@@ -31,7 +31,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
         super().__init__(
             parent,
             title="Step 4: 特徵篩選 (Feature Filtering)",
-            description="依訊號強度、背景比例、存在/缺失標記（MNAR）與 QC 表現篩選特徵。",
+            description="依訊號強度、穩定檢出率、存在/缺失標記（MNAR）與 QC 檢出率篩選特徵。",
             step_index=step_index,
             on_load_file=on_load_file,
             on_complete=on_complete,
@@ -47,7 +47,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
         self.params_frame.grid_columnconfigure(2, minsize=160, weight=1)
         self.params_frame.grid_columnconfigure(3, minsize=110)
 
-        signal_label = ctk.CTkLabel(self.params_frame, text="訊號門檻值", font=FONTS["body"])
+        signal_label = ctk.CTkLabel(self.params_frame, text="訊號強度門檻", font=FONTS["body"])
         self._style_form_label(signal_label)
         signal_label.grid(row=0, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="e")
 
@@ -65,7 +65,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
         self.bg_enabled_var = tk.BooleanVar(value=True)
         self.bg_enabled_switch = self._create_threshold_switch(
             row=1,
-            text="背景比例門檻",
+            text="穩定檢出率門檻",
             variable=self.bg_enabled_var,
         )
         self.bg_slider = self._create_threshold_slider(
@@ -107,7 +107,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
         self.mnar_enabled_var = tk.BooleanVar(value=True)
         self.mnar_enabled_switch = self._create_threshold_switch(
             row=3,
-            text="高檢出率閾值",
+            text="出現組檢出率下限",
             variable=self.mnar_enabled_var,
         )
         self.high_det_slider = self._create_threshold_slider(
@@ -122,7 +122,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
             self.high_det_entry,
         )
 
-        low_det_label = ctk.CTkLabel(self.params_frame, text="低檢出率閾值", font=FONTS["body"])
+        low_det_label = ctk.CTkLabel(self.params_frame, text="缺失組檢出率上限", font=FONTS["body"])
         self._style_form_label(low_det_label)
         low_det_label.grid(
             row=4, column=1, padx=PADDING["small"], pady=PADDING["small"], sticky="e"
@@ -142,7 +142,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
         self.qc_ratio_enabled_var = tk.BooleanVar(value=True)
         self.qc_ratio_enabled_switch = self._create_threshold_switch(
             row=5,
-            text="QC_ratio 門檻",
+            text="QC 檢出率門檻",
             variable=self.qc_ratio_enabled_var,
         )
         self.qc_ratio_slider = self._create_threshold_slider(
@@ -193,26 +193,26 @@ class FeatureFilterWidget(BaseProcessingWidget):
         content = (
             "篩選規則說明\n\n"
             "整體邏輯\n"
-            "前 3 條是正向保留條件，採 OR 判斷；只要符合其中一條，feature 就可以先保留下來。\n"
-            "QC_ratio 則是負向覆寫條件，用來排除在 QC 中完全不穩定或幾乎沒有檢出的 feature。\n\n"
-            "1. 訊號門檻值\n"
+            "穩定檢出、強度倍率、存在/缺失標記是正向保留條件，採 OR 判斷；只要符合其中一條，feature 就可以先保留下來。\n"
+            "QC 檢出率是負向覆寫條件，用來排除在 QC 中完全不穩定或幾乎沒有檢出的 feature。\n\n"
+            "1. 訊號強度門檻\n"
             "   先確認這個 feature 本身有沒有足夠訊號。\n"
-            "   後續的 ratio 與 QC_ratio，都是以高於訊號門檻的樣本數為基礎計算。\n\n"
-            "2. 背景比例門檻（Stable gate）\n"
-            "   ratio = 組內高於訊號門檻的樣本數 / 組內總樣本數\n"
-            "   若至少 2 組的 ratio 都大於等於背景比例門檻，代表這個 feature 在多個實驗組都能穩定檢出，可先保留。\n\n"
+            "   後續的檢出率與 QC 檢出率，都是以高於訊號強度門檻的樣本數為基礎計算。\n\n"
+            "2. 穩定檢出率門檻（Stable detection gate）\n"
+            "   檢出率 = 組內高於訊號強度門檻的樣本數 / 組內總樣本數\n"
+            "   若至少 2 個實驗組的檢出率都大於等於此門檻，代表這個 feature 在多個組別穩定出現，可先保留。\n\n"
             "3. 強度倍率門檻（Intensity FC gate）\n"
             "   這一條看的是不同組別之間的平均強度差異。\n"
             "   fold-change = 最大組平均強度 / 最小組平均強度\n"
             "   若 fold-change 大於等於強度倍率門檻，代表至少有一組顯著高於另一組，可視為具生物差異訊號。\n\n"
-            "4. 存在/缺失標記（MNAR 80/20 gate）\n"
-            "   ratio = 組內高於訊號門檻的樣本數 / 組內總樣本數\n"
-            "   若至少一組 ratio ≥ 高檢出率閾值，且至少另一組 ratio ≤ 低檢出率閾值，\n"
-            "   代表此 feature 在某組中高頻率出現、在另一組中幾乎缺失（MNAR 特徵），予以保留並標記。\n"
+            "4. 存在/缺失標記（MNAR presence/absence gate）\n"
+            "   檢出率 = 組內高於訊號強度門檻的樣本數 / 組內總樣本數\n"
+            "   若至少一組檢出率 ≥ 出現組檢出率下限，且至少另一組檢出率 ≤ 缺失組檢出率上限，\n"
+            "   代表此 feature 在某組中高頻率出現、在另一組中接近缺失（MNAR 特徵），予以保留並標記。\n"
             "   輸出欄位 is_Presence_Absence_Marker = True 的特徵即屬此類。\n\n"
-            "5. QC_ratio 門檻（QC gate）\n"
-            "   QC_ratio = QC 中高於訊號門檻的樣本數 / QC 總樣本數\n"
-            "   若 QC_ratio = 0，或低於你設定的 QC_ratio 門檻，代表這個 feature 在 QC 中表現不穩定，會被移除。"
+            "5. QC 檢出率門檻（QC gate）\n"
+            "   QC 檢出率 = QC 中高於訊號強度門檻的樣本數 / QC 總樣本數\n"
+            "   若 QC 檢出率 = 0，或低於你設定的 QC 檢出率門檻，代表這個 feature 在 QC 中表現不穩定，會被移除。"
         )
         self.criteria_textbox.insert("1.0", content)
         inner_text = getattr(self.criteria_textbox, "_textbox", None)
@@ -222,11 +222,11 @@ class FeatureFilterWidget(BaseProcessingWidget):
             for marker in [
                 "篩選規則說明",
                 "整體邏輯",
-                "1. 訊號門檻值",
-                "2. 背景比例門檻（Stable gate）",
+                "1. 訊號強度門檻",
+                "2. 穩定檢出率門檻（Stable detection gate）",
                 "3. 強度倍率門檻（Intensity FC gate）",
-                "4. 存在/缺失標記（MNAR 80/20 gate）",
-                "5. QC_ratio 門檻（QC gate）",
+                "4. 存在/缺失標記（MNAR presence/absence gate）",
+                "5. QC 檢出率門檻（QC gate）",
             ]:
                 start = "1.0"
                 while True:
@@ -458,8 +458,8 @@ class FeatureFilterWidget(BaseProcessingWidget):
             tkinter.messagebox.askokcancel(
                 "單一組別警告",
                 "偵測到資料只有 1 個分析組別（非 QC）。\n\n"
-                "「背景比例門檻（Stable gate）」正常需要至少 2 組，\n"
-                "繼續執行將退化為：只要該組 ratio ≥ 設定閾值即保留特徵。\n\n"
+                "「穩定檢出率門檻」正常需要至少 2 個實驗組，\n"
+                "繼續執行將退化為：只要該組檢出率 ≥ 設定門檻即保留特徵。\n\n"
                 "確認要以單組降級模式繼續嗎？",
                 parent=self,
             )

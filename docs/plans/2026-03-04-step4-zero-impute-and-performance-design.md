@@ -177,7 +177,7 @@ User dataset verification (`STEP3_VERIFY_STEP1_validation_dataset.xlsx`, thresho
 
 Scope alignment for release:
 - Step1-4 intermediate format = parquet (with metadata sidecar).
-- Final deliverables remain `.xlsx`, and final export/DNP bridge consume xlsx only.
+- Final deliverables remain `.xlsx`; downstream normalization/statistics handoff is manual.
 - Step4 keeps zero-as-missing as default behavior (including QC columns).
 
 rollback checklist:
@@ -187,5 +187,5 @@ rollback checklist:
 
 troubleshooting checklist:
 - Missing metadata marks after reload: verify `<artifact>.parquet.meta.json` is present and version-compatible.
-- Unexpected DNP export input format: ensure final materialization step writes xlsx before DNP bridge invocation.
+- Unexpected downstream input format: ensure final materialization step writes xlsx before handoff.
 - Performance regression on warm path: compare cold/warm benchmark sections separately (`load_s`, `step_times`, `save_s`, `total_s`) and validate cache hit conditions.
