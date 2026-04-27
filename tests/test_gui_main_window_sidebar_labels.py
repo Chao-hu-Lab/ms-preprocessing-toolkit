@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import customtkinter as ctk
+import pandas as pd
 
 from ms_preprocessing.gui.layout import MainWindowLayoutMixin
+from ms_preprocessing.gui.main_window import MainWindow
 
 
 class _SidebarHarness(MainWindowLayoutMixin, ctk.CTkFrame):
@@ -89,6 +91,7 @@ def test_main_window_sidebar_exposes_run_all_profile_selector(ctk_root) -> None:
         assert app.pipeline_preset_label.cget("text") == "Run All Preset"
         assert app.run_all_profile_var.get() == "default"
         assert app.run_all_profile_menu.cget("values") == ["loose", "default", "strict"]
+        assert not hasattr(app, "run_all_profile_preview_label")
         assert app.run_all_btn.cget("text") == "Run All"
         assert app.run_all_btn.cget("fg_color") == "#2E8B57"
         assert app.export_results_btn.cget("text") == "Export Results"
@@ -101,14 +104,105 @@ def test_main_window_sidebar_exposes_run_all_profile_selector(ctk_root) -> None:
         app.destroy()
 
 
+def test_main_window_startup_logs_default_profile_details() -> None:
+    app = MainWindow()
+    app.withdraw()
+    app.update_idletasks()
+    try:
+        log_text = app.log_text.get("1.0", "end")
+
+        assert "Applied Run All preset: default" in log_text
+        assert "Preset parameters:" in log_text
+        assert "QC_ratio: 0.25" in log_text
+    finally:
+        app.destroy()
+
+
+def test_main_window_manual_completion_switches_then_accepts_deferred_save(tmp_path) -> None:
+    app = MainWindow()
+    app.withdraw()
+    app.update_idletasks()
+    result_data = pd.DataFrame({"Mz/RT": ["Sample_Type", "100.0/1.0"], "S1": ["case", 123]})
+    original_input = str(tmp_path / "input.xlsx")
+    deferred_path = tmp_path / "STEP1_input.parquet"
+    scheduled: list[tuple[int, int | None]] = []
+    app.step_widgets[0].set_input_file(original_input)
+    app._schedule_step_output_save = (
+        lambda step_index, _data, *, next_step_index=None: scheduled.append((step_index, next_step_index))
+    )
+
+    try:
+        app._on_step_complete(result_data, metadata={})
+        app.update_idletasks()
+
+        assert app._current_step == 1
+        assert app._visible_step_index == 1
+        assert app.step_widgets[0].input_entry.get() == original_input
+        assert app.step_widgets[1]._data is result_data
+        assert app.step_widgets[1].input_entry.get() == ""
+        assert scheduled == [(0, 1)]
+
+        app._finish_deferred_step_output_save(
+            step_index=0,
+            next_step_index=1,
+            session_token=id(app._pipeline_session),
+            path=deferred_path,
+            error_message=None,
+        )
+
+        assert app._step_output_paths[0] == deferred_path
+        assert app.step_widgets[1].input_entry.get() == str(deferred_path)
+    finally:
+        app.destroy()
+
+
 def test_content_area_prioritizes_step_panel_height_over_bottom_log(ctk_root) -> None:
     app = _ContentAreaHarness(ctk_root)
     app.pack(fill="both", expand=True)
     ctk_root.update_idletasks()
     try:
-        assert app.content_frame.grid_rowconfigure(0)["weight"] == 1
-        assert app.content_frame.grid_rowconfigure(1)["weight"] == 0
+        assert app.content_frame.grid_rowconfigure(0)["weight"] == 0
+        assert app.content_frame.grid_rowconfigure(1)["weight"] == 1
+        assert app.content_frame.grid_rowconfigure(2)["weight"] == 0
+        assert app.run_context_frame.grid_info()["row"] == 0
+        assert app.main_frame.grid_info()["row"] == 1
+        assert app.bottom_frame.grid_info()["row"] == 2
         assert app.main_frame.grid_info()["sticky"] == "nesw"
+    finally:
+        app.destroy()
+
+
+def test_bottom_action_buttons_keep_position_when_status_text_changes(ctk_root) -> None:
+    app = _ContentAreaHarness(ctk_root)
+    app.pack(fill="both", expand=True)
+    ctk_root.update_idletasks()
+    try:
+        initial_x = app.action_button_frame.winfo_rootx()
+        initial_width = app.action_button_frame.winfo_width()
+
+        app.status_label.configure(text="Step 1 complete. Step 2 ready.")
+        ctk_root.update_idletasks()
+
+        assert app.action_button_frame.winfo_rootx() == initial_x
+        assert app.action_button_frame.winfo_width() == initial_width
+        assert app.run_step_btn.grid_info()["in"] == app.action_button_frame
+        assert app.reset_step_btn.grid_info()["in"] == app.action_button_frame
+    finally:
+        app.destroy()
+
+
+def test_bottom_action_status_does_not_inflate_action_row_height(ctk_root) -> None:
+    app = _ContentAreaHarness(ctk_root)
+    app.pack(fill="both", expand=True)
+    ctk_root.update_idletasks()
+    try:
+        app.status_label.configure(text="Step 1 complete. Step 2 ready.")
+        ctk_root.update_idletasks()
+
+        assert app.action_bar_frame.winfo_height() <= 42
+        assert app.action_button_frame.winfo_y() <= 4
+        assert app.status_frame.winfo_height() <= 40
+        assert app.action_button_frame.winfo_height() <= 40
     finally:
         app.destroy()
 

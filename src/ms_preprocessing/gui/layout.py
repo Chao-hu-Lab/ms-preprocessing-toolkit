@@ -165,7 +165,7 @@ class MainWindowLayoutMixin:
             dropdown_font=FONTS["small"],
             anchor="w",
         )
-        self.run_all_profile_menu.pack(fill="x", padx=PADDING["medium"], pady=(0, 8))
+        self.run_all_profile_menu.pack(fill="x", padx=PADDING["medium"], pady=(0, PADDING["small"]))
 
         self.run_all_btn = ctk.CTkButton(
             self.sidebar,
@@ -224,15 +224,70 @@ class MainWindowLayoutMixin:
         self.content_frame = ctk.CTkFrame(self)
         self.content_frame.grid(row=0, column=1, sticky="nsew")
         self.content_frame.grid_columnconfigure(0, weight=1)
-        self.content_frame.grid_rowconfigure(0, weight=1)
-        self.content_frame.grid_rowconfigure(1, weight=0)
+        self.content_frame.grid_rowconfigure(0, weight=0)
+        self.content_frame.grid_rowconfigure(1, weight=1)
+        self.content_frame.grid_rowconfigure(2, weight=0)
+
+        self.run_context_frame = ctk.CTkFrame(
+            self.content_frame,
+            fg_color="#182433",
+            corner_radius=8,
+            height=112,
+        )
+        self.run_context_frame.grid(
+            row=0,
+            column=0,
+            sticky="ew",
+            padx=PADDING["medium"],
+            pady=(PADDING["medium"], 0),
+        )
+        self.run_context_frame.grid_columnconfigure(0, weight=1)
+        self.run_context_frame.grid_propagate(False)
+
+        self.run_context_label = ctk.CTkLabel(
+            self.run_context_frame,
+            text=(
+                "Run: Source: not loaded | Step: 1 | Completed: 0\n"
+                "Files: Method: not selected | ISTD: not selected | Date: not set\n"
+                "Output: Combined TSV: not selected | Latest output: not available"
+            ),
+            font=FONTS["small"],
+            text_color=COLORS["text"],
+            anchor="w",
+            justify="left",
+            wraplength=1100,
+        )
+        self.run_context_label.grid(
+            row=0,
+            column=0,
+            sticky="ew",
+            padx=PADDING["medium"],
+            pady=(8, 0),
+        )
+
+        self.latest_result_label = ctk.CTkLabel(
+            self.run_context_frame,
+            text="Latest Result: waiting",
+            font=FONTS["small"],
+            text_color=COLORS["text_secondary"],
+            anchor="w",
+            justify="left",
+            wraplength=1100,
+        )
+        self.latest_result_label.grid(
+            row=1,
+            column=0,
+            sticky="ew",
+            padx=PADDING["medium"],
+            pady=(2, 8),
+        )
 
         self.main_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
         self.main_frame.grid(
-            row=0,
+            row=1,
             column=0,
             sticky="nsew",
-            pady=(DIMENSIONS["content_top_offset"], 0),
+            pady=(PADDING["small"], 0),
         )
         self.main_frame.grid_columnconfigure(0, weight=1)
         self.main_frame.grid_rowconfigure(0, weight=1)
@@ -279,10 +334,13 @@ class MainWindowLayoutMixin:
 
         self._show_step(0)
         self._create_bottom_group()
+        updater = getattr(self, "_update_run_context_summary", None)
+        if callable(updater):
+            updater()
 
     def _create_bottom_group(self) -> None:
         self.bottom_frame = ctk.CTkFrame(self.content_frame, fg_color="#0d1b2a")
-        self.bottom_frame.grid(row=1, column=0, sticky="nsew")
+        self.bottom_frame.grid(row=2, column=0, sticky="nsew")
         self.bottom_frame.grid_columnconfigure(0, weight=1)
         self.bottom_frame.grid_rowconfigure(0, weight=0)
         self.bottom_frame.grid_rowconfigure(1, weight=0)
@@ -299,13 +357,24 @@ class MainWindowLayoutMixin:
         )
         self.progress_bar.set(0)
 
-        button_row = ctk.CTkFrame(self.bottom_frame, fg_color="transparent")
-        button_row.grid(row=1, column=0, sticky="ew", padx=PADDING["large"], pady=(0, PADDING["small"]))
-        button_row.grid_columnconfigure(0, weight=1)
-        button_row.grid_columnconfigure(3, weight=1)
+        self.action_bar_frame = ctk.CTkFrame(self.bottom_frame, fg_color="transparent", height=34)
+        self.action_bar_frame.grid(
+            row=1,
+            column=0,
+            sticky="ew",
+            padx=PADDING["large"],
+            pady=(0, PADDING["small"]),
+        )
+        self.action_bar_frame.grid_propagate(False)
+        self.action_bar_frame.grid_columnconfigure(0, weight=1, uniform="action_sides")
+        self.action_bar_frame.grid_columnconfigure(1, weight=0)
+        self.action_bar_frame.grid_columnconfigure(2, weight=1, uniform="action_sides")
+
+        self.action_button_frame = ctk.CTkFrame(self.action_bar_frame, fg_color="transparent", height=34)
+        self.action_button_frame.grid(row=0, column=1, sticky="n")
 
         self.run_step_btn = ctk.CTkButton(
-            button_row,
+            self.action_button_frame,
             text="Run Step",
             command=self._run_current_step,
             width=110,
@@ -316,7 +385,7 @@ class MainWindowLayoutMixin:
         self.run_step_btn.grid(row=0, column=1, padx=(0, PADDING["medium"]))
 
         self.reset_step_btn = ctk.CTkButton(
-            button_row,
+            self.action_button_frame,
             text="Reset",
             command=self._reset_current_step,
             width=90,
@@ -327,13 +396,19 @@ class MainWindowLayoutMixin:
         )
         self.reset_step_btn.grid(row=0, column=2, padx=(0, PADDING["medium"]))
 
+        self.status_frame = ctk.CTkFrame(self.action_bar_frame, fg_color="transparent", width=280, height=34)
+        self.status_frame.grid(row=0, column=2, sticky="w")
+        self.status_frame.grid_propagate(False)
+
         self.status_label = ctk.CTkLabel(
-            button_row,
+            self.status_frame,
             text="Ready",
             font=FONTS["small"],
             text_color=COLORS["text_secondary"],
+            width=260,
+            anchor="w",
         )
-        self.status_label.grid(row=0, column=3, padx=(0, PADDING["large"]), sticky="w")
+        self.status_label.grid(row=0, column=0, sticky="w")
 
         log_header = ctk.CTkFrame(self.bottom_frame, fg_color="transparent")
         log_header.grid(row=2, column=0, sticky="ew", padx=PADDING["medium"], pady=(PADDING["small"], 0))
@@ -378,12 +453,20 @@ class MainWindowLayoutMixin:
         self.bind("<Control-4>", lambda _event: self._switch_step(3))
 
     def _show_step(self, step_index: int) -> None:
-        for widget in self.step_widgets:
-            widget.grid_forget()
-        self.step_widgets[step_index].grid(
-            row=0,
-            column=0,
-            sticky="nsew",
-            padx=0,
-            pady=0,
-        )
+        if getattr(self, "_visible_step_index", None) == step_index:
+            return
+
+        if not getattr(self, "_step_widgets_are_stacked", False):
+            for widget in self.step_widgets:
+                widget.grid(
+                    row=0,
+                    column=0,
+                    sticky="nsew",
+                    padx=0,
+                    pady=0,
+                )
+            self._step_widgets_are_stacked = True
+
+        target_widget = self.step_widgets[step_index]
+        target_widget.tkraise()
+        self._visible_step_index = step_index

@@ -10,6 +10,7 @@ import pandas as pd
 
 from ms_preprocessing.adapters import feature_filter as feature_filter_adapter
 from ms_preprocessing.gui.styles import COLORS, FONTS, PADDING
+from ms_preprocessing.gui.validation import ValidationWarning, validate_step4_params
 from ms_preprocessing.gui.widgets.base_widget import BaseProcessingWidget
 
 
@@ -416,6 +417,9 @@ class FeatureFilterWidget(BaseProcessingWidget):
             self.low_det_entry.insert(0, f"{parsed:.3f}")
         self._sync_threshold_control_states()
 
+    def validate_parameters(self, params: dict) -> list[ValidationWarning]:
+        return validate_step4_params(params)
+
     def _apply_threshold_value(
         self,
         control_key: str,
@@ -496,19 +500,33 @@ class FeatureFilterWidget(BaseProcessingWidget):
 
     def _on_run_clicked(self) -> None:
         """Override to check for single-group and small-N conditions before starting worker."""
+        if self._is_processing:
+            self.log("Processing is already in progress")
+            return
+        if self._data is None:
+            self.log("No input data loaded")
+            return
+
         self._allow_single_group_stable = False
+        params = self.get_parameters()
+        self._last_parameters = dict(params)
+        if not self._validate_parameters_before_run(params):
+            return
+
         if self._data is not None and self.bg_enabled_var.get():
             if self._count_analysis_groups() == 1:
                 if not self._confirm_single_group_run():
                     return
                 self._allow_single_group_stable = True
+                params["allow_single_group_stable"] = True
 
         if self._data is not None:
             small_groups = self._detect_small_biological_groups()
             if small_groups and not self._confirm_small_group_run(small_groups):
                 return
 
-        super()._on_run_clicked()
+        self._last_parameters = dict(params)
+        self._start_processing(params)
 
     def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
         """Run the feature filtering step."""

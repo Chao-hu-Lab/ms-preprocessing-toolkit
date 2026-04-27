@@ -135,11 +135,7 @@ class PipelineSession:
     def save_step_output(self, step_index: int, data: pd.DataFrame, file_handler) -> Path:
         """Persist step output as parquet intermediate for GUI chaining."""
         self._sync_metadata_from_context()
-        self.intermediate_dir.mkdir(parents=True, exist_ok=True)
-        stem = self._get_base_stem(self.source_file) if self.source_file else "output"
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        step_prefix = f"STEP{step_index + 1}"
-        path = self.intermediate_dir / f"{step_prefix}_{stem}_{timestamp}.parquet"
+        path = self.build_step_output_path(step_index)
 
         file_handler.save_data(
             data,
@@ -152,6 +148,14 @@ class PipelineSession:
         )
         self.step_output_paths[step_index] = path
         return path
+
+    def build_step_output_path(self, step_index: int) -> Path:
+        """Build a GUI intermediate path without registering it as a completed output."""
+        self.intermediate_dir.mkdir(parents=True, exist_ok=True)
+        stem = self._get_base_stem(self.source_file) if self.source_file else "output"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        step_prefix = f"STEP{step_index + 1}"
+        return self.intermediate_dir / f"{step_prefix}_{stem}_{timestamp}.parquet"
 
     def build_final_export_path(
         self,

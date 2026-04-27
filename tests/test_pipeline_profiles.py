@@ -5,7 +5,10 @@ from __future__ import annotations
 import pytest
 
 from ms_preprocessing.config.pipeline_defaults import STEP1_PARAMS, STEP2_PARAMS, STEP3_PARAMS
-from ms_preprocessing.config.pipeline_profiles import get_pipeline_profile
+from ms_preprocessing.config.pipeline_profiles import (
+    format_pipeline_profile_preview,
+    get_pipeline_profile,
+)
 
 
 @pytest.mark.parametrize(
@@ -47,3 +50,14 @@ def test_pipeline_profiles_return_copies_of_mutable_step_dicts() -> None:
     profile["step2"]["ppm_tolerance"] = 99.0
 
     assert STEP2_PARAMS["ppm_tolerance"] == pytest.approx(20.0)
+
+
+def test_pipeline_profile_preview_uses_actual_profile_values() -> None:
+    preview = format_pipeline_profile_preview("default")
+
+    assert "Step 1-3: fixed defaults" in preview
+    assert "Signal: 5000" in preview
+    assert "Background: 0.33" in preview
+    assert "MNAR: 0.80 / 0.20" in preview
+    assert "QC_ratio: 0.25" in preview
+    assert "Intensity FC: off" in preview

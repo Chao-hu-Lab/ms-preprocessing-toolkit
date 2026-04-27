@@ -10,6 +10,7 @@ import pandas as pd
 
 from ms_preprocessing.adapters import istd_marker as istd_marker_adapter
 from ms_preprocessing.gui.styles import FONTS, PADDING
+from ms_preprocessing.gui.validation import ValidationWarning, validate_step2_params
 from ms_preprocessing.gui.widgets.base_widget import BaseProcessingWidget
 
 
@@ -168,6 +169,9 @@ class ISTDMarkerWidget(BaseProcessingWidget):
         if "istd_record_date" in params:
             self.date_entry.delete(0, "end")
             self.date_entry.insert(0, str(params["istd_record_date"]))
+
+    def validate_parameters(self, params: dict) -> list[ValidationWarning]:
+        return validate_step2_params(params)
 
     def _parse_istd_mz_list(self) -> List[float]:
         """Parse ISTD m/z list from entry, fallback to default."""

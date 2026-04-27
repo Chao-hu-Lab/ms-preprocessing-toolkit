@@ -53,7 +53,7 @@ class MainWindow(MainWindowEventHandlersMixin, MainWindowLayoutMixin, ctk.CTk):
         self._pipeline_is_processing = False
 
         self._create_layout()
-        self._apply_pipeline_profile_to_widgets("default", log=False)
+        self._apply_pipeline_profile_to_widgets("default", log=True)
         self._bind_shortcuts()
 
 

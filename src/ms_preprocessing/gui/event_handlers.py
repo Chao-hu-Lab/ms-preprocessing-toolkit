@@ -18,10 +18,16 @@ import pandas as pd
 
 from ms_preprocessing.adapters import data_organizer as data_organizer_adapter
 from ms_preprocessing.bootstrap_paths import ensure_dnp_bridge_on_path, find_dnp_main_module
-from ms_preprocessing.config import get_pipeline_profile
+from ms_preprocessing.config import format_pipeline_profile_preview, get_pipeline_profile
 from ms_preprocessing.config.settings import Settings
 from ms_preprocessing.gui.pipeline_session import PipelineSession
 from ms_preprocessing.gui.styles import COLORS
+from ms_preprocessing.gui.step_summary import summarize_step_result
+from ms_preprocessing.gui.validation import (
+    ValidationWarning,
+    format_validation_warnings,
+    has_blocking_warnings,
+)
 
 
 if TYPE_CHECKING:
@@ -48,6 +54,8 @@ if TYPE_CHECKING:
         _step_status_labels: list[Any]
         export_dnp_btn: Any
         log_text: Any
+        run_context_label: Any
+        latest_result_label: Any
         run_all_profile_var: Any
 
         def _show_step(self, step_index: int) -> None: ...
@@ -65,6 +73,161 @@ class MainWindowEventHandlersMixin:
     def _new_pipeline_session(self: "_MainWindowEventHost", source_file: Path | None) -> PipelineSession:
         return PipelineSession(output_dir=self._output_dir, source_file=source_file)
 
+    def _display_name(self: "_MainWindowEventHost", value: Any) -> str:
+        if not value:
+            return "not selected"
+        return Path(str(value)).name
+
+    def _safe_step_params(self: "_MainWindowEventHost", step_index: int) -> dict[str, Any]:
+        session_params = getattr(self._pipeline_session, "step_parameters", {}).get(step_index)
+        if session_params:
+            return dict(session_params)
+        widgets = self.__dict__.get("step_widgets", [])
+        if step_index >= len(widgets):
+            return {}
+        getter = getattr(widgets[step_index], "get_parameters", None)
+        if not callable(getter):
+            return {}
+        try:
+            return dict(getter())
+        except Exception:
+            return {}
+
+    def _combined_tsv_state(self: "_MainWindowEventHost") -> str:
+        widgets = self.__dict__.get("step_widgets", [])
+        if not widgets:
+            return "not selected"
+        getter = getattr(widgets[0], "get_combined_preprocessor_paths", None)
+        if not callable(getter):
+            return "not selected"
+        try:
+            paths = getter()
+        except Exception:
+            return "not selected"
+        return "selected" if str(paths.get("combined_tsv") or "").strip() else "not selected"
+
+    def _latest_output_name(self: "_MainWindowEventHost") -> str:
+        materialized = self.__dict__.get("_last_materialized_export_path")
+        if materialized:
+            return Path(materialized).name
+        last_step = self.__dict__.get("_last_completed_step")
+        step_paths = self.__dict__.get("_step_output_paths", {})
+        if last_step is not None and step_paths.get(last_step):
+            return Path(step_paths[last_step]).name
+        return "not available"
+
+    def _update_run_context_summary(self: "_MainWindowEventHost") -> None:
+        label = self.__dict__.get("run_context_label")
+        if label is None:
+            return
+
+        context = self.__dict__.get("_context", {}) or {}
+        step1_params = self._safe_step_params(0)
+        step2_params = self._safe_step_params(1)
+
+        method_file = context.get("method_file") or step1_params.get("method_file")
+        istd_record = context.get("istd_record_file") or step2_params.get("istd_record_file")
+        istd_date = context.get("istd_record_date") or step2_params.get("istd_record_date")
+
+        lines = [
+            "Run: "
+            f"Source: {self._display_name(self.__dict__.get('_source_file'))} | "
+            f"Step: {int(self.__dict__.get('_current_step', 0)) + 1} | "
+            f"Completed: {len(self.__dict__.get('_completed_steps', set()))}",
+            "Files: "
+            f"Method: {self._display_name(method_file)} | "
+            f"ISTD: {self._display_name(istd_record)} | "
+            f"Date: {istd_date or 'not set'}",
+            "Output: "
+            f"Combined TSV: {self._combined_tsv_state()} | "
+            f"Latest output: {self._latest_output_name()}",
+        ]
+        label.configure(text="\n".join(lines))
+
+    def _update_latest_result_summary(
+        self: "_MainWindowEventHost",
+        lines: list[str],
+    ) -> None:
+        label = self.__dict__.get("latest_result_label")
+        if label is None:
+            return
+        if not lines:
+            text = "Latest Result: waiting"
+        elif len(lines) <= 2:
+            text = f"Latest Result: {' | '.join(lines)}"
+        else:
+            text = "Latest Result:\n" + " | ".join(lines)
+        label.configure(text=text)
+
+    def _summarize_widget_result(
+        self: "_MainWindowEventHost",
+        step_index: int,
+        widget: Any,
+        params: dict[str, Any] | None = None,
+    ) -> list[str]:
+        metadata_getter = getattr(widget, "get_metadata", None)
+        metadata = metadata_getter() if callable(metadata_getter) else {}
+        metadata = metadata or {}
+        stats = metadata.get("statistics") or {}
+        result_getter = getattr(widget, "get_processing_result", None)
+        processing_result = result_getter() if callable(result_getter) else None
+        if not stats and processing_result is not None:
+            stats = getattr(processing_result, "statistics", {}) or {}
+        if not isinstance(stats, dict):
+            stats = {}
+        parameters = dict(params or {})
+        if not parameters:
+            param_getter = getattr(widget, "get_last_parameters", None)
+            if callable(param_getter):
+                parameters = dict(param_getter())
+        if step_index == 3 and hasattr(widget, "_export_deleted_var"):
+            try:
+                parameters["export_deleted_feature_sheet"] = bool(widget._export_deleted_var.get())
+            except Exception:
+                pass
+        step_name = getattr(processing_result, "step", None)
+        if not isinstance(step_name, str):
+            step_name = Settings.WORKFLOW_STEPS[step_index][0]
+        return summarize_step_result(step_name, stats, metadata, parameters)
+
+    def _confirm_validation_warnings(
+        self: "_MainWindowEventHost",
+        warnings: list[ValidationWarning],
+    ) -> bool:
+        try:
+            return bool(
+                messagebox.askokcancel(
+                    "Parameter warning",
+                    format_validation_warnings(warnings),
+                )
+            )
+        except Exception:
+            return True
+
+    def _collect_run_all_validation_warnings(
+        self: "_MainWindowEventHost",
+        params_by_step: list[dict[str, Any]],
+    ) -> list[ValidationWarning]:
+        warnings: list[ValidationWarning] = []
+        for index, params in enumerate(params_by_step):
+            if index >= len(self.__dict__.get("step_widgets", [])):
+                continue
+            validator = getattr(self.step_widgets[index], "validate_parameters", None)
+            if not callable(validator):
+                continue
+            step_warnings = validator(params)
+            if not isinstance(step_warnings, (list, tuple)):
+                continue
+            for warning in step_warnings:
+                warnings.append(
+                    ValidationWarning(
+                        code=warning.code,
+                        message=f"Step {index + 1}: {warning.message}",
+                        blocking=warning.blocking,
+                    )
+                )
+        return warnings
+
     def _on_pipeline_profile_selected(self: "_MainWindowEventHost", profile_name: str) -> None:
         self._apply_pipeline_profile_to_widgets(profile_name)
 
@@ -79,6 +242,8 @@ class MainWindowEventHandlersMixin:
             self._pipeline_worker_thread = None
         if "_pipeline_is_processing" not in self.__dict__:
             self._pipeline_is_processing = False
+        if "_step_output_save_threads" not in self.__dict__:
+            self._step_output_save_threads = []
 
     def _can_schedule_ui_callbacks(self: "_MainWindowEventHost") -> bool:
         after = getattr(self, "after", None)
@@ -126,7 +291,15 @@ class MainWindowEventHandlersMixin:
                 break
             callback(*args)
 
-        worker_alive = self._pipeline_worker_thread is not None and self._pipeline_worker_thread.is_alive()
+        save_threads = [
+            thread
+            for thread in self.__dict__.get("_step_output_save_threads", [])
+            if thread.is_alive()
+        ]
+        self._step_output_save_threads = save_threads
+        worker_alive = (
+            self._pipeline_worker_thread is not None and self._pipeline_worker_thread.is_alive()
+        ) or bool(save_threads)
         if worker_alive or not self._ui_queue.empty():
             self._schedule_ui_queue_drain()
 
@@ -205,6 +378,7 @@ class MainWindowEventHandlersMixin:
 
         if log:
             self._log(f"Applied Run All preset: {profile_name}")
+            self._log(f"Preset parameters: {format_pipeline_profile_preview(profile_name)}")
 
     def _has_active_processing(self: "_MainWindowEventHost") -> bool:
         self._ensure_async_state()
@@ -338,6 +512,7 @@ class MainWindowEventHandlersMixin:
             load_format = metadata.get("format", "unknown")
             self._log(f"Loaded successfully: {len(df)} rows, {len(df.columns)} columns (format: {load_format})")
             self._update_export_dnp_btn()
+            self._update_run_context_summary()
         except Exception as exc:
             self._log(f"Error loading file: {exc}")
             self._show_error(f"Failed to load file:\n{exc}")
@@ -429,6 +604,8 @@ class MainWindowEventHandlersMixin:
         prefill = getattr(self.step_widgets[0], "prefill_normal_method_from_combined", None)
         if callable(prefill):
             prefill()
+        self._last_materialized_export_path = loaded_path
+        self._update_run_context_summary()
         self._log("Ready: review Step 1 settings, then run Step 1 or Run All.")
 
     def _show_error(self: "_MainWindowEventHost", message: str) -> None:
@@ -448,8 +625,6 @@ class MainWindowEventHandlersMixin:
         self._current_step = step_index
         self._show_step(step_index)
         self.step_widgets[step_index].set_context(self._context)
-        if hasattr(self, "_step_output_paths") and self._step_output_paths.get(step_index):
-            self.step_widgets[step_index].set_input_file(str(self._step_output_paths[step_index]))
 
         for index, (button, status_label) in enumerate(zip(self.step_buttons, self._step_status_labels)):
             if index == step_index:
@@ -461,6 +636,7 @@ class MainWindowEventHandlersMixin:
             else:
                 button.configure(fg_color="transparent")
                 status_label.configure(text="-", text_color="#4a6fa5")
+        self._update_run_context_summary()
 
     def _run_current_step(self: "_MainWindowEventHost") -> None:
         if 0 <= self._current_step < len(self.step_widgets):
@@ -481,10 +657,12 @@ class MainWindowEventHandlersMixin:
         result_data: pd.DataFrame,
         metadata: Optional[dict] = None,
     ) -> None:
+        step_index = self._current_step
+        next_step = step_index + 1
         self._current_data = result_data
-        current_widget = self.step_widgets[self._current_step]
+        current_widget = self.step_widgets[step_index]
         self._pipeline_session.record_step_parameters(
-            self._current_step,
+            step_index,
             current_widget.get_last_parameters(),
         )
 
@@ -494,29 +672,34 @@ class MainWindowEventHandlersMixin:
         else:
             self._update_context_from_metadata(metadata)
         self._context = self._pipeline_session.context
-        self._completed_steps.add(self._current_step)
+        self._completed_steps.add(step_index)
 
         stats = current_widget.get_metadata().get("statistics") or {}
         current_widget.show_stats(stats)
+        summary_lines = self._summarize_widget_result(step_index, current_widget)
 
-        self._last_completed_step = self._current_step
+        self._last_completed_step = step_index
         self._last_run_all = False
-        self._update_export_dnp_btn()
 
-        output_path = self._save_step_output(self._current_step, result_data)
-        if output_path:
-            self._step_output_paths[self._current_step] = output_path
-            current_widget.set_input_file(str(output_path))
-
-        next_step = self._current_step + 1
         if next_step < len(self.step_widgets):
             self.step_widgets[next_step].set_data(result_data)
             self.step_widgets[next_step].set_context(self._context)
-            if output_path:
-                self.step_widgets[next_step].set_input_file(str(output_path))
+            self._switch_step(next_step)
+            self._safe_update_action_bar_progress(
+                100,
+                f"Step {step_index + 1} complete. Step {next_step + 1} ready.",
+            )
+            self._update_latest_result_summary(summary_lines)
+            self._update_export_dnp_btn()
+            self._update_run_context_summary()
             self._log(f"Data passed to Step {next_step + 1}")
+            self._schedule_step_output_save(step_index, result_data, next_step_index=next_step)
+            return
 
+        self._update_latest_result_summary(summary_lines)
+        self._update_export_dnp_btn()
         self._auto_export_final_results()
+        self._update_run_context_summary()
 
     def _run_all_steps(self: "_MainWindowEventHost") -> None:
         if self._has_active_processing():
@@ -534,6 +717,28 @@ class MainWindowEventHandlersMixin:
         except Exception as exc:
             self._log(f"Error preparing Run All: {exc}")
             return
+
+        profile_var = self.__dict__.get("run_all_profile_var")
+        profile_name = "default"
+        if profile_var is not None:
+            try:
+                profile_name = str(profile_var.get())
+            except Exception:
+                profile_name = "default"
+        self._log(f"Run All preset: {profile_name}")
+        self._log(f"Preset parameters: {format_pipeline_profile_preview(profile_name)}")
+
+        validation_warnings = self._collect_run_all_validation_warnings(params_by_step)
+        if validation_warnings:
+            validation_message = format_validation_warnings(validation_warnings)
+            if has_blocking_warnings(validation_warnings):
+                self._log(f"Validation blocked Run All:\n{validation_message}")
+                self._show_error(validation_message)
+                return
+            self._log(f"Validation warning before Run All:\n{validation_message}")
+            if not self._confirm_validation_warnings(validation_warnings):
+                self._log("Run All cancelled after validation warning.")
+                return
 
         self._set_pipeline_busy_state(True)
         self._safe_update_action_bar_progress(0, "Running all steps...")
@@ -601,6 +806,11 @@ class MainWindowEventHandlersMixin:
                 if output_path:
                     self._step_output_paths[index] = output_path
                 self._log(f"Step {index + 1} completed")
+                summary_lines = self._summarize_widget_result(index, widget, params)
+                for line in summary_lines:
+                    self._log(f"Step {index + 1} summary: {line}")
+                self._dispatch_to_ui(self._update_latest_result_summary, summary_lines)
+                self._dispatch_to_ui(self._update_run_context_summary)
 
             self._last_run_all = True
             self._dispatch_to_ui(self._safe_update_action_bar_progress, 100, "All steps complete!")
@@ -628,6 +838,7 @@ class MainWindowEventHandlersMixin:
             self._safe_update_action_bar_progress(0, "Run All failed")
         else:
             self._auto_export_final_results()
+            self._update_run_context_summary()
         self._switch_step(min(original_step, len(self.step_widgets) - 1))
 
     def _export_results(self: "_MainWindowEventHost") -> Optional[Path]:
@@ -671,6 +882,7 @@ class MainWindowEventHandlersMixin:
             )
             self._last_materialized_export_path = filepath
             self._log(f"Exported to: {filepath}")
+            self._update_run_context_summary()
             return filepath
         except Exception as exc:
             self._log(f"Export error: {exc}")
@@ -835,6 +1047,7 @@ class MainWindowEventHandlersMixin:
             self._step_output_paths[self._last_completed_step] = target_path
             self._last_materialized_export_path = target_path
             self._log(f"Materialized final xlsx from parquet: {target_path}")
+            self._update_run_context_summary()
             return target_path
         except Exception as exc:
             self._log(f"Materialization error: {exc}")
@@ -873,6 +1086,115 @@ class MainWindowEventHandlersMixin:
         except Exception as exc:
             self._log(f"Auto-save error: {exc}")
             return None
+
+    def _schedule_step_output_save(
+        self: "_MainWindowEventHost",
+        step_index: int,
+        data: pd.DataFrame,
+        *,
+        next_step_index: int | None = None,
+    ) -> None:
+        if data is None:
+            return
+        try:
+            self._ensure_async_state()
+            session = self._pipeline_session
+            session.set_source_file(getattr(self, "_source_file", None))
+            output_path = session.build_step_output_path(step_index)
+            formatting_context = {
+                "highlight_rows": set(session.context.get("highlight_rows") or []),
+                "blue_font_cells": list(session.context.get("blue_font_cells") or []),
+                "red_font_rows": set(session.context.get("red_font_rows") or []),
+            }
+            session_token = id(session)
+            data_snapshot = data.copy(deep=False)
+        except Exception as exc:
+            self._log(f"Auto-save error: {exc}")
+            return
+
+        worker = threading.Thread(
+            target=self._run_step_output_save_worker,
+            args=(
+                step_index,
+                data_snapshot,
+                next_step_index,
+                session_token,
+                output_path,
+                formatting_context,
+            ),
+            daemon=True,
+            name=f"step-{step_index + 1}-autosave-worker",
+        )
+        self._step_output_save_threads.append(worker)
+        self._schedule_ui_queue_drain()
+        worker.start()
+
+    def _run_step_output_save_worker(
+        self: "_MainWindowEventHost",
+        step_index: int,
+        data: pd.DataFrame,
+        next_step_index: int | None,
+        session_token: object,
+        output_path: Path,
+        formatting_context: dict[str, object],
+    ) -> None:
+        try:
+            self._file_handler.save_data(
+                data,
+                output_path,
+                sheet_name="RawIntensity",
+                highlight_rows=formatting_context.get("highlight_rows"),
+                blue_font_cells=formatting_context.get("blue_font_cells"),
+                red_font_rows=formatting_context.get("red_font_rows"),
+                save_parquet_cache=False,
+            )
+        except Exception as exc:
+            error_message = str(exc)
+            self._dispatch_to_ui(
+                lambda: self._finish_deferred_step_output_save(
+                    step_index=step_index,
+                    next_step_index=next_step_index,
+                    session_token=session_token,
+                    path=None,
+                    error_message=error_message,
+                )
+            )
+            return
+
+        self._dispatch_to_ui(
+            lambda: self._finish_deferred_step_output_save(
+                step_index=step_index,
+                next_step_index=next_step_index,
+                session_token=session_token,
+                path=output_path,
+                error_message=None,
+            )
+        )
+
+    def _finish_deferred_step_output_save(
+        self: "_MainWindowEventHost",
+        *,
+        step_index: int,
+        next_step_index: int | None,
+        session_token: object,
+        path: Path | None,
+        error_message: str | None,
+    ) -> None:
+        if session_token != id(self._pipeline_session):
+            return
+        if error_message is not None:
+            self._log(f"Auto-save error: {error_message}")
+            return
+        if path is None:
+            self._log("Auto-save error: output path was not created")
+            return
+
+        self._step_output_paths[step_index] = path
+        self._pipeline_session.step_output_paths[step_index] = path
+        if next_step_index is not None and next_step_index < len(self.step_widgets):
+            self.step_widgets[next_step_index].set_input_file(str(path))
+        self._log(f"Auto-saved: {path}")
+        self._update_run_context_summary()
 
     def _open_output_folder(self: "_MainWindowEventHost") -> None:
         try:
