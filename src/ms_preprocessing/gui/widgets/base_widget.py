@@ -7,7 +7,8 @@ from __future__ import annotations
 import queue
 import threading
 from abc import ABC, abstractmethod
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import customtkinter as ctk
 import pandas as pd

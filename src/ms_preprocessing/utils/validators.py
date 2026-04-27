@@ -6,7 +6,7 @@ to ensure data quality before processing.
 """
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
@@ -23,7 +23,7 @@ class ValidationError(Exception):
 class ValidationWarning:
     """Represents a non-critical validation warning."""
 
-    def __init__(self, message: str, details: Optional[dict[str, Any]] = None):
+    def __init__(self, message: str, details: dict[str, Any] | None = None):
         self.message = message
         self.details = details or {}
 
@@ -202,7 +202,7 @@ class DataValidator:
         self,
         df: pd.DataFrame,
         sample_type_row: int = 0,
-        expected_types: Optional[list[str]] = None,
+        expected_types: list[str] | None = None,
     ) -> tuple[bool, dict[str, int]]:
         """
         Validate sample type row and count each type.
@@ -240,7 +240,7 @@ class DataValidator:
 
         return True, type_counts
 
-    def _find_column(self, df: pd.DataFrame, patterns: list[str]) -> Optional[str]:
+    def _find_column(self, df: pd.DataFrame, patterns: list[str]) -> str | None:
         """Find a column matching any of the given patterns."""
         for col in df.columns:
             col_lower = str(col).lower().replace(" ", "").replace("_", "")

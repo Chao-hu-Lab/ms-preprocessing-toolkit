@@ -8,9 +8,9 @@ Adapters are the only application-layer modules that should import from
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
 from time import time_ns
-from typing import Callable
 
 import pandas as pd
 

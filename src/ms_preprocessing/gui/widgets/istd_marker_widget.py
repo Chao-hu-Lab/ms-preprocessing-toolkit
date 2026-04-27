@@ -2,8 +2,8 @@
 ISTD Marker Widget - GUI for Step 2.
 """
 
+from collections.abc import Callable
 from tkinter import filedialog
-from typing import Callable, Optional
 
 import customtkinter as ctk
 import pandas as pd
@@ -21,10 +21,10 @@ class ISTDMarkerWidget(BaseProcessingWidget):
         self,
         parent: ctk.CTkFrame,
         step_index: int,
-        on_load_file: Optional[Callable[[int], None]] = None,
-        on_complete: Optional[Callable[[pd.DataFrame], None]] = None,
-        on_log: Optional[Callable[[str], None]] = None,
-        on_progress: Optional[Callable[[float, str], None]] = None,
+        on_load_file: Callable[[int], None] | None = None,
+        on_complete: Callable[[pd.DataFrame], None] | None = None,
+        on_log: Callable[[str], None] | None = None,
+        on_progress: Callable[[float, str], None] | None = None,
     ):
         self._istd_features: set[str] = set()
         super().__init__(

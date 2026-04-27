@@ -626,7 +626,9 @@ class MainWindowEventHandlersMixin:
         self._show_step(step_index)
         self.step_widgets[step_index].set_context(self._context)
 
-        for index, (button, status_label) in enumerate(zip(self.step_buttons, self._step_status_labels)):
+        for index, (button, status_label) in enumerate(
+            zip(self.step_buttons, self._step_status_labels, strict=True)
+        ):
             if index == step_index:
                 button.configure(fg_color=COLORS["primary"])
                 status_label.configure(text=">", text_color="#52b788")

@@ -10,7 +10,6 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Union
 
 import pandas as pd
 from openpyxl import load_workbook
@@ -38,18 +37,18 @@ class FileHandler:
 
     def __init__(self):
         """Initialize the FileHandler."""
-        self._last_loaded_path: Optional[Path] = None
+        self._last_loaded_path: Path | None = None
 
     @staticmethod
-    def is_supported_format(file_path: Union[str, Path]) -> bool:
+    def is_supported_format(file_path: str | Path) -> bool:
         """Check if the file format is supported."""
         path = Path(file_path)
         return path.suffix.lower() in FileHandler.SUPPORTED_FORMATS
 
     def load_data(
         self,
-        file_path: Union[str, Path],
-        sheet_name: Optional[Union[str, int]] = 0,
+        file_path: str | Path,
+        sheet_name: str | int | None = 0,
         header_row: int = 0,
     ) -> tuple[pd.DataFrame, dict]:
         """
@@ -119,7 +118,7 @@ class FileHandler:
     @staticmethod
     def _load_excel(
         file_path: Path,
-        sheet_name: Optional[Union[str, int]] = 0,
+        sheet_name: str | int | None = 0,
         header_row: int = 0,
     ) -> tuple[pd.DataFrame, set]:
         """Load data from Excel file with formatting extraction.
@@ -163,13 +162,13 @@ class FileHandler:
     def save_data(
         self,
         df: pd.DataFrame,
-        file_path: Union[str, Path],
+        file_path: str | Path,
         sheet_name: str = "Sheet1",
         index: bool = False,
-        highlight_rows: Optional[set] = None,
-        blue_font_cells: Optional[list] = None,
-        red_font_rows: Optional[set] = None,
-        extra_sheets: Optional[dict] = None,
+        highlight_rows: set | None = None,
+        blue_font_cells: list | None = None,
+        red_font_rows: set | None = None,
+        extra_sheets: dict | None = None,
         save_parquet_cache: bool = False,
     ) -> Path:
         """
@@ -244,10 +243,10 @@ class FileHandler:
         file_path: Path,
         sheet_name: str = "Sheet1",
         index: bool = False,
-        highlight_rows: Optional[set] = None,
-        blue_font_cells: Optional[list] = None,
-        red_font_rows: Optional[set] = None,
-        extra_sheets: Optional[dict] = None,
+        highlight_rows: set | None = None,
+        blue_font_cells: list | None = None,
+        red_font_rows: set | None = None,
+        extra_sheets: dict | None = None,
     ) -> None:
         """Save DataFrame to Excel with optional formatting."""
         # First save with pandas
@@ -296,9 +295,9 @@ class FileHandler:
 
     @staticmethod
     def generate_output_path(
-        input_path: Union[str, Path],
+        input_path: str | Path,
         suffix: str = "_processed",
-        output_dir: Optional[Union[str, Path]] = None,
+        output_dir: str | Path | None = None,
         add_timestamp: bool = True,
     ) -> Path:
         """
@@ -337,9 +336,9 @@ class FileHandler:
         self,
         df: pd.DataFrame,
         parquet_path: Path,
-        highlight_rows: Optional[set] = None,
-        blue_font_cells: Optional[list] = None,
-        red_font_rows: Optional[set] = None,
+        highlight_rows: set | None = None,
+        blue_font_cells: list | None = None,
+        red_font_rows: set | None = None,
     ) -> None:
         """Save a parquet cache with metadata sidecar for formatting."""
         meta = {
@@ -358,7 +357,7 @@ class FileHandler:
         except Exception as exc:
             logger.warning("Parquet cache save failed (non-fatal): %s", exc)
 
-    def _load_parquet_meta(self, parquet_path: Path) -> Optional[dict]:
+    def _load_parquet_meta(self, parquet_path: Path) -> dict | None:
         """Load parquet metadata sidecar if it exists."""
         meta_path = self._parquet_meta_path(parquet_path)
         if not meta_path.exists():
@@ -375,7 +374,7 @@ class FileHandler:
             logger.warning("Failed to load parquet meta: %s", exc)
             return None
 
-    def _resolve_parquet_cache(self, excel_path: Path) -> Optional[Path]:
+    def _resolve_parquet_cache(self, excel_path: Path) -> Path | None:
         """Return parquet cache if it exists and is newer than Excel."""
         parquet_path = excel_path.with_suffix(".parquet")
         meta_path = self._parquet_meta_path(parquet_path)
@@ -411,7 +410,7 @@ class FileHandler:
         return pd.read_csv(path, header=header_row, sep=sep)
 
 
-def parse_mz_rt_string(value: str) -> tuple[Optional[float], Optional[float]]:
+def parse_mz_rt_string(value: str) -> tuple[float | None, float | None]:
     """
     Parse a combined m/z and RT string (e.g., "123.456/1.23").
 
