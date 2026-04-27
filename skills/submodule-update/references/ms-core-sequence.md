@@ -27,10 +27,11 @@ git push origin <branch>
 
 ## Useful Checks
 
-```bash
+```powershell
 git -C ms-core rev-parse --short HEAD
 git diff --submodule
-PYTHONPATH=ms-core/src pytest tests/ -v --tb=short -x
+$env:PYTHONPATH='ms-core/src'
+python -m pytest tests/ -v --tb=short -x
 ```
 
 ## Common Failure Modes
@@ -39,5 +40,5 @@ PYTHONPATH=ms-core/src pytest tests/ -v --tb=short -x
   - fix by pushing `ms-core` first
 - top-level repo points to the wrong submodule SHA
   - fix by restaging `ms-core` after checking out the intended submodule commit
-- coordinated fix tested without `PYTHONPATH=ms-core/src`
+- coordinated fix tested without `$env:PYTHONPATH='ms-core/src'`
   - rerun verification with the correct environment

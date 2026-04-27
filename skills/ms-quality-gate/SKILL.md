@@ -7,11 +7,15 @@ description: Run standardized testing and code-review workflows for the MS prepr
 
 Run deterministic quality checks and structure review output for this repository.
 
+Before choosing test commands, read `docs/TESTING.md`. It is the source of truth
+for test ownership, focused verification scope, GUI smoke checks, root hygiene,
+and when to run `ms-core/tests`.
+
 ## Quick Start
 
 - Run full quality gate:
   - `powershell -ExecutionPolicy Bypass -File "<path-to-skill>/scripts/run_quality_checks.ps1"`
-- Run fast gate (no full pytest):
+- Run fast gate (compile/version/smoke only; skips advisory ruff):
   - `powershell -ExecutionPolicy Bypass -File "<path-to-skill>/scripts/run_quality_checks.ps1" -Fast`
 - Collect review context snapshot:
   - `powershell -ExecutionPolicy Bypass -File "<path-to-skill>/scripts/review_snapshot.ps1"`

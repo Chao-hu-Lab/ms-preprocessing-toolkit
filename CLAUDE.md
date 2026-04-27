@@ -44,13 +44,24 @@ Before ANY development work, always run `git status` to confirm:
 
 ## Testing
 
-Run the full test suite before considering work complete:
+Testing policy source of truth:
 
-```bash
-PYTHONPATH=ms-core/src pytest tests/ -v --tb=short -x
+- `docs/TESTING.md`
+
+Use that document for responsibility boundaries, focused commands, GUI smoke
+checks, root hygiene, and when to run `ms-core/tests`.
+Top-level pytest marker assignment is centralized in `tests/testing_markers.py`;
+update that mapping and `tests/test_testing_markers.py` when adding marker-owned
+test files.
+
+Default top-level full suite:
+
+```powershell
+$env:PYTHONPATH='ms-core/src'
+python -m pytest tests/ -v --tb=short -x
 ```
 
-All 82+ tests must pass. No merging without passing tests.
+Do not merge without fresh verification evidence.
 
 ## Release Flow
 
@@ -100,20 +111,21 @@ git push origin v0.X.Y
 
 ### toolkit 變更（後做）
 
-```bash
+```powershell
 # 4. 在 toolkit 建立 fix branch
-cd <toolkit-root>
+Set-Location <toolkit-root>
 git checkout -b fix/<description>
 
 # 5. 更新 submodule 到新 tag
-cd ms-core
+Set-Location ms-core
 git fetch --tags
 git checkout v0.X.Y
-cd ..
+Set-Location ..
 git add ms-core
 
 # 6. 改 toolkit 代碼（若有）→ 跑測試 → commit → PR
-PYTHONPATH=ms-core/src uv run pytest tests/ -q --tb=short -x
+$env:PYTHONPATH='ms-core/src'
+uv run pytest tests/ -q --tb=short -x
 git commit -m "chore: bump ms-core to v0.X.Y
 
 ms-core changes:
@@ -130,10 +142,10 @@ Toolkit changes:
 
 ## Hygiene Rules
 
-- **測試暫存一律在 `.tmp/` 下**：使用 `conftest.py` 的 `project_temp_dir` fixture，禁止用 `Path.cwd()` 產生暫存
-- **`tests/` 是原始碼，`.tmp/tests/` 是 runtime 暫存**，兩者不同
+- **測試暫存一律走 repo fixtures**：使用 `tests/conftest.py` 的 `tmp_path`、`tmp_path_factory`、`project_temp_dir` 或 `temp_dir`，禁止用 `Path.cwd()` 產生暫存
+- **`tests/` 是原始碼，`build/pytest/` 是 runtime 暫存根**，兩者不同
 - **`tests/` 下只放 `.py` 檔案**，測試用的固定資料放 `tests/fixtures/`
-- 清理：`find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; rm -rf .tmp/ .pytest_cache/`
+- 清理：使用 `scripts/clean_local_artifacts.ps1`
 
 ### Temp Path Source Of Truth
 
@@ -143,9 +155,10 @@ Toolkit changes:
 
 ## Key Commands
 
-```bash
+```powershell
 # Run tests
-PYTHONPATH=ms-core/src pytest tests/ -v --tb=short -x
+$env:PYTHONPATH='ms-core/src'
+python -m pytest tests/ -v --tb=short -x
 
 # Build exe locally
 pyinstaller ms-preprocessing.spec --clean --noconfirm

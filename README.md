@@ -213,15 +213,20 @@ ms-preprocessing-toolkit/
 
 ### 執行測試
 
-```bash
+完整測試策略、責任邊界與精準測試範圍請看
+[docs/TESTING.md](docs/TESTING.md)。
+
+```powershell
 # 安裝開發依賴
-pip install -e ".[dev]"
+python -m pip install -e ".[dev]"
 
-# 執行測試
-pytest tests/
+# 快速 smoke
+$env:PYTHONPATH='ms-core/src'
+python -m pytest -m smoke -v --tb=short
 
-# 執行測試並顯示覆蓋率
-pytest tests/ --cov=ms_preprocessing
+# top-level full suite
+$env:PYTHONPATH='ms-core/src'
+python -m pytest tests/ -v --tb=short -x
 ```
 
 ### 程式碼風格

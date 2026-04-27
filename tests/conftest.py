@@ -2,19 +2,20 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager
-from pathlib import Path
 import re
 import shutil
 import sys
 import time
-from typing import Iterator
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
 
-import numpy as np
+import customtkinter as ctk
 import pandas as pd
 import pytest
-import customtkinter as ctk
+
+from tests.testing_markers import classify_test_markers
 
 # Ensure src/ is on the import path for tests
 ROOT = Path(__file__).resolve().parents[1]
@@ -106,6 +107,17 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[object]):
     outcome = yield
     report = outcome.get_result()
     setattr(item, f"rep_{report.when}", report)
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Apply suite markers from the central path-based classification rules."""
+    for item in items:
+        raw_path = getattr(item, "path", None)
+        if raw_path is None:
+            raw_path = getattr(item, "fspath", item.nodeid.split("::", 1)[0])
+        item_path = Path(str(raw_path))
+        for marker in sorted(classify_test_markers(item_path)):
+            item.add_marker(getattr(pytest.mark, marker))
 
 
 @pytest.fixture(scope="session")
