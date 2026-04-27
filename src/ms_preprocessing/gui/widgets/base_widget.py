@@ -11,6 +11,11 @@ import customtkinter as ctk
 import pandas as pd
 
 from ms_preprocessing.gui.styles import COLORS, DIMENSIONS, FONTS, PADDING
+from ms_preprocessing.gui.validation import (
+    ValidationWarning,
+    format_validation_warnings,
+    has_blocking_warnings,
+)
 from ms_preprocessing.utils.perf import format_perf_delta, take_snapshot
 from ms_preprocessing.utils.results import ProcessingResult
 
@@ -237,6 +242,10 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
     def apply_parameters(self, params: dict) -> None:
         _ = params
 
+    def validate_parameters(self, params: dict) -> list[ValidationWarning]:
+        _ = params
+        return []
+
     def is_processing(self) -> bool:
         return self._is_processing
 
@@ -253,7 +262,6 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
     def _emit_progress(self, value: float, status: str = "") -> None:
         if self._on_progress:
             self._on_progress(value, status)
-        self.update_idletasks()
 
     def _dispatch_to_ui(self, callback: Callable[..., None], *args: Any) -> None:
         if threading.get_ident() == self._ui_thread_id:
@@ -339,19 +347,24 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         error_message: str | None,
         perf_summary: str,
     ) -> None:
+        restore_controls = False
         try:
             if error_message is None and result is not None:
                 self._result = result
                 self.update_progress(100, "Complete!")
                 self.log("Processing completed successfully")
                 self.log(perf_summary)
+                self._is_processing = False
+                restore_controls = True
                 if self.on_complete:
                     self.on_complete(result, self.get_metadata())
             else:
                 self.update_progress(0, "Failed")
                 self.log(f"Error: {error_message or 'Unknown error'}")
+                restore_controls = True
         finally:
-            self._set_processing_state(False)
+            if restore_controls or self._is_processing:
+                self._set_processing_state(False)
             self._worker_thread = None
             if not self._ui_queue.empty():
                 self._schedule_ui_queue_drain()
@@ -370,6 +383,33 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
 
         params = self.get_parameters()
         self._last_parameters = dict(params)
+        if not self._validate_parameters_before_run(params):
+            return
+        self._start_processing(params)
+
+    def _validate_parameters_before_run(self, params: dict) -> bool:
+        warnings = self.validate_parameters(params)
+        if not warnings:
+            return True
+
+        message = format_validation_warnings(warnings)
+        self.log(message)
+        if has_blocking_warnings(warnings):
+            return False
+        return self._confirm_validation_warnings(warnings)
+
+    def _confirm_validation_warnings(self, warnings: list[ValidationWarning]) -> bool:
+        import tkinter.messagebox
+
+        return bool(
+            tkinter.messagebox.askokcancel(
+                "Parameter warning",
+                format_validation_warnings(warnings),
+                parent=self,
+            )
+        )
+
+    def _start_processing(self, params: dict) -> None:
         self._set_processing_state(True)
         self.update_progress(0, "Running...")
 

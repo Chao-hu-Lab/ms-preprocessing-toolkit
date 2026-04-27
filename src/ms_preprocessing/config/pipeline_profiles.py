@@ -49,3 +49,37 @@ def get_pipeline_profile(name: PipelineProfileName = "default") -> PipelineProfi
         "step4": get_step4_preset(step4_name),
     }
 
+
+def _format_number(value: float) -> str:
+    numeric = float(value)
+    if numeric.is_integer():
+        return str(int(numeric))
+    return f"{numeric:.2f}"
+
+
+def format_pipeline_profile_preview(name: PipelineProfileName = "default") -> str:
+    """Return the compact sidebar preview for a Run All pipeline profile."""
+
+    profile = get_pipeline_profile(name)
+    step4 = profile["step4"]
+    intensity_fc = (
+        f"{_format_number(step4['intensity_fc_threshold'])}x"
+        if step4.get("enable_intensity_fc_threshold")
+        else "off"
+    )
+    return "\n".join(
+        [
+            "Step 1-3: fixed defaults",
+            (
+                f"Signal: {_format_number(step4['signal_threshold'])} | "
+                f"Background: {_format_number(step4['background_threshold'])}"
+            ),
+            (
+                f"MNAR: {float(step4['high_det_thresh']):.2f} / "
+                f"{float(step4['low_det_thresh']):.2f} | "
+                f"QC_ratio: {float(step4['qc_ratio_threshold']):.2f}"
+            ),
+            f"Intensity FC: {intensity_fc}",
+        ]
+    )
+

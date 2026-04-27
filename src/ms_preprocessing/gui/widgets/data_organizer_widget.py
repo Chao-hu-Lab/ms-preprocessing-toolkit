@@ -11,6 +11,7 @@ import pandas as pd
 
 from ms_preprocessing.adapters import data_organizer as data_organizer_adapter
 from ms_preprocessing.gui.styles import FONTS, PADDING
+from ms_preprocessing.gui.validation import ValidationWarning, validate_step1_params
 from ms_preprocessing.gui.widgets.base_widget import BaseProcessingWidget
 
 
@@ -246,6 +247,9 @@ class DataOrganizerWidget(BaseProcessingWidget):
         if method_file is not None:
             self._set_entry_value(self.method_entry, str(method_file))
 
+    def validate_parameters(self, params: dict) -> list[ValidationWarning]:
+        return validate_step1_params(params)
+
     def _looks_like_raw_combined_tsv(self, df: pd.DataFrame) -> bool:
         for idx, col in enumerate(df.columns):
             compact = re.sub(r"[^a-z0-9]+", "", str(col).strip().lower())
@@ -256,7 +260,10 @@ class DataOrganizerWidget(BaseProcessingWidget):
     def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
         """Run the data organization step."""
         if self._looks_like_raw_combined_tsv(data):
-            raise Exception("Combined TSV 請先使用上方 Combined TSV 前處理產生 combined_fix 檔案。")
+            raise Exception(
+                "偵測到 raw combined TSV。請先在「Combined TSV 前處理」選擇 TSV 與方法檔，"
+                "按「產生 combined_fix」，再用產出的 .xlsx 跑一般 Toolkit 流程。"
+            )
 
         result = data_organizer_adapter.run_from_df(
             data,

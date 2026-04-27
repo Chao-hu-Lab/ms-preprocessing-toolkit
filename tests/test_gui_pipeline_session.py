@@ -75,6 +75,19 @@ def test_pipeline_session_creates_output_directory_only_when_final_export_path_i
     assert final_path.parent == output_dir
 
 
+def test_build_step_output_path_does_not_register_path(tmp_path) -> None:
+    from ms_preprocessing.gui.pipeline_session import PipelineSession
+
+    session = PipelineSession(output_dir=tmp_path / "OUTPUT", source_file=tmp_path / "input.xlsx")
+
+    path = session.build_step_output_path(0)
+
+    assert path.parent == session.intermediate_dir
+    assert path.name.startswith("STEP1_input_")
+    assert path.suffix == ".parquet"
+    assert session.step_output_paths == {}
+
+
 def test_gui_parameters_are_collected_in_single_pipeline_session_context(tmp_path) -> None:
     from ms_preprocessing.gui.pipeline_session import PipelineSession
 

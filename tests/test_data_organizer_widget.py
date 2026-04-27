@@ -20,6 +20,14 @@ def test_data_organizer_widget_uses_global_form_alignment(widget) -> None:
     assert widget.method_entry.grid_info()["column"] == 1
 
 
+def test_data_organizer_widget_validates_missing_method_file(widget, tmp_path) -> None:
+    warnings = widget.validate_parameters({"method_file": str(tmp_path / "missing.docx")})
+
+    assert len(warnings) == 1
+    assert warnings[0].code == "method_file_not_found"
+    assert warnings[0].blocking is True
+
+
 def test_data_organizer_widget_hides_mode_selector_and_defaults_normalization(widget) -> None:
     params = widget.get_parameters()
 

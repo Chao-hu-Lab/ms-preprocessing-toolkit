@@ -68,6 +68,14 @@ def test_istd_marker_widget_apply_parameters_populates_profile_defaults(widget) 
         assert "istd_record_date" not in params
 
 
+def test_istd_marker_widget_validates_record_date_format(widget) -> None:
+    warnings = widget.validate_parameters({"istd_record_date": "2026-01-06"})
+
+    assert len(warnings) == 1
+    assert warnings[0].code == "invalid_istd_date"
+    assert warnings[0].blocking is True
+
+
 def test_istd_marker_widget_uses_aligned_form_columns(widget) -> None:
     assert widget.params_frame.grid_columnconfigure(0)["minsize"] == 180
     assert widget.ppm_entry.grid_info()["column"] == 1

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import customtkinter as ctk
 import pandas as pd
 import pytest
 
@@ -29,6 +30,10 @@ def test_duplicate_remover_widget_keeps_controls_in_aligned_columns(widget) -> N
     assert widget.rt_entry.cget("justify") == "center"
     assert widget.topn_entry.cget("justify") == "center"
     assert widget.degeneracy_switch.grid_info()["column"] == 0
+
+
+def test_duplicate_remover_widget_uses_scrollable_content_panel(widget) -> None:
+    assert isinstance(widget._content_frame, ctk.CTkScrollableFrame)
 
 
 def test_duplicate_remover_widget_hides_preserve_red_toggle_but_keeps_it_true(widget) -> None:

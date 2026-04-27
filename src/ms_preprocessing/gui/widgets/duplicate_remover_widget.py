@@ -38,6 +38,7 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
             on_complete=on_complete,
             on_log=on_log,
             on_progress=on_progress,
+            scrollable_content=True,
         )
 
     def _browse_adduct_table(self) -> None:

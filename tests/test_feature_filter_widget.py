@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import threading
 import time
+from unittest.mock import Mock
 
 import customtkinter as ctk
 import pandas as pd
@@ -107,6 +108,38 @@ def test_feature_filter_widget_apply_parameters_updates_visible_controls(widget)
     assert params["enable_intensity_fc_threshold"] is False
 
 
+def test_feature_filter_widget_validates_mnar_threshold_order(widget) -> None:
+    warnings = widget.validate_parameters({"high_det_thresh": 0.3, "low_det_thresh": 0.7})
+
+    assert len(warnings) == 1
+    assert warnings[0].code == "invalid_mnar_threshold_order"
+    assert warnings[0].blocking is True
+
+
+def test_feature_filter_widget_blocks_parameter_validation_before_data_confirmations(
+    widget,
+    monkeypatch,
+) -> None:
+    input_df = pd.DataFrame(
+        {
+            "Mz/RT": ["Sample_Type", "100.0/1.0"],
+            "Tolerance": ["na", "na"],
+            "Case1": ["case", 9000],
+            "QC1": ["qc", 9000],
+        }
+    )
+    widget.set_data(input_df)
+    widget.apply_parameters({"high_det_thresh": 0.3, "low_det_thresh": 0.7})
+    single_group_confirm = Mock(return_value=True)
+    monkeypatch.setattr(widget, "_confirm_single_group_run", single_group_confirm)
+    widget.on_log = lambda _message: None
+
+    widget._on_run_clicked()
+
+    assert widget.is_processing() is False
+    single_group_confirm.assert_not_called()
+
+
 def test_feature_filter_widget_uses_consistent_form_alignment(widget) -> None:
     assert widget.params_frame.grid_columnconfigure(0)["minsize"] == 44
     assert widget.params_frame.grid_columnconfigure(1)["minsize"] == 180
@@ -164,6 +197,38 @@ def test_feature_filter_widget_explains_rules_in_plainer_lab_language(widget) ->
     assert "QC_ratio 則是負向覆寫條件" in criteria_text
     assert "至少 2 組的 ratio 都大於等於背景比例門檻" in criteria_text
     assert "fold-change = 最大組平均強度 / 最小組平均強度" in criteria_text
+
+
+def test_progress_update_does_not_force_immediate_repaint(widget, monkeypatch) -> None:
+    updates: list[tuple[float, str]] = []
+    monkeypatch.setattr(widget, "update_idletasks", Mock())
+    widget._on_progress = lambda value, status: updates.append((value, status))
+
+    widget._emit_progress(100, "Complete!")
+
+    assert updates == [(100.0, "Complete!")]
+    widget.update_idletasks.assert_not_called()
+
+
+def test_finish_processing_marks_idle_before_callback_but_restores_controls_after(widget) -> None:
+    events: list[str] = []
+    control = Mock()
+    control.configure.side_effect = lambda **kwargs: events.append(f"control:{kwargs['state']}")
+    widget._iter_shared_action_buttons = lambda: [control]
+    widget._on_progress = lambda _value, _status: None
+    widget.on_log = lambda _message: None
+
+    def on_complete(_result, _metadata):
+        events.append(f"callback_busy:{widget.is_processing()}")
+
+    widget.on_complete = on_complete
+    widget._set_processing_state(True)
+    events.clear()
+
+    widget._finish_processing(pd.DataFrame({"S1": [1]}), None, "perf ok")
+
+    assert events[0] == "callback_busy:False"
+    assert events[-1] == "control:normal"
 
 
 def test_feature_filter_widget_runs_processing_in_background_without_duplicate_runs(
@@ -231,6 +296,20 @@ def test_feature_filter_widget_runs_processing_in_background_without_duplicate_r
     assert any(status == "Worker started" for _, status in progress_updates)
     assert any(status == "Complete!" for _, status in progress_updates)
     assert any("already in progress" in message for message in logs)
+
+
+def test_finish_processing_marks_widget_idle_before_completion_callback(widget) -> None:
+    observed_busy_states: list[bool] = []
+
+    widget.on_complete = lambda _result, _metadata: observed_busy_states.append(widget.is_processing())
+    widget.on_log = lambda _message: None
+    widget._on_progress = lambda _value, _status: None
+    widget._set_processing_state(True)
+
+    widget._finish_processing(pd.DataFrame({"S1": [1]}), None, "perf ok")
+
+    assert observed_busy_states == [False]
+    assert widget.is_processing() is False
 
 
 def test_feature_filter_widget_defaults_mnar_gate_enabled(widget) -> None:
