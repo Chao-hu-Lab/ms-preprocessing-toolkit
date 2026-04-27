@@ -22,7 +22,7 @@ ADAPTER_TEST_FILES = frozenset(
 INTEGRATION_TEST_FILES = frozenset(
     {
         "test_cli_parquet_chain.py",
-        "test_export_dnp_bridge.py",
+        "test_final_export_handoff.py",
         "test_final_export_cache_policy.py",
         "test_integration_parquet_pipeline.py",
         "test_intermediate_store_bridge.py",

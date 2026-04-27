@@ -9,42 +9,20 @@ toolkit fixes are merged.
 ## Out Of Scope For This Branch
 
 - Editing code inside `ms-core/`
-- Editing code inside `Data_Normalization_project_v2/`
+- Editing code inside downstream normalization project repositories
 - Changing external repository release or deployment configuration
 
 ## Follow-Up Tasks
 
-### 1. DNP bridge path injection hardening
-
-Files to review:
-- `src/ms_preprocessing/gui/event_handlers.py`
-
-Current behavior:
-- `_export_to_dnp()` inserts candidate `Data_Normalization_project_v2/src`
-  directories into `sys.path` at runtime before importing the bridge adapter.
-- `_launch_dnp()` separately discovers and launches the external project from a
-  Desktop-relative path.
+### 1. Downstream normalization boundary
 
 Status:
-- Completed in `feature/cross-project-bootstrap-boundaries`.
+- Superseded by toolkit boundary cleanup.
 
-Implemented:
-- Added `bootstrap_paths.find_dnp_src()` / `ensure_dnp_src_on_path()` /
-  `find_dnp_main_module()`.
-- Added `find_dnp_bridge_module()` / `ensure_dnp_bridge_on_path()` so export
-  discovery verifies the bridge adapter module, not just the package root.
-- Export and launch now share the same discovery policy.
-- Added env overrides:
-  - `MSPTK_DNP_SRC`
-  - `MSPTK_DNP_PROJECT_ROOT`
-- Added tests for:
-  - "bridge project not found"
-  - "bridge path found via override"
-  - "package found but bridge adapter missing"
-
-Remaining:
-- Decide whether DNP launch should eventually move to an explicit configured
-  project root instead of layout discovery.
+Current policy:
+- Toolkit stops at Step 4 final `.xlsx` export.
+- Toolkit does not import, launch, or configure downstream normalization projects.
+- Users hand the exported `.xlsx` to downstream tools manually after checking SampleInfo metadata.
 
 ### 2. Bootstrap path policy for `ms-core`
 
@@ -134,5 +112,5 @@ Remaining:
 - Cross-project discovery paths are explicit and testable.
 - Runtime imports no longer depend only on implicit Desktop-relative
   assumptions.
-- Any shared contract with `ms-core` or DNP bridge code is documented and
+- Any shared contract with `ms-core` or downstream handoff code is documented and
   covered by at least one integration test.

@@ -120,7 +120,6 @@ def test_run_all_steps_checks_pipeline_prerequisites_before_processing() -> None
     switch_calls: list[int] = []
     window._log = logs.append
     window._save_step_output = lambda *_args, **_kwargs: None
-    window._update_export_dnp_btn = lambda: None
     window.update_idletasks = lambda: None
     window._switch_step = switch_calls.append
 
@@ -190,7 +189,6 @@ def test_run_all_steps_rebuilds_clean_pipeline_session_from_loaded_source(tmp_pa
     }
     window._log = lambda *_args, **_kwargs: None
     window._save_step_output = lambda *_args, **_kwargs: None
-    window._update_export_dnp_btn = lambda: None
     window.update_idletasks = lambda: None
     window._switch_step = lambda *_args, **_kwargs: None
 
@@ -307,7 +305,6 @@ def test_run_all_step_completion_updates_latest_result_summary(tmp_path) -> None
     window.latest_result_label = label
     window._log = lambda *_args, **_kwargs: None
     window._save_step_output = lambda *_args, **_kwargs: None
-    window._update_export_dnp_btn = lambda: None
     window.update_idletasks = lambda: None
     window._switch_step = lambda *_args, **_kwargs: None
 
@@ -433,7 +430,6 @@ def test_manual_step_completion_auto_advances_to_next_step(tmp_path) -> None:
     window._last_run_all = False
     window._step_output_paths = {}
     window._pipeline_session = PipelineSession(output_dir=tmp_path / "OUTPUT", source_file=tmp_path / "input.xlsx")
-    window._update_export_dnp_btn = lambda: None
     window._schedule_step_output_save = Mock()
     window._switch_step = Mock()
     window._auto_export_final_results = Mock()
@@ -472,7 +468,6 @@ def test_manual_step_completion_switches_before_autosave(tmp_path) -> None:
     window._last_run_all = False
     window._step_output_paths = {}
     window._pipeline_session = PipelineSession(output_dir=tmp_path / "OUTPUT", source_file=tmp_path / "input.xlsx")
-    window._update_export_dnp_btn = lambda: events.append("export-dnp")
     window._update_latest_result_summary = lambda _lines: events.append("summary")
     window._update_run_context_summary = lambda: events.append("context-summary")
     window._safe_update_action_bar_progress = lambda *_args: events.append("progress")
@@ -509,7 +504,6 @@ def test_step_4_completion_auto_exports_final_results(tmp_path) -> None:
     window._step_output_paths = {}
     window._pipeline_session = Mock()
     window._pipeline_session.context = {}
-    window._update_export_dnp_btn = lambda: None
     window._schedule_step_output_save = Mock()
     window._export_results = Mock(return_value=tmp_path / "ALL_input.xlsx")
 
@@ -634,8 +628,8 @@ def test_pipeline_profile_selection_applies_step_parameters_to_all_widgets() -> 
     window.step_widgets[3].apply_parameters.assert_called_once_with(profile["step4"])
     window.run_all_profile_var.set.assert_called_once_with("strict")
     assert any("Applied Run All preset: strict" in message for message in logs)
-    assert any("QC_ratio: 0.50" in message for message in logs)
-    assert any("Intensity FC: off" in message for message in logs)
+    assert any("QC檢出: 0.50" in message for message in logs)
+    assert any("強度倍率: off" in message for message in logs)
 
 
 class _RunAllAsyncHarness(MainWindowEventHandlersMixin, ctk.CTkFrame):
@@ -666,9 +660,6 @@ class _RunAllAsyncHarness(MainWindowEventHandlersMixin, ctk.CTkFrame):
 
     def _switch_step(self, step_index: int) -> None:
         self._current_step = step_index
-
-    def _update_export_dnp_btn(self) -> None:
-        return None
 
     def _update_action_bar_progress(self, value: float, status: str = "") -> None:
         _ = (value, status)

@@ -201,24 +201,12 @@ class MainWindowLayoutMixin:
                 **config,
             )
             self._apply_action_button_theme(button, "secondary")
-            button.pack(fill="x", padx=PADDING["medium"], pady=2)
+            button.pack(
+                fill="x",
+                padx=PADDING["medium"],
+                pady=(2, PADDING["large"] if attr_name == "open_output_folder_btn" else 2),
+            )
             setattr(self, attr_name, button)
-
-        self.export_dnp_btn = ctk.CTkButton(
-            self.sidebar,
-            text="Export DNP",
-            command=self._export_to_dnp,
-            height=34,
-            font=FONTS["small"],
-            anchor="w",
-            state="disabled",
-        )
-        self._apply_action_button_theme(self.export_dnp_btn, "disabled")
-        self.export_dnp_btn.pack(
-            fill="x",
-            padx=PADDING["medium"],
-            pady=(2, PADDING["large"]),
-        )
 
     def _create_content_area(self) -> None:
         self.content_frame = ctk.CTkFrame(self)

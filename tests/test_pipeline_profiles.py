@@ -56,8 +56,8 @@ def test_pipeline_profile_preview_uses_actual_profile_values() -> None:
     preview = format_pipeline_profile_preview("default")
 
     assert "Step 1-3: fixed defaults" in preview
-    assert "Signal: 5000" in preview
-    assert "Background: 0.33" in preview
-    assert "MNAR: 0.80 / 0.20" in preview
-    assert "QC_ratio: 0.25" in preview
-    assert "Intensity FC: off" in preview
+    assert "訊號: 5000" in preview
+    assert "穩定檢出: 0.33" in preview
+    assert "MNAR 出現/缺失: 0.80 / 0.20" in preview
+    assert "QC檢出: 0.25" in preview
+    assert "強度倍率: off" in preview

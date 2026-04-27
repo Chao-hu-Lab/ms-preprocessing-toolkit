@@ -4,7 +4,7 @@ Step 4 Feature Filter — Parameter Presets
 設計依據：
   - 主場景：2 組（exposure vs control）+ QC，總樣本 85–148，每組約 20–46 人
   - QC 樣本數量少（7–10 個），因此 preset 採固定通用值：loose=0.00、default=0.25、strict=0.50
-  - high_det_thresh / low_det_thresh 為 MNAR 80/20 規則閾值：高組 ≥ high_det_thresh 且另一組 ≤ low_det_thresh
+  - high_det_thresh / low_det_thresh 為 MNAR 存在/缺失規則：出現組 ≥ high_det_thresh 且缺失組 ≤ low_det_thresh
   - intensity_fc_threshold 代表「各組平均強度 fold-change」，抓偵測率相似但強度差異大的特徵
 
 使用方式：
@@ -88,9 +88,9 @@ STEP4_PRESETS: dict[PresetName, Step4Params] = {
 
 # 各 preset 的人類可讀說明，可用於 GUI tooltip 或測試報告
 PRESET_DESCRIPTIONS: dict[PresetName, str] = {
-    "loose":   "寬鬆：探索型分析，保留較多候選特徵（MNAR 80/20，bg≥0.20，fc≥1.5x，QC_ratio=0 僅移除零值）",
-    "default": "預設：主力用途，平衡保留與 QC 穩定性（MNAR 80/20，bg≥0.33，fc≥2.0x，QC_ratio≥0.25）",
-    "strict":  "嚴謹：發表品質，強調高確信與 QC 穩定（MNAR 80/20，bg≥0.50，fc≥3.0x，QC_ratio≥0.50）",
+    "loose":   "寬鬆：探索型分析，保留較多候選特徵（MNAR 存在/缺失，穩定檢出≥0.20，fc≥1.5x，QC 僅移除零檢出）",
+    "default": "預設：主力用途，平衡保留與 QC 穩定性（MNAR 存在/缺失，穩定檢出≥0.33，fc≥2.0x，QC檢出≥0.25）",
+    "strict":  "嚴謹：發表品質，強調高確信與 QC 穩定（MNAR 存在/缺失，穩定檢出≥0.50，fc≥3.0x，QC檢出≥0.50）",
 }
 
 

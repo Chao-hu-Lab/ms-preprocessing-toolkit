@@ -197,7 +197,6 @@ def test_step_completion_updates_latest_result_summary(ctk_root, tmp_path) -> No
     app.step_widgets = [_Widget()]
     app._current_step = 0
     app._save_step_output = lambda *_args, **_kwargs: None
-    app._update_export_dnp_btn = lambda: None
     app._auto_export_final_results = lambda: None
     app.pack()
     ctk_root.update_idletasks()

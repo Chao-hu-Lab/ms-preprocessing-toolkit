@@ -62,7 +62,7 @@ def test_docs_reference_unified_parquet_pipeline_and_zero_missing_behavior() -> 
 
     assert "Unified Parquet V2" in readme
     assert "Step1-4 intermediate format = parquet" in readme
-    assert "final export/DNP = xlsx" in readme
+    assert "final export = xlsx; downstream handoff is manual" in readme
     assert "Step4 zero-as-missing default behavior" in readme
 
     assert "Unified Parquet V2 Addendum" in design
@@ -76,8 +76,7 @@ def test_readme_documents_dependency_override_policy() -> None:
     assert "MSPTK_MS_CORE_SRC" in readme
     assert "MSPTK_MS_CORE_ROOT" in readme
     assert "development-only override" in readme
-    assert "MSPTK_DNP_SRC" in readme
-    assert "MSPTK_DNP_PROJECT_ROOT" in readme
+    assert "does not import, launch, or configure downstream normalization projects" in readme
 
 
 def test_docs_include_conservative_io_go_no_go_and_rollback_criteria() -> None:

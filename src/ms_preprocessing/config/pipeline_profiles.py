@@ -71,15 +71,15 @@ def format_pipeline_profile_preview(name: PipelineProfileName = "default") -> st
         [
             "Step 1-3: fixed defaults",
             (
-                f"Signal: {_format_number(step4['signal_threshold'])} | "
-                f"Background: {_format_number(step4['background_threshold'])}"
+                f"訊號: {_format_number(step4['signal_threshold'])} | "
+                f"穩定檢出: {_format_number(step4['background_threshold'])}"
             ),
             (
-                f"MNAR: {float(step4['high_det_thresh']):.2f} / "
+                f"MNAR 出現/缺失: {float(step4['high_det_thresh']):.2f} / "
                 f"{float(step4['low_det_thresh']):.2f} | "
-                f"QC_ratio: {float(step4['qc_ratio_threshold']):.2f}"
+                f"QC檢出: {float(step4['qc_ratio_threshold']):.2f}"
             ),
-            f"Intensity FC: {intensity_fc}",
+            f"強度倍率: {intensity_fc}",
         ]
     )
 

@@ -28,9 +28,9 @@
 - 動態識別 Sample Type
 - 計算各組訊號比例 (ratio)
 - 三重條件篩選：
-  - 穩定性：≥2 組 ratio ≥ 背景門檻
-  - 偏態：任一組 ratio ≥ 偏態門檻
-  - 差異：任兩組差異 ≥ 差異門檻
+  - 穩定檢出：≥2 組檢出率 ≥ 穩定檢出率門檻
+  - 存在/缺失：一組檢出率 ≥ 出現組檢出率下限，另一組檢出率 ≤ 缺失組檢出率上限
+  - 強度差異：任兩組平均強度倍率 ≥ 強度倍率門檻
 - 使用組內最小值/2 填補缺失值
 
 ## 安裝
@@ -80,10 +80,7 @@ git submodule update --init --recursive
 - If you intentionally want to use an external `ms-core` checkout, set one of:
   - `MSPTK_MS_CORE_SRC`
   - `MSPTK_MS_CORE_ROOT`
-- If `Data_Normalization_project_v2` lives outside the default discovery layout, set one of:
-  - `MSPTK_DNP_SRC`
-  - `MSPTK_DNP_PROJECT_ROOT`
-- DNP export and launch prefer these explicit overrides before falling back to layout discovery.
+- This toolkit does not import, launch, or configure downstream normalization projects. It stops at the Step 4 `.xlsx` output.
 
 ## 使用方式
 
@@ -122,9 +119,11 @@ python main.py --help
 | `--istd-record-file` | ISTD 記錄表 (.xlsx) | - |
 | `--istd-record-date` | ISTD 日期 (YYYYMMDD) | - |
 | `--rt-tol` | RT 容差 (分鐘) | 1.0 |
-| `--bg-threshold` | 背景門檻 | 0.33 |
-| `--skew-threshold` | 偏態門檻 | 0.66 |
-| `--diff-threshold` | 差異門檻 | 0.30 |
+| `--bg-threshold` | 穩定檢出率門檻 | 0.33 |
+| `--high-det-thresh` | MNAR 出現組檢出率下限 | 0.80 |
+| `--low-det-thresh` | MNAR 缺失組檢出率上限 | 0.20 |
+| `--qc-ratio-threshold` | QC 檢出率門檻 | profile 預設 |
+| `--intensity-fc-threshold` | 強度倍率門檻 | profile 預設 |
 | `--method-file` | 上機順序 Word 檔案 (.docx) | - |
 
 ## 專案結構
@@ -259,10 +258,11 @@ MIT License
 - Intermediate workflow outputs now prefer parquet for Step 1-3 auto-save paths.
 - Parquet cache is enabled by default (`SAVE_PARQUET_CACHE = True`) to speed repeated reloads.
 - Final user-facing deliverables remain `.xlsx` (including Step 4 export and final output).
+- Downstream normalization/statistics tools should consume the exported `.xlsx` manually after SampleInfo `Batch` and project-specific correction/metadata columns are reviewed.
 
 ## Unified Parquet V2 (2026-03-05)
 
 - Step1-4 intermediate format = parquet
-- final export/DNP = xlsx
+- final export = xlsx; downstream handoff is manual
 - Step4 zero-as-missing default behavior
 - Unified Parquet V2 rollout checklist: `docs/plans/2026-03-05-unified-parquet-v2-rollout-checklist.md`
