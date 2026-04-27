@@ -2,10 +2,12 @@
 Base widget class for processing step widgets.
 """
 
-from abc import ABC, abstractmethod
+from __future__ import annotations
+
 import queue
 import threading
-from typing import Any, Callable, Optional
+from abc import ABC, abstractmethod
+from typing import Any, Callable
 
 import customtkinter as ctk
 import pandas as pd
@@ -34,10 +36,10 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         title: str,
         description: str,
         step_index: int,
-        on_load_file: Optional[Callable[[int], None]] = None,
-        on_complete: Optional[Callable[[pd.DataFrame], None]] = None,
-        on_log: Optional[Callable[[str], None]] = None,
-        on_progress: Optional[Callable[[float, str], None]] = None,
+        on_load_file: Callable[[int], None] | None = None,
+        on_complete: Callable[[pd.DataFrame], None] | None = None,
+        on_log: Callable[[str], None] | None = None,
+        on_progress: Callable[[float, str], None] | None = None,
         scrollable_content: bool = False,
     ):
         super().__init__(parent)
@@ -49,15 +51,15 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         self.on_complete = on_complete
         self.on_log = on_log
         self._on_progress = on_progress
-        self._data: Optional[pd.DataFrame] = None
-        self._result: Optional[pd.DataFrame] = None
-        self._processing_result: Optional[ProcessingResult] = None
+        self._data: pd.DataFrame | None = None
+        self._result: pd.DataFrame | None = None
+        self._processing_result: ProcessingResult | None = None
         self._context: dict = {}
         self._last_metadata: dict = {}
         self._last_parameters: dict = {}
         self.run_button = None
         self.reset_button = None
-        self.input_entry: Optional[ctk.CTkEntry] = None
+        self.input_entry: ctk.CTkEntry | None = None
         self._ui_thread_id = threading.get_ident()
         self._ui_queue: queue.SimpleQueue[tuple[Callable[..., None], tuple[Any, ...]]] = queue.SimpleQueue()
         self._ui_queue_after_id: str | None = None
@@ -217,23 +219,23 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         self._data = data
         self.log(f"Loaded data with {len(data)} rows and {len(data.columns)} columns")
 
-    def set_input_file(self, path: Optional[str]) -> None:
+    def set_input_file(self, path: str | None) -> None:
         if not self.input_entry:
             return
         self.input_entry.delete(0, "end")
         if path:
             self.input_entry.insert(0, path)
 
-    def set_context(self, context: Optional[dict]) -> None:
+    def set_context(self, context: dict | None) -> None:
         self._context = context or {}
 
     def get_metadata(self) -> dict:
         return self._last_metadata or {}
 
-    def get_result(self) -> Optional[pd.DataFrame]:
+    def get_result(self) -> pd.DataFrame | None:
         return self._result
 
-    def get_processing_result(self) -> Optional[ProcessingResult]:
+    def get_processing_result(self) -> ProcessingResult | None:
         return self._processing_result
 
     def get_last_parameters(self) -> dict:
@@ -343,7 +345,7 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
 
     def _finish_processing(
         self,
-        result: Optional[pd.DataFrame],
+        result: pd.DataFrame | None,
         error_message: str | None,
         perf_summary: str,
     ) -> None:

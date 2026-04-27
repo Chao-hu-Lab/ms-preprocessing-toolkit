@@ -10,7 +10,6 @@ from pathlib import Path
 
 from ms_core.preprocessing.settings import Settings
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 

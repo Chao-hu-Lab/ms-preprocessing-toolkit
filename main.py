@@ -15,7 +15,11 @@ src_path = Path(__file__).parent / "src"
 if src_path.exists():
     sys.path.insert(0, str(src_path))
 
-from ms_preprocessing.main import main
+def _run() -> int:
+    from ms_preprocessing.main import main
+
+    return main()
+
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(_run())

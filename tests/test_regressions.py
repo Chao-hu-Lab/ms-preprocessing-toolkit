@@ -6,9 +6,9 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pandas as pd
-
 from ms_core.preprocessing.duplicate_remover import DuplicateRemover
 from ms_core.utils.file_handler import FileHandler
+
 from ms_preprocessing.gui.main_window import MainWindow
 from ms_preprocessing.gui.pipeline_session import PipelineSession
 

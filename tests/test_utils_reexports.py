@@ -8,6 +8,8 @@ def test_utils_package_reexports_local_symbols() -> None:
     from ms_preprocessing.utils.file_handler import FileHandler as LocalFileHandler
     from ms_preprocessing.utils.validators import (
         DataValidator as LocalDataValidator,
+    )
+    from ms_preprocessing.utils.validators import (
         detect_fixed_columns as local_detect_fixed_columns,
     )
 

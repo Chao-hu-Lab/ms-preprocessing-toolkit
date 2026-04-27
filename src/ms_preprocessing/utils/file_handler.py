@@ -5,15 +5,16 @@ This module provides functions for reading and writing various file formats
 commonly used in mass spectrometry data processing.
 """
 
-import logging
-from pathlib import Path
-from typing import Optional, Union, Tuple
-from datetime import datetime
+import importlib.util
 import json
+import logging
+from datetime import datetime
+from pathlib import Path
+from typing import Optional, Union
 
 import pandas as pd
 from openpyxl import load_workbook
-from openpyxl.styles import Font, PatternFill, Color
+from openpyxl.styles import Font, PatternFill
 
 from ms_preprocessing.config.settings import Settings
 from ms_preprocessing.utils.intermediate_store import IntermediateStore
@@ -50,7 +51,7 @@ class FileHandler:
         file_path: Union[str, Path],
         sheet_name: Optional[Union[str, int]] = 0,
         header_row: int = 0,
-    ) -> Tuple[pd.DataFrame, dict]:
+    ) -> tuple[pd.DataFrame, dict]:
         """
         Load data from a file.
 
@@ -120,7 +121,7 @@ class FileHandler:
         file_path: Path,
         sheet_name: Optional[Union[str, int]] = 0,
         header_row: int = 0,
-    ) -> Tuple[pd.DataFrame, set]:
+    ) -> tuple[pd.DataFrame, set]:
         """Load data from Excel file with formatting extraction.
 
         Returns:
@@ -396,11 +397,7 @@ class FileHandler:
     @staticmethod
     def _load_delimited(path: Path, header_row: int, sep: str) -> pd.DataFrame:
         """Load CSV/TSV using pyarrow engine if available."""
-        try:
-            import pyarrow  # type: ignore
-            engine = "pyarrow"
-        except Exception:
-            engine = None
+        engine = "pyarrow" if importlib.util.find_spec("pyarrow") is not None else None
 
         if engine:
             try:
@@ -414,7 +411,7 @@ class FileHandler:
         return pd.read_csv(path, header=header_row, sep=sep)
 
 
-def parse_mz_rt_string(value: str) -> Tuple[Optional[float], Optional[float]]:
+def parse_mz_rt_string(value: str) -> tuple[Optional[float], Optional[float]]:
     """
     Parse a combined m/z and RT string (e.g., "123.456/1.23").
 

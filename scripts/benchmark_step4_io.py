@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-
 from ms_core.preprocessing.ms_quality_filter import FeatureFilter
 from ms_core.preprocessing.settings import Settings
 from ms_core.utils.file_handler import FileHandler

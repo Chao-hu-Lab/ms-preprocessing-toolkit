@@ -3,8 +3,8 @@ Data Organizer Widget - GUI for Step 1.
 """
 
 import re
-from typing import Callable, Optional
 from tkinter import filedialog
+from typing import Callable, Optional
 
 import customtkinter as ctk
 import pandas as pd

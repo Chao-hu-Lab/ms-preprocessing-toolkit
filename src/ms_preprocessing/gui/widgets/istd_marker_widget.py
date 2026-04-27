@@ -2,8 +2,8 @@
 ISTD Marker Widget - GUI for Step 2.
 """
 
-from typing import Callable, List, Optional, Set
 from tkinter import filedialog
+from typing import Callable, Optional
 
 import customtkinter as ctk
 import pandas as pd
@@ -26,7 +26,7 @@ class ISTDMarkerWidget(BaseProcessingWidget):
         on_log: Optional[Callable[[str], None]] = None,
         on_progress: Optional[Callable[[float, str], None]] = None,
     ):
-        self._istd_features: Set[str] = set()
+        self._istd_features: set[str] = set()
         super().__init__(
             parent,
             title="Step 2: ISTD 標記 (ISTD Marking)",
@@ -173,7 +173,7 @@ class ISTDMarkerWidget(BaseProcessingWidget):
     def validate_parameters(self, params: dict) -> list[ValidationWarning]:
         return validate_step2_params(params)
 
-    def _parse_istd_mz_list(self) -> List[float]:
+    def _parse_istd_mz_list(self) -> list[float]:
         """Parse ISTD m/z list from entry, fallback to default."""
         istd_text = self.istd_entry.get().strip()
         if not istd_text:

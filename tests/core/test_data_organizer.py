@@ -1,8 +1,7 @@
 """Tests for DataOrganizer module."""
 
-import pytest
 import pandas as pd
-
+import pytest
 from ms_core.preprocessing.data_organizer import DataOrganizer, InjectionInfo
 
 

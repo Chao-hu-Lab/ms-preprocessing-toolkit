@@ -55,9 +55,9 @@ def _make_cli_args(input_path: Path, output_path: Path) -> SimpleNamespace:
 
 def _patch_cli_dependencies(monkeypatch, fake_handler: _FakeFileHandler) -> None:
     import ms_preprocessing.adapters.data_organizer as organizer_module
-    import ms_preprocessing.adapters.istd_marker as istd_module
     import ms_preprocessing.adapters.duplicate_remover as duplicate_module
     import ms_preprocessing.adapters.feature_filter as filter_module
+    import ms_preprocessing.adapters.istd_marker as istd_module
     import ms_preprocessing.utils.file_handler as file_handler_module
 
     monkeypatch.setattr(file_handler_module, "FileHandler", lambda: fake_handler)

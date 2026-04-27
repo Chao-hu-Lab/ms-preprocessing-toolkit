@@ -5,10 +5,12 @@ This module provides the main entry point for running the application
 either as a GUI or from the command line.
 """
 
-import sys
+from __future__ import annotations
+
 import argparse
-from pathlib import Path
+import sys
 from datetime import datetime
+from pathlib import Path
 
 
 def _resolve_cli_step_parameters(args):
@@ -348,14 +350,20 @@ def run_cli(args):
     # Import processing modules
     from ms_preprocessing.adapters import (
         data_organizer as _adapter_do,
+    )
+    from ms_preprocessing.adapters import (
         duplicate_remover as _adapter_dr,
+    )
+    from ms_preprocessing.adapters import (
         feature_filter as _adapter_ff,
+    )
+    from ms_preprocessing.adapters import (
         istd_marker as _adapter_istd,
     )
     from ms_preprocessing.config.settings import Settings
     from ms_preprocessing.gui.pipeline_session import PipelineSession
     from ms_preprocessing.utils.file_handler import FileHandler
-    from ms_preprocessing.utils.perf import take_snapshot, format_perf_delta
+    from ms_preprocessing.utils.perf import format_perf_delta, take_snapshot
 
     def _compact_stats(stats: dict) -> dict:
         compact = {}

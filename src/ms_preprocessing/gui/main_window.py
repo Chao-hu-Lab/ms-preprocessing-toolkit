@@ -5,7 +5,6 @@ from __future__ import annotations
 import queue
 import threading
 from pathlib import Path
-from typing import Optional
 
 import customtkinter as ctk
 import pandas as pd
@@ -34,21 +33,21 @@ class MainWindow(MainWindowEventHandlersMixin, MainWindowLayoutMixin, ctk.CTk):
         self._output_dir = self._project_root / "OUTPUT"
 
         self._file_handler = FileHandler()
-        self._current_data: Optional[pd.DataFrame] = None
-        self._original_data: Optional[pd.DataFrame] = None
-        self._source_file: Optional[Path] = None
+        self._current_data: pd.DataFrame | None = None
+        self._original_data: pd.DataFrame | None = None
+        self._source_file: Path | None = None
         self._current_step = 0
-        self._last_completed_step: Optional[int] = None
+        self._last_completed_step: int | None = None
         self._last_run_all = False
         self._completed_steps: set[int] = set()
         self._pipeline_session = PipelineSession(output_dir=self._output_dir, source_file=None)
         self._step_output_paths = self._pipeline_session.step_output_paths
         self._context = self._pipeline_session.context
         self._source_context_snapshot: dict[str, object] | None = None
-        self._last_materialized_export_path: Optional[Path] = None
+        self._last_materialized_export_path: Path | None = None
         self._ui_thread_id = threading.get_ident()
         self._ui_queue = queue.SimpleQueue()
-        self._ui_queue_after_id: Optional[str] = None
+        self._ui_queue_after_id: str | None = None
         self._pipeline_worker_thread = None
         self._pipeline_is_processing = False
 

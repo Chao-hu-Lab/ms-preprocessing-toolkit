@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Callable, Optional
-from tkinter import filedialog
 import tkinter as tk
+from tkinter import filedialog
+from typing import Callable
 
 import customtkinter as ctk
 import pandas as pd
@@ -21,10 +21,10 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
         self,
         parent: ctk.CTkFrame,
         step_index: int,
-        on_load_file: Optional[Callable[[int], None]] = None,
-        on_complete: Optional[Callable[[pd.DataFrame], None]] = None,
-        on_log: Optional[Callable[[str], None]] = None,
-        on_progress: Optional[Callable[[float, str], None]] = None,
+        on_load_file: Callable[[int], None] | None = None,
+        on_complete: Callable[[pd.DataFrame], None] | None = None,
+        on_log: Callable[[str], None] | None = None,
+        on_progress: Callable[[float, str], None] | None = None,
     ):
         self.enable_degeneracy_var = tk.BooleanVar(value=False)
         super().__init__(

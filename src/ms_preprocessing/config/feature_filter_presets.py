@@ -18,7 +18,6 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
-
 PresetName = Literal["loose", "default", "strict"]
 
 

@@ -6,7 +6,6 @@ import os
 from typing import Any, Callable
 
 import pandas as pd
-
 from ms_core.preprocessing import DataOrganizer as _DataOrganizer
 from ms_core.preprocessing import Settings as _CoreSettings
 

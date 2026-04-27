@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import importlib.util
 import os
-from pathlib import Path
 import sys
+from dataclasses import dataclass
+from pathlib import Path
 
 MS_CORE_REPO_NAME = "ms-core"
 MS_CORE_SRC_ENV = "MSPTK_MS_CORE_SRC"
