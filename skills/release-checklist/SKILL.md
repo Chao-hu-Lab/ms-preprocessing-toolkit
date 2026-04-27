@@ -9,6 +9,9 @@ description: Use when preparing or executing a release for this repository, espe
 
 Run the repository's release flow in a consistent order. Use this skill when code is already ready to ship and the remaining work is versioning, tagging, pushing, and verifying the release outcome.
 
+For test selection and verification scope, read the repo root's
+`docs/TESTING.md` first.
+
 ## Preconditions
 
 Use this skill only when:
@@ -48,8 +51,9 @@ Stop and ask before proceeding if:
 - Do not skip fresh evidence.
 - Prefer the repository default test command:
 
-```bash
-PYTHONPATH=ms-core/src pytest tests/ -v --tb=short -x
+```powershell
+$env:PYTHONPATH='ms-core/src'
+python -m pytest tests/ -v --tb=short -x
 ```
 
 - Re-check the local package version after editing:

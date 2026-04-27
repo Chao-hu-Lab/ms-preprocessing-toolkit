@@ -9,6 +9,9 @@ description: Use when a task changes ms-core or the top-level repository must po
 
 Handle coordinated changes between the top-level toolkit repository and `ms-core/` without leaving the repositories out of sync. Use this skill whenever `ms-core` code is modified or the submodule pointer needs to advance safely.
 
+For test selection and verification scope, read the repo root's
+`docs/TESTING.md` first.
+
 ## When To Use
 
 Use this skill when:
@@ -48,8 +51,9 @@ Do not use this skill for top-level-only changes.
 
 For top-level validation, prefer:
 
-```bash
-PYTHONPATH=ms-core/src pytest tests/ -v --tb=short -x
+```powershell
+$env:PYTHONPATH='ms-core/src'
+python -m pytest tests/ -v --tb=short -x
 ```
 
 For submodule coordination, confirm:

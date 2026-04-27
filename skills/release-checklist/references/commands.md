@@ -22,8 +22,9 @@ python -c "from ms_preprocessing import __version__; print(__version__)"
 
 ## Default Verification
 
-```bash
-PYTHONPATH=ms-core/src pytest tests/ -v --tb=short -x
+```powershell
+$env:PYTHONPATH='ms-core/src'
+python -m pytest tests/ -v --tb=short -x
 ```
 
 ## Version Bump Commit

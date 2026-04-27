@@ -83,10 +83,18 @@ git worktree add .worktrees/<branch-name> -b <type>/<branch-name>
 
 Do not claim completion without fresh evidence.
 
+Testing policy source of truth: `docs/TESTING.md`. When selecting tests or
+working on testing, CI, quality gates, GUI smoke checks, root hygiene, or
+verification scope, read that document first and use its change-to-test matrix.
+Top-level pytest marker assignment is centralized in `tests/testing_markers.py`;
+update that mapping and `tests/test_testing_markers.py` when adding marker-owned
+test files.
+
 Default verification commands:
 
-```bash
-PYTHONPATH=ms-core/src pytest tests/ -v --tb=short -x
+```powershell
+$env:PYTHONPATH='ms-core/src'
+python -m pytest tests/ -v --tb=short -x
 ```
 
 For smaller tasks, run the narrowest sufficient check first, then expand if risk justifies it.

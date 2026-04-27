@@ -90,6 +90,14 @@ warn_unused_ignores = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-p no:cacheprovider"
+addopts = "-p no:cacheprovider --strict-markers"
 norecursedirs = ["OUTPUT", ".git", ".pytest_cache", "__pycache__", ".tmp"]
 tmp_path_retention_policy = "failed"
+markers = [
+    "smoke: fast entrypoint, import, packaging, or public API sanity checks",
+    "adapter: toolkit adapter contract tests",
+    "gui: GUI layer tests, including widgets, workflow labels, validation helpers, styles, session summaries, or event scheduling",
+    "integration: multi-component workflow, file IO, export, or cache behavior",
+    "perf: runtime or performance guardrails",
+    "serial: tests that must not run concurrently because they touch global GUI state, shared temp roots, cleanup scripts, or process-wide state",
+]
