@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import queue
+import threading
+from pathlib import Path
+
 import customtkinter as ctk
 import pandas as pd
 
+from ms_preprocessing.gui.event_handlers import MainWindowEventHandlersMixin
 from ms_preprocessing.gui.layout import MainWindowLayoutMixin
-from ms_preprocessing.gui.main_window import MainWindow
+from ms_preprocessing.gui.pipeline_session import PipelineSession
+from ms_preprocessing.utils.file_handler import FileHandler
 
 
 class _SidebarHarness(MainWindowLayoutMixin, ctk.CTkFrame):
@@ -65,6 +71,34 @@ class _ContentAreaHarness(MainWindowLayoutMixin, ctk.CTkFrame):
         return None
 
 
+class _MainWindowHarness(MainWindowEventHandlersMixin, MainWindowLayoutMixin, ctk.CTkFrame):
+    def __init__(self, master, tmp_path: Path) -> None:
+        super().__init__(master)
+        self._project_root = tmp_path
+        self._output_dir = tmp_path / "OUTPUT"
+        self._file_handler = FileHandler()
+        self._current_data = None
+        self._original_data = None
+        self._source_file = None
+        self._current_step = 0
+        self._last_completed_step = None
+        self._last_run_all = False
+        self._completed_steps: set[int] = set()
+        self._pipeline_session = PipelineSession(output_dir=self._output_dir, source_file=None)
+        self._step_output_paths = self._pipeline_session.step_output_paths
+        self._context = self._pipeline_session.context
+        self._source_context_snapshot = None
+        self._last_materialized_export_path = None
+        self._ui_thread_id = threading.get_ident()
+        self._ui_queue = queue.SimpleQueue()
+        self._ui_queue_after_id = None
+        self._pipeline_worker_thread = None
+        self._pipeline_is_processing = False
+
+        self._create_layout()
+        self._apply_pipeline_profile_to_widgets("default", log=True)
+
+
 def test_main_window_sidebar_uses_expected_workflow_labels(ctk_root) -> None:
     app = _SidebarHarness(ctk_root)
     app.pack()
@@ -104,10 +138,10 @@ def test_main_window_sidebar_exposes_run_all_profile_selector(ctk_root) -> None:
         app.destroy()
 
 
-def test_main_window_startup_logs_default_profile_details() -> None:
-    app = MainWindow()
-    app.withdraw()
-    app.update_idletasks()
+def test_main_window_startup_logs_default_profile_details(ctk_root, tmp_path) -> None:
+    app = _MainWindowHarness(ctk_root, tmp_path)
+    app.pack(fill="both", expand=True)
+    ctk_root.update_idletasks()
     try:
         log_text = app.log_text.get("1.0", "end")
 
@@ -118,10 +152,10 @@ def test_main_window_startup_logs_default_profile_details() -> None:
         app.destroy()
 
 
-def test_main_window_manual_completion_switches_then_accepts_deferred_save(tmp_path) -> None:
-    app = MainWindow()
-    app.withdraw()
-    app.update_idletasks()
+def test_main_window_manual_completion_switches_then_accepts_deferred_save(ctk_root, tmp_path) -> None:
+    app = _MainWindowHarness(ctk_root, tmp_path)
+    app.pack(fill="both", expand=True)
+    ctk_root.update_idletasks()
     result_data = pd.DataFrame({"Mz/RT": ["Sample_Type", "100.0/1.0"], "S1": ["case", 123]})
     original_input = str(tmp_path / "input.xlsx")
     deferred_path = tmp_path / "STEP1_input.parquet"
