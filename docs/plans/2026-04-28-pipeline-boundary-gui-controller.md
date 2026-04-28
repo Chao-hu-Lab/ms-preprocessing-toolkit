@@ -29,6 +29,9 @@ Do not modify:
 - CLI workflow logic in `src/ms_preprocessing/main.py`
 - workflow runner contracts unless approved by main agent
 - submodule pointer
+- `src/ms_preprocessing/workflow/__init__.py`
+- `tests/testing_markers.py`
+- `tests/test_testing_markers.py`
 
 ## Precondition
 
@@ -148,8 +151,13 @@ Step 3: Verify:
 
 ```powershell
 $env:PYTHONPATH='ms-core/src'
-python -m pytest tests\test_gui_pipeline_controller.py tests\test_gui_async_task_runner.py tests\test_combined_tsv_service.py tests\test_gui_event_handlers.py tests\test_gui_main_window_sidebar_labels.py -v --tb=short
+python -m pytest tests\test_gui_pipeline_controller.py tests\test_gui_async_task_runner.py tests\test_combined_tsv_service.py tests\test_gui_event_handlers.py tests\test_gui_main_window_sidebar_labels.py tests\test_final_export_handoff.py tests\test_final_export_cache_policy.py -v --tb=short
 ```
+
+The final export regression tests are required because this task moves
+`_export_results()` and `_materialize_final_xlsx_from_latest_step()` behavior
+behind services. They protect final xlsx materialization, `deleted_feature`
+sheet export, and `save_parquet_cache=False` behavior.
 
 ## Deliverable
 

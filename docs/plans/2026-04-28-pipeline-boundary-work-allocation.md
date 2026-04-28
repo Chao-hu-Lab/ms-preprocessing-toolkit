@@ -20,6 +20,7 @@ Owns:
 - `ms-core` submodule coordination
 - final integration and conflict resolution
 - `ms-core/tests/testing_markers.py` and `ms-core/tests/test_testing_markers.py`
+- top-level `tests/testing_markers.py` and `tests/test_testing_markers.py`
 - top-level `ms-core` pointer commit
 - PR creation, review, and merge sequencing
 
@@ -82,7 +83,10 @@ Plan:
 
 Owns:
 
-- `src/ms_preprocessing/workflow/`
+- `src/ms_preprocessing/workflow/__init__.py`
+- `src/ms_preprocessing/workflow/input_loader.py`
+- `src/ms_preprocessing/workflow/workflow_runner.py`
+- `src/ms_preprocessing/workflow/export_service.py`
 - `src/ms_preprocessing/main.py`
 - `tests/test_workflow_runner.py`
 - `tests/test_workflow_export_service.py`
@@ -129,6 +133,30 @@ Not allowed in parallel:
 - Any two subagents editing `main.py`.
 - Any subagent updating the submodule pointer.
 - Any subagent landing or merging PRs.
+
+## Shared File Rules
+
+Test marker files are integration-owned:
+
+- `tests/testing_markers.py`
+- `tests/test_testing_markers.py`
+- `ms-core/tests/testing_markers.py`
+- `ms-core/tests/test_testing_markers.py`
+
+Subagents must not edit these files. When a subagent adds a test file that should
+be selected by `smoke`, `adapter`, `integration`, `perf`, or `serial`, it must
+state the required marker decision in its handoff. The main agent updates marker
+ownership after reviewing the patch and before checkpoint verification.
+
+Workflow package ownership is split by module, not by directory:
+
+- Workflow Runner owns `input_loader.py`, `workflow_runner.py`,
+  `export_service.py`, and initial `workflow/__init__.py` exports for those
+  services.
+- GUI Controller owns `combined_tsv_service.py` and may request a main-agent
+  `workflow/__init__.py` export update after implementation.
+- The main agent owns final `workflow/__init__.py` reconciliation so package
+  exports are stable and subagents do not overlap.
 
 ## Development Cadence
 

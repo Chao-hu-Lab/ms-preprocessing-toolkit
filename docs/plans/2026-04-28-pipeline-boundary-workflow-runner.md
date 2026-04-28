@@ -29,6 +29,8 @@ Do not modify:
 - `src/ms_preprocessing/gui/main_window.py`
 - `ms-core/`
 - submodule pointer
+- `tests/testing_markers.py`
+- `tests/test_testing_markers.py`
 
 ## Precondition
 
@@ -72,6 +74,44 @@ Expected RED:
 - missing `ms_preprocessing.workflow.workflow_runner`.
 
 Step 2: Implement `WorkflowRunner`.
+
+Result contract:
+
+```python
+@dataclass(frozen=True)
+class WorkflowRunResult:
+    success: bool
+    data: pd.DataFrame | None
+    step: str
+    completed_steps: list[str]
+    last_completed_step_index: int | None
+    step_results: dict[str, ProcessingResult]
+    session: PipelineSession
+    step_output_paths: dict[int, Path]
+    validation_warnings: list[str]
+    errors: list[str]
+    message: str
+    final_export_ready: bool
+```
+
+Contract rules:
+
+- `data` is the latest in-memory dataframe after the final completed step, or
+  `None` when validation fails before any adapter call.
+- `completed_steps` uses the canonical adapter step names in execution order.
+- `last_completed_step_index` uses GUI-compatible zero-based indices
+  (`0=Step1`, `1=Step2`, `2=Step3`, `3=Step4`) and is `None` when no step
+  completed.
+- `step_results` stores the raw toolkit `ProcessingResult` for each completed
+  step so GUI/CLI adapters can preserve current metadata behavior.
+- `session` is the same `PipelineSession` instance passed into `run()` after
+  metadata updates.
+- `step_output_paths` mirrors `session.step_output_paths`; the runner owns
+  intermediate persistence when `persist_intermediate=True`.
+- `validation_warnings` contains blocking or user-confirmable validation
+  messages collected before adapter execution.
+- `final_export_ready` is true when the run reached Step4 or a selected step
+  produced data that can be exported through `ExportService`.
 
 Target interface:
 

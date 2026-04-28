@@ -183,7 +183,21 @@ Expected RED:
 
 Step 2: Implement `FeatureFilterOutputBuilder`.
 
+Move these responsibilities:
+
+- filtered dataframe construction
+- deleted feature row collection
+- protected row remapping
+- `is_Presence_Absence_Marker` column construction
+- zero-to-NaN conversion for sample/QC data columns
+- output-shaping stats such as `zeros_converted_to_nan`
+
 Step 3: Convert `FeatureFilter._filter_features()` to orchestrate decision table + output builder.
+
+Step 4: Move the current zero-to-NaN block from `FeatureFilter.process()` into
+`FeatureFilterOutputBuilder` so `FeatureFilter.process()` stays an orchestration
+facade. Keep progress reporting in `process()`, but not the dataframe mutation
+logic.
 
 ## Verification
 

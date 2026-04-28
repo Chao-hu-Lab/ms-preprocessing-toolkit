@@ -99,7 +99,7 @@ python -m pytest -m adapter -v --tb=short
 $env:PYTHONPATH='ms-core/src'
 python -m pytest tests\test_cli_parquet_chain.py tests\test_workflow_runner.py tests\test_workflow_export_service.py -v --tb=short
 $env:PYTHONPATH='ms-core/src'
-python -m pytest tests\test_gui_event_handlers.py tests\test_gui_pipeline_controller.py tests\test_gui_async_task_runner.py -v --tb=short
+python -m pytest tests\test_gui_event_handlers.py tests\test_gui_pipeline_controller.py tests\test_gui_async_task_runner.py tests\test_combined_tsv_service.py tests\test_final_export_handoff.py tests\test_final_export_cache_policy.py -v --tb=short
 ```
 
 Expand to top-level full suite when GUI/workflow changes are large:
@@ -129,4 +129,3 @@ if (-not $isLanded) { throw "Block merge: top-level ms-core pointer is not on ms
 ```
 
 If the guard fails, do not merge toolkit. Land the `ms-core` stack first.
-
