@@ -89,6 +89,7 @@ Owns:
 - `src/ms_preprocessing/workflow/export_service.py`
 - `src/ms_preprocessing/main.py`
 - `tests/test_workflow_runner.py`
+- `tests/test_workflow_input_loader.py`
 - `tests/test_workflow_export_service.py`
 - focused CLI tests
 
