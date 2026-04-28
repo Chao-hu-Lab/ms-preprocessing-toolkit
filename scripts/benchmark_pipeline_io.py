@@ -16,7 +16,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from ms_preprocessing.config.pipeline_defaults import DEFAULT_ISTD_RECORD_FILE, DEFAULT_METHOD_FILE
+from ms_preprocessing.config.pipeline_defaults import DEFAULT_METHOD_FILE, DEFAULT_XIC_RESULTS_FILE
 
 METADATA_KEYS = (
     "red_font_rows",
@@ -60,24 +60,22 @@ def run_benchmark(
     output_path: str | Path | None = None,
     dry_run: bool = False,
     method_file: str | Path | None = None,
-    istd_record_file: str | Path | None = None,
+    xic_results_file: str | Path | None = None,
     mz_tol: float = 20.0,
-    rt_tol: float = 1.5,
+    rt_tol: float = 0.1,
 ) -> dict[str, Any]:
     """Run pipeline I/O benchmark with cold/warm comparison and invariants."""
     start = perf_counter()
     input_path = Path(input_path)
     method_file_obj = Path(method_file) if method_file else DEFAULT_METHOD_FILE
-    istd_record_file_obj = (
-        Path(istd_record_file) if istd_record_file else DEFAULT_ISTD_RECORD_FILE
-    )
+    xic_results_file_obj = Path(xic_results_file) if xic_results_file else DEFAULT_XIC_RESULTS_FILE
 
     if dry_run:
         return {
             "input_path": str(input_path),
             "output_path": str(output_path) if output_path else "",
             "method_file": _stringify_reference_path(method_file_obj),
-            "istd_record_file": _stringify_reference_path(istd_record_file_obj),
+            "xic_results_file": _stringify_reference_path(xic_results_file_obj),
             "load_s": 0.0,
             "step_times": _empty_step_times(),
             "save_s": 0.0,
@@ -167,7 +165,7 @@ def run_benchmark(
         "input_path": str(input_path),
         "output_path": str(output_path_obj),
         "method_file": _stringify_reference_path(method_file_obj),
-        "istd_record_file": _stringify_reference_path(istd_record_file_obj),
+        "xic_results_file": _stringify_reference_path(xic_results_file_obj),
         "mz_tol": float(mz_tol),
         "rt_tol": float(rt_tol),
         "load_s": float(load_s),
@@ -199,12 +197,12 @@ def _parse_args() -> argparse.Namespace:
         help="Method file path (.docx). Defaults to the local pipeline reference when configured.",
     )
     parser.add_argument(
-        "--istd-record-file",
-        default=_stringify_reference_path(DEFAULT_ISTD_RECORD_FILE),
-        help="ISTD record file path (.xlsx). Defaults to the local pipeline reference when configured.",
+        "--xic-results-file",
+        default=_stringify_reference_path(DEFAULT_XIC_RESULTS_FILE),
+        help="XIC Extractor results workbook (.xlsx). Defaults to the local pipeline reference when configured.",
     )
-    parser.add_argument("--mz-tol", type=float, default=20.0, help="m/z tolerance (ppm).")
-    parser.add_argument("--rt-tol", type=float, default=1.5, help="RT tolerance (minutes).")
+    parser.add_argument("--mz-tol", type=float, default=20.0, help="Step 3 m/z tolerance (ppm).")
+    parser.add_argument("--rt-tol", type=float, default=0.1, help="Step 3 RT tolerance (minutes).")
     parser.add_argument("--dry-run", action="store_true", help="Return empty benchmark contract.")
     return parser.parse_args()
 
@@ -216,7 +214,7 @@ def main() -> int:
         output_path=args.output,
         dry_run=args.dry_run,
         method_file=args.method_file,
-        istd_record_file=args.istd_record_file,
+        xic_results_file=args.xic_results_file,
         mz_tol=args.mz_tol,
         rt_tol=args.rt_tol,
     )
@@ -225,7 +223,7 @@ def main() -> int:
         "input_path",
         "output_path",
         "method_file",
-        "istd_record_file",
+        "xic_results_file",
         "load_s",
         "save_s",
         "cold_load_s",

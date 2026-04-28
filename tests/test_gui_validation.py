@@ -24,11 +24,75 @@ def test_step1_missing_method_file_returns_blocking_warning(tmp_path) -> None:
     ]
 
 
-def test_step2_invalid_istd_date_returns_blocking_warning() -> None:
-    warnings = validate_step2_params({"istd_record_date": "2026-01-06"})
+def test_step2_missing_xic_results_file_returns_blocking_warning() -> None:
+    warnings = validate_step2_params({"xic_results_file": ""})
 
     assert len(warnings) == 1
-    assert warnings[0].code == "invalid_istd_date"
+    assert warnings[0].code == "xic_results_file_required"
+    assert warnings[0].blocking is True
+
+
+def test_step2_nonexistent_xic_results_file_returns_blocking_warning(tmp_path) -> None:
+    warnings = validate_step2_params({"xic_results_file": str(tmp_path / "missing.xlsx")})
+
+    assert len(warnings) == 1
+    assert warnings[0].code == "xic_results_file_not_found"
+    assert warnings[0].blocking is True
+
+
+def test_step2_non_xlsx_xic_results_file_returns_blocking_warning(tmp_path) -> None:
+    xic_file = tmp_path / "xic_results.csv"
+    xic_file.write_text("placeholder", encoding="utf-8")
+
+    warnings = validate_step2_params({"xic_results_file": str(xic_file)})
+
+    assert len(warnings) == 1
+    assert warnings[0].code == "invalid_xic_results_file_extension"
+    assert warnings[0].blocking is True
+
+
+def test_step2_existing_xlsx_xic_results_file_passes_path_validation(tmp_path) -> None:
+    xic_file = tmp_path / "xic_results.xlsx"
+    xic_file.write_text("placeholder", encoding="utf-8")
+
+    warnings = validate_step2_params({"xic_results_file": str(xic_file)})
+
+    assert warnings == []
+
+
+def test_step2_legacy_keys_return_blocking_warning() -> None:
+    warnings = validate_step2_params({"istd_record_file": "legacy.xlsx"})
+
+    assert len(warnings) == 1
+    assert warnings[0].code == "legacy_step2_source_key"
+    assert warnings[0].blocking is True
+
+
+def test_step2_legacy_env_returns_blocking_warning(monkeypatch, tmp_path) -> None:
+    with monkeypatch.context() as env:
+        env.setenv("MSPTK_ISTD_RECORD_FILE", "legacy.xlsx")
+        env.setenv("MSPTK_LOCAL_REFERENCE_CONFIG", str(tmp_path / "missing-config.json"))
+
+        warnings = validate_step2_params({"xic_results_file": ""})
+
+    assert len(warnings) == 1
+    assert warnings[0].code == "legacy_step2_source_key"
+    assert warnings[0].blocking is True
+
+
+def test_step2_legacy_local_config_returns_blocking_warning(monkeypatch, tmp_path) -> None:
+    config_path = tmp_path / "local_reference_paths.json"
+    config_path.write_text('{"istd_record_file": "legacy.xlsx"}', encoding="utf-8")
+
+    with monkeypatch.context() as env:
+        env.delenv("MSPTK_ISTD_RECORD_FILE", raising=False)
+        env.delenv("MSPTK_ISTD_RECORD_DATE", raising=False)
+        env.setenv("MSPTK_LOCAL_REFERENCE_CONFIG", str(config_path))
+
+        warnings = validate_step2_params({"xic_results_file": ""})
+
+    assert len(warnings) == 1
+    assert warnings[0].code == "legacy_step2_source_key"
     assert warnings[0].blocking is True
 
 

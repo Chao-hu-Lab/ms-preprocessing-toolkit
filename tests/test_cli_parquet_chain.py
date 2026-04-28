@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -35,6 +36,10 @@ class _FakeFileHandler:
 
 
 def _make_cli_args(input_path: Path, output_path: Path | None, step: str) -> SimpleNamespace:
+    xic_results_file = input_path.with_name("xic_results.xlsx")
+    if step in {"istd", "all"} and not xic_results_file.exists():
+        xic_results_file.write_text("placeholder", encoding="utf-8")
+
     return SimpleNamespace(
         input=str(input_path),
         output=str(output_path) if output_path else None,
@@ -42,9 +47,7 @@ def _make_cli_args(input_path: Path, output_path: Path | None, step: str) -> Sim
         method_file=None,
         step=step,
         mz_tol=None,
-        istd_mz=None,
-        istd_record_file=None,
-        istd_record_date=None,
+        xic_results_file=str(xic_results_file),
         rt_tol=None,
         merge_mode=None,
         enable_degeneracy_annotation=False,
@@ -213,6 +216,63 @@ def test_cli_single_step_filter_accepts_parquet_input(monkeypatch, project_temp_
         assert save_suffixes[-1] == ".xlsx"
 
 
+def test_cli_step2_requires_xic_results_file(monkeypatch, project_temp_dir) -> None:
+    with project_temp_dir() as temp_dir:
+        base = Path(temp_dir)
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.1/1.0"],
+                "Case1": ["case", 1000],
+            }
+        )
+        input_path = base / "input.csv"
+        df.to_csv(input_path, index=False)
+        fake_handler = _FakeFileHandler(input_df=df)
+        _patch_cli_dependencies(monkeypatch, fake_handler)
+
+        args = _make_cli_args(input_path=input_path, output_path=None, step="istd")
+        args.xic_results_file = None
+
+        import ms_preprocessing.config.pipeline_defaults as defaults
+
+        try:
+            with monkeypatch.context() as isolated_env:
+                isolated_env.setenv(
+                    "MSPTK_LOCAL_REFERENCE_CONFIG",
+                    str(base / "missing-local-reference-paths.json"),
+                )
+                importlib.reload(defaults)
+                rc = run_cli(args)
+        finally:
+            importlib.reload(defaults)
+
+        assert rc == 1
+        assert not fake_handler.calls
+
+
+def test_cli_step2_rejects_missing_xic_results_file_path(monkeypatch, project_temp_dir) -> None:
+    with project_temp_dir() as temp_dir:
+        base = Path(temp_dir)
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.1/1.0"],
+                "Case1": ["case", 1000],
+            }
+        )
+        input_path = base / "input.csv"
+        df.to_csv(input_path, index=False)
+        fake_handler = _FakeFileHandler(input_df=df)
+        _patch_cli_dependencies(monkeypatch, fake_handler)
+
+        args = _make_cli_args(input_path=input_path, output_path=None, step="istd")
+        args.xic_results_file = str(base / "missing_xic.xlsx")
+
+        rc = run_cli(args)
+
+        assert rc == 1
+        assert not fake_handler.calls
+
+
 def test_cli_default_profile_uses_integrated_step_parameters(monkeypatch, project_temp_dir) -> None:
     with project_temp_dir() as temp_dir:
         base = Path(temp_dir)
@@ -306,14 +366,12 @@ def test_cli_default_profile_uses_integrated_step_parameters(monkeypatch, projec
 
         assert rc == 0
         assert captured["step1"]["method_file"] == profile["step1"]["method_file"]
-        assert captured["step2"]["ppm_tolerance"] == 20.0
-        assert captured["step2"]["rt_tolerance"] == 1.5
-        assert (
-            str(captured["step2"]["istd_record_file"])
-            if captured["step2"]["istd_record_file"]
-            else ""
-        ) == profile["step2"]["istd_record_file"]
-        assert captured["step2"]["istd_record_date"] == "20260106"
+        assert captured["step2"]["xic_results_file"] == input_path.with_name("xic_results.xlsx")
+        assert "ppm_tolerance" not in captured["step2"]
+        assert "rt_tolerance" not in captured["step2"]
+        assert "istd_mz_list" not in captured["step2"]
+        assert "istd_record_file" not in captured["step2"]
+        assert "istd_record_date" not in captured["step2"]
         assert captured["step3"]["mz_tolerance_ppm"] == 20.0
         assert captured["step3"]["rt_tolerance"] == 0.1
         assert captured["step3"]["merge_mode"] == "per_sample_max"
@@ -331,6 +389,54 @@ def test_cli_default_profile_uses_integrated_step_parameters(monkeypatch, projec
         assert captured["step4"]["enable_background_threshold"] is True
         assert captured["step4"]["enable_qc_ratio_threshold"] is True
         assert captured["step4"]["enable_intensity_fc_threshold"] is False
+
+
+def test_cli_xic_results_file_override_reaches_step2(monkeypatch, project_temp_dir) -> None:
+    with project_temp_dir() as temp_dir:
+        base = Path(temp_dir)
+        df = pd.DataFrame(
+            {
+                "Mz/RT": ["Sample_Type", "100.1/1.0"],
+                "Tolerance": ["na", "na"],
+                "Case1": ["case", 1000],
+                "Control1": ["control", 1200],
+                "QC1": ["qc", 1100],
+            }
+        )
+        input_path = base / "input.csv"
+        df.to_csv(input_path, index=False)
+        output_path = base / "final.xlsx"
+        xic_results_file = base / "xic_results.xlsx"
+        xic_results_file.write_text("placeholder", encoding="utf-8")
+
+        fake_handler = _FakeFileHandler(input_df=df)
+        _patch_cli_dependencies(monkeypatch, fake_handler)
+
+        import ms_preprocessing.adapters.istd_marker as istd_module
+
+        captured: dict[str, dict] = {}
+        monkeypatch.setattr(
+            istd_module,
+            "run_from_df",
+            lambda data, **kwargs: (
+                captured.setdefault("step2", dict(kwargs)),
+                ProcessingResult(
+                    success=True,
+                    step="istd_marker",
+                    output_path=None,
+                    data=data.copy(),
+                    metadata=ProcessingMetadata(red_font_rows=set(), protected_rows=set()),
+                ),
+            )[1],
+        )
+
+        args = _make_cli_args(input_path=input_path, output_path=output_path, step="istd")
+        args.xic_results_file = str(xic_results_file)
+
+        rc = run_cli(args)
+
+        assert rc == 0
+        assert captured["step2"]["xic_results_file"] == xic_results_file
 
 
 def test_cli_merge_mode_override_reaches_step3(monkeypatch, project_temp_dir) -> None:

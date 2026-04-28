@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 from ms_core.preprocessing.data_organizer import DataOrganizer as CoreDataOrganizer
 from ms_core.preprocessing.duplicate_remover import DuplicateRemover as CoreDuplicateRemover
@@ -31,6 +33,36 @@ def _feature_matrix_input() -> pd.DataFrame:
             "QC1": ["qc", 5200, 5201, 6200],
         }
     )
+
+
+def _write_xic_workbook(path: Path) -> None:
+    targets = pd.DataFrame(
+        [
+            {
+                "Label": "target-1",
+                "Role": "ISTD",
+                "m/z": 100.123,
+                "RT min": 1.4,
+                "RT max": 1.6,
+                "ppm tol": 20,
+            }
+        ]
+    )
+    summary = pd.DataFrame(
+        [
+            {
+                "Target": "target-1",
+                "Role": "ISTD",
+                "Detected": 3,
+                "Total": 3,
+                "Detection %": "100%",
+                "Mean RT": 1.5,
+            }
+        ]
+    )
+    with pd.ExcelWriter(path) as writer:
+        targets.to_excel(writer, sheet_name="Targets", index=False)
+        summary.to_excel(writer, sheet_name="Summary", index=False)
 
 
 def test_data_organizer_adapter_preserves_current_ms_core_sample_info_contract() -> None:
@@ -74,9 +106,12 @@ def test_feature_filter_adapter_normalizes_current_ms_core_deleted_features_cont
     )
 
 
-def test_istd_marker_adapter_matches_current_ms_core_row_marking_contract() -> None:
-    core_result = CoreISTDMarker().process(_feature_matrix_input())
-    adapter_result = istd_marker.run_from_df(_feature_matrix_input())
+def test_istd_marker_adapter_matches_current_ms_core_row_marking_contract(tmp_path) -> None:
+    xic_path = tmp_path / "xic_results.xlsx"
+    _write_xic_workbook(xic_path)
+
+    core_result = CoreISTDMarker().process(_feature_matrix_input(), xic_results_file=xic_path)
+    adapter_result = istd_marker.run_from_df(_feature_matrix_input(), xic_results_file=xic_path)
 
     assert core_result.success is True
     assert adapter_result.success is True

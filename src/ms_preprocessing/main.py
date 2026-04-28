@@ -12,10 +12,51 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+STEP2_XIC_REQUIRED_MESSAGE = (
+    "Step2 now requires an XIC Extractor results workbook. "
+    "Please set xic_results_file or pass --xic-results-file."
+)
+_LEGACY_STEP2_CLI_FLAGS = {
+    "istd_mz": "--istd-mz",
+    "istd_record_file": "--istd-record-file",
+    "istd_record_date": "--istd-record-date",
+}
+
+
+def _legacy_step2_cli_flags(args) -> list[str]:
+    return [
+        flag
+        for attr, flag in _LEGACY_STEP2_CLI_FLAGS.items()
+        if getattr(args, attr, None) not in (None, "")
+    ]
+
+
+def _collect_cli_validation_warnings(step: str, resolved: dict) -> list:
+    from ms_preprocessing.pipeline_validation import (
+        validate_step1_params,
+        validate_step2_params,
+        validate_step4_params,
+    )
+
+    warnings = []
+    if step in ["organize", "all"]:
+        warnings.extend(validate_step1_params(resolved["step1"]))
+    if step in ["istd", "all"]:
+        warnings.extend(validate_step2_params(resolved["step2"]))
+    if step in ["filter", "all"]:
+        warnings.extend(validate_step4_params(resolved["step4"]))
+    return warnings
+
 
 def _resolve_cli_step_parameters(args):
     """Resolve CLI step parameters from the selected profile plus explicit overrides."""
     from ms_preprocessing.config import get_pipeline_profile
+
+    legacy_flags = _legacy_step2_cli_flags(args)
+    if legacy_flags:
+        raise ValueError(
+            f"{STEP2_XIC_REQUIRED_MESSAGE} Unsupported legacy option(s): {', '.join(legacy_flags)}."
+        )
 
     merge_mode = getattr(args, "merge_mode", None)
     enable_degeneracy_annotation = bool(getattr(args, "enable_degeneracy_annotation", False))
@@ -36,19 +77,11 @@ def _resolve_cli_step_parameters(args):
             "method_file": args.method_file if args.method_file is not None else step1.get("method_file"),
         },
         "step2": {
-            "istd_mz_list": (
-                [float(x.strip()) for x in args.istd_mz.split(",") if x.strip()]
-                if args.istd_mz
-                else step2.get("istd_mz_list")
+            "xic_results_file": (
+                args.xic_results_file
+                if getattr(args, "xic_results_file", None) is not None
+                else step2.get("xic_results_file")
             ),
-            "istd_record_file": (
-                args.istd_record_file if args.istd_record_file is not None else step2.get("istd_record_file")
-            ),
-            "istd_record_date": (
-                args.istd_record_date if args.istd_record_date is not None else step2.get("istd_record_date")
-            ),
-            "ppm_tolerance": args.mz_tol if args.mz_tol is not None else step2.get("ppm_tolerance"),
-            "rt_tolerance": args.rt_tol if args.rt_tol is not None else step2.get("rt_tolerance"),
         },
         "step3": {
             "mz_tolerance_ppm": args.mz_tol if args.mz_tol is not None else step3.get("mz_tolerance_ppm"),
@@ -169,32 +202,38 @@ Examples:
         "--mz-tol",
         type=float,
         default=None,
-        help="m/z tolerance in ppm (overrides Step 2/3 profile values)",
+        help="Step 3 m/z tolerance in ppm (overrides profile value)",
+    )
+
+    parser.add_argument(
+        "--xic-results-file",
+        type=str,
+        help="XIC Extractor results workbook for Step 2 (.xlsx)",
     )
 
     parser.add_argument(
         "--istd-mz",
         type=str,
-        help="Comma-separated ISTD m/z list (e.g., 261.1273,245.1324)",
+        help=argparse.SUPPRESS,
     )
 
     parser.add_argument(
         "--istd-record-file",
         type=str,
-        help="ISTD record Excel file path",
+        help=argparse.SUPPRESS,
     )
 
     parser.add_argument(
         "--istd-record-date",
         type=str,
-        help="ISTD record target date (YYYYMMDD)",
+        help=argparse.SUPPRESS,
     )
 
     parser.add_argument(
         "--rt-tol",
         type=float,
         default=None,
-        help="RT tolerance in minutes (overrides Step 2/3 profile values)",
+        help="Step 3 RT tolerance in minutes (overrides profile value)",
     )
 
     parser.add_argument(
@@ -307,6 +346,14 @@ Examples:
 
     args = parser.parse_args()
 
+    legacy_flags = _legacy_step2_cli_flags(args)
+    if legacy_flags:
+        print(
+            f"Error: {STEP2_XIC_REQUIRED_MESSAGE} "
+            f"Unsupported legacy option(s): {', '.join(legacy_flags)}."
+        )
+        return 2
+
     # Show version
     if args.version:
         from ms_preprocessing import __version__
@@ -375,7 +422,20 @@ def run_cli(args):
         return compact
 
     try:
+        step = args.step
         resolved = _resolve_cli_step_parameters(args)
+        validation_warnings = _collect_cli_validation_warnings(step, resolved)
+        if validation_warnings:
+            from ms_preprocessing.pipeline_validation import (
+                format_validation_warnings,
+                has_blocking_warnings,
+            )
+
+            validation_message = format_validation_warnings(validation_warnings)
+            if has_blocking_warnings(validation_warnings):
+                print(f"Validation blocked CLI run:\n{validation_message}")
+                return 1
+            print(f"Validation warning before CLI run:\n{validation_message}")
 
         # Load data
         print(f"Loading: {input_path}")
@@ -427,7 +487,6 @@ def run_cli(args):
                 preserved_sheets = {}
 
         # Run requested steps
-        step = args.step
         project_root = Path(__file__).resolve().parents[2]
         intermediate_dir: Path | None = None
         if step == "all" and args.persist_intermediate:
@@ -472,22 +531,14 @@ def run_cli(args):
         if step in ["istd", "all"]:
             print("Step 2: ISTD Marking...")
             perf_start = take_snapshot()
-            if args.istd_mz:
-                try:
-                    resolved["step2"]["istd_mz_list"] = [
-                        float(x.strip()) for x in args.istd_mz.split(",") if x.strip()
-                    ]
-                except ValueError:
-                    print("  Error: Invalid --istd-mz format")
-                    return 1
 
             session.record_step_parameters(
                 1,
                 dict(resolved["step2"]),
             )
             step2_kwargs = dict(resolved["step2"])
-            if step2_kwargs.get("istd_record_file"):
-                step2_kwargs["istd_record_file"] = Path(step2_kwargs["istd_record_file"])
+            if step2_kwargs.get("xic_results_file"):
+                step2_kwargs["xic_results_file"] = Path(step2_kwargs["xic_results_file"])
             result = _adapter_istd.run_from_df(df, **step2_kwargs)
             if result.success:
                 df = result.data

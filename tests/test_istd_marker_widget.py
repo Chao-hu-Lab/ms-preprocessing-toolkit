@@ -16,14 +16,20 @@ def widget(step_widget_factory):
     return step_widget_factory(ISTDMarkerWidget, step_index=1)
 
 
-def test_istd_marker_widget_defaults_rt_tolerance_to_1_5(widget) -> None:
+def test_istd_marker_widget_only_exposes_xic_file_parameter(widget) -> None:
     params = widget.get_parameters()
 
-    assert params["ppm_tolerance"] == pytest.approx(20.0)
-    assert params["rt_tolerance"] == pytest.approx(1.5)
+    assert params["xic_results_file"] == ""
+    assert "ppm_tolerance" not in params
+    assert "rt_tolerance" not in params
+    assert "istd_mz_list" not in params
+    assert "istd_record_file" not in params
+    assert "istd_record_date" not in params
+    assert not hasattr(widget, "ppm_entry")
+    assert not hasattr(widget, "rt_entry")
 
 
-def test_istd_marker_widget_run_processing_forwards_rt_tolerance(widget, monkeypatch) -> None:
+def test_istd_marker_widget_run_processing_forwards_only_xic_source(widget, monkeypatch) -> None:
     captured: dict[str, object] = {}
 
     def fake_run_from_df(data, **kwargs):
@@ -49,7 +55,12 @@ def test_istd_marker_widget_run_processing_forwards_rt_tolerance(widget, monkeyp
     result = widget.run_processing(input_df, **widget.get_parameters())
 
     assert result.equals(input_df)
-    assert captured["rt_tolerance"] == pytest.approx(1.5)
+    assert "xic_results_file" in captured
+    assert "ppm_tolerance" not in captured
+    assert "rt_tolerance" not in captured
+    assert "istd_mz_list" not in captured
+    assert "istd_record_file" not in captured
+    assert "istd_record_date" not in captured
 
 
 def test_istd_marker_widget_apply_parameters_populates_profile_defaults(widget) -> None:
@@ -57,31 +68,22 @@ def test_istd_marker_widget_apply_parameters_populates_profile_defaults(widget) 
 
     params = widget.get_parameters()
 
-    assert params["ppm_tolerance"] == pytest.approx(STEP2_PARAMS["ppm_tolerance"])
-    assert params["rt_tolerance"] == pytest.approx(STEP2_PARAMS["rt_tolerance"])
-    assert params["istd_mz_list"] == STEP2_PARAMS["istd_mz_list"]
-    if STEP2_PARAMS["istd_record_file"]:
-        assert params["istd_record_file"] == STEP2_PARAMS["istd_record_file"]
-        assert params["istd_record_date"] == STEP2_PARAMS["istd_record_date"]
-    else:
-        assert "istd_record_file" not in params
-        assert "istd_record_date" not in params
+    assert params["xic_results_file"] == STEP2_PARAMS["xic_results_file"]
+    assert "ppm_tolerance" not in params
+    assert "rt_tolerance" not in params
+    assert "istd_mz_list" not in params
+    assert "istd_record_file" not in params
+    assert "istd_record_date" not in params
 
 
-def test_istd_marker_widget_validates_record_date_format(widget) -> None:
-    warnings = widget.validate_parameters({"istd_record_date": "2026-01-06"})
+def test_istd_marker_widget_validates_missing_xic_file(widget, tmp_path) -> None:
+    warnings = widget.validate_parameters({"xic_results_file": str(tmp_path / "missing.xlsx")})
 
     assert len(warnings) == 1
-    assert warnings[0].code == "invalid_istd_date"
+    assert warnings[0].code == "xic_results_file_not_found"
     assert warnings[0].blocking is True
 
 
 def test_istd_marker_widget_uses_aligned_form_columns(widget) -> None:
     assert widget.params_frame.grid_columnconfigure(0)["minsize"] == 180
-    assert widget.ppm_entry.grid_info()["column"] == 1
-    assert widget.rt_entry.grid_info()["column"] == 1
-    assert widget.istd_entry.grid_info()["column"] == 1
-    assert widget.record_entry.grid_info()["column"] == 1
-    assert widget.date_entry.grid_info()["column"] == 1
-    assert widget.ppm_entry.cget("justify") == "center"
-    assert widget.rt_entry.cget("justify") == "center"
+    assert widget.xic_entry.grid_info()["column"] == 1

@@ -14,9 +14,9 @@
 
 ### 2. ISTD 標記 (ISTD Marking)
 - 依 m/z 值排序數據
-- 標記內標 (Internal Standard) 特徵
-- 基於 ppm 和 RT 容差偵測重複特徵
-- 移除 ISTD 標記的列
+- 使用 XIC Extractor 結果 workbook 的 ISTD targets 作為唯一內標來源
+- 依 XIC target 的 `ppm tol`、RT window 或 Summary Mean RT 選出最符合的內標列
+- 將內標列寫入紅字與 protected row metadata，供 Step 3 保護使用
 
 ### 3. 重複訊號刪除 (Duplicate Removal)
 - 自動識別 RT、m/z、Intensity 欄位
@@ -98,10 +98,10 @@ ms-preprocessing
 
 ```bash
 # 執行全部流程
-python main.py --input data.xlsx --output processed.xlsx
+python main.py --input data.xlsx --output processed.xlsx --xic-results-file xic_results.xlsx
 
 # 執行特定步驟
-python main.py --input data.xlsx --step duplicate-removal --mz-tol 20 --rt-tol 1.0
+python main.py --input data.xlsx --step istd --xic-results-file xic_results.xlsx
 
 # 查看幫助
 python main.py --help
@@ -114,17 +114,17 @@ python main.py --help
 | `--input, -i` | 輸入檔案路徑 | - |
 | `--output, -o` | 輸出檔案路徑 | 自動生成 |
 | `--step` | 執行步驟 (organize/istd/duplicate-removal/filter/all) | all |
-| `--mz-tol` | m/z 容差 (ppm) | 20 |
-| `--istd-mz` | ISTD m/z 清單（逗號分隔） | 內建預設 |
-| `--istd-record-file` | ISTD 記錄表 (.xlsx) | - |
-| `--istd-record-date` | ISTD 日期 (YYYYMMDD) | - |
-| `--rt-tol` | RT 容差 (分鐘) | 1.0 |
+| `--mz-tol` | Step 3 重複訊號刪除 m/z 容差 (ppm) | 20 |
+| `--xic-results-file` | XIC Extractor 結果 workbook (.xlsx)，Step 2 必填來源 | - |
+| `--rt-tol` | Step 3 重複訊號刪除 RT 容差 (分鐘) | profile 預設 |
 | `--bg-threshold` | 穩定檢出率門檻 | 0.33 |
 | `--high-det-thresh` | MNAR 出現組檢出率下限 | 0.80 |
 | `--low-det-thresh` | MNAR 缺失組檢出率上限 | 0.20 |
 | `--qc-ratio-threshold` | QC 檢出率門檻 | profile 預設 |
 | `--intensity-fc-threshold` | 強度倍率門檻 | profile 預設 |
 | `--method-file` | 上機順序 Word 檔案 (.docx) | - |
+
+Step 2 不再支援 `--istd-mz`、`--istd-record-file` 或 `--istd-record-date`。本機預設路徑請使用 `MSPTK_XIC_RESULTS_FILE` 或 `config/local_reference_paths.json` 的 `xic_results_file`。
 
 ## 專案結構
 
@@ -187,16 +187,17 @@ ms-preprocessing-toolkit/
 
 預期的資料結構：
 ```
-| FeatureID       | Tolerance | Sample1 | Sample2 | QC1  | ... |
-|-----------------|-----------|---------|---------|------|-----|
-| Sample_Type     | na        | case    | case    | qc   | ... |
-| 100.1234/1.50   | 20/0.5    | 5000    | 5500    | 5200 | ... |
-| 200.5678/2.50   | na        | 6000    | 6500    | 6200 | ... |
+| FeatureID       | Sample1 | Sample2 | QC1  | ... |
+|-----------------|---------|---------|------|-----|
+| Sample_Type     | case    | case    | qc   | ... |
+| 100.1234/1.50   | 5000    | 5500    | 5200 | ... |
+| 200.5678/2.50   | 6000    | 6500    | 6200 | ... |
 ```
 
 - 第一欄：FeatureID (格式: m/z/RT)
-- 第二欄：Tolerance (ppm/RT 容差，可為 "na")
+- 舊資料若含 Tolerance 欄仍可讀取，但 Step 2 不使用此欄
 - 第二列：Sample_Type (樣本類型標籤)
+- Step 2 的 ppm tolerance、RT window 與 Mean RT 由 XIC Extractor workbook 提供
 
 ### Sample Type 標籤
 

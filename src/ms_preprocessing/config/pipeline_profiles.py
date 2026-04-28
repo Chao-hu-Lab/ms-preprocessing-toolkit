@@ -15,7 +15,6 @@ from ms_preprocessing.config.feature_filter_presets import (
     Step4Params,
     get_step4_preset,
 )
-from ms_preprocessing.config.pipeline_defaults import STEP1_PARAMS, STEP2_PARAMS, STEP3_PARAMS
 
 
 class PipelineProfile(TypedDict):
@@ -40,6 +39,8 @@ def get_pipeline_profile(name: PipelineProfileName = "default") -> PipelineProfi
         - Step 1-3 reuse the fixed pipeline defaults.
         - Step 4 is selected from the existing loose/default/strict presets.
     """
+
+    from ms_preprocessing.config.pipeline_defaults import STEP1_PARAMS, STEP2_PARAMS, STEP3_PARAMS
 
     step4_name: PresetName = name
     return {

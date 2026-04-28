@@ -72,16 +72,19 @@ def _summarize_step1(stats: dict[str, Any], meta: dict[str, Any], params: dict[s
 
 def _summarize_step2(stats: dict[str, Any], meta: dict[str, Any], params: dict[str, Any]) -> list[str]:
     lines: list[str] = []
-    record_file = _value_from(meta, params, keys=("istd_record_file",))
-    lines.append(f"Record: {_basename(record_file) if record_file else 'not selected'}")
+    xic_file = _value_from(meta, stats, params, keys=("xic_source_path", "xic_results_file"))
+    lines.append(f"XIC: {_basename(xic_file) if xic_file else 'not selected'}")
 
-    _append_value(lines, "Date", _value_from(meta, params, keys=("istd_record_date",)))
-    _append_value(lines, "Source", _value_from(meta, stats, keys=("istd_record_source",)))
-    _append_value(lines, "Format", _value_from(meta, stats, keys=("istd_record_format",)))
-    _append_value(lines, "Targets", _value_from(meta, stats, keys=("istd_target_count",)))
-    _append_value(lines, "Pairs", _value_from(meta, stats, keys=("istd_pair_count",)))
+    _append_value(lines, "Targets", _value_from(meta, stats, keys=("xic_target_count",)))
+    skipped = _value_from(meta, stats, keys=("xic_skipped_targets",))
+    if isinstance(skipped, list):
+        lines.append(f"Skipped targets: {len(skipped)}")
     _append_value(lines, "Samples", _value_from(meta, stats, keys=("istd_sample_count",)))
-    _append_value(lines, "Marked", _value_from(meta, stats, keys=("istd_marked_count", "marked_count")))
+    _append_value(
+        lines,
+        "Marked",
+        _value_from(meta, stats, keys=("istd_marked", "istd_marked_count", "marked_count")),
+    )
     _append_value(
         lines,
         "Duplicate ISTD",

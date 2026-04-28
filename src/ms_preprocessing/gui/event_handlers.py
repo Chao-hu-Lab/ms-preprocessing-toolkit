@@ -122,8 +122,7 @@ class MainWindowEventHandlersMixin:
         step2_params = self._safe_step_params(1)
 
         method_file = context.get("method_file") or step1_params.get("method_file")
-        istd_record = context.get("istd_record_file") or step2_params.get("istd_record_file")
-        istd_date = context.get("istd_record_date") or step2_params.get("istd_record_date")
+        xic_results_file = context.get("xic_results_file") or step2_params.get("xic_results_file")
 
         lines = [
             "Run: "
@@ -132,8 +131,7 @@ class MainWindowEventHandlersMixin:
             f"Completed: {len(self.__dict__.get('_completed_steps', set()))}",
             "Files: "
             f"Method: {self._display_name(method_file)} | "
-            f"ISTD: {self._display_name(istd_record)} | "
-            f"Date: {istd_date or 'not set'}",
+            f"XIC: {self._display_name(xic_results_file)}",
             "Output: "
             f"Combined TSV: {self._combined_tsv_state()} | "
             f"Latest output: {self._latest_output_name()}",
