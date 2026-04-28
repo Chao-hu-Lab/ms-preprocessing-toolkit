@@ -1,8 +1,8 @@
 # Step1 Internal Boundary Refactor Spec
 
 Date: 2026-04-28
-Status: In progress (Phase 3 complete; Phase 4 deferred)
-Target branch: feature/step1-internal-boundaries
+Status: In progress (Phase 4 extracted)
+Target branch: feature/step1-combined-tsv-preprocessor
 
 ## Goal
 
@@ -253,7 +253,9 @@ Current branch status:
 
 Current branch status:
 
-- Not started. Keep this separate from SampleInfoBuilder unless a shared contract forces a small preparatory change.
+- Done: `ms_core.preprocessing.combined_tsv` now owns combined TSV split detection, beforeVBA construction, false-positive filtering, MZmine area scaling, and post-VBA cleanup.
+- Done: `DataOrganizer` keeps compatibility wrappers for `process_combined()`, `false_positive_fix()`, `post_vba_cleanup()`, and `process_combined_and_fix()`.
+- Done: focused tests cover combined side splitting, MZmine ID order restoration, trailing unnamed MZmine-column cleanup, false-positive zero handling, and marker ownership.
 
 ### Phase 5: Revisit Other Boundary Smells
 
