@@ -1,14 +1,23 @@
 # Step1 Internal Boundary Refactor Spec
 
 Date: 2026-04-28
-Status: Draft for future branch
-Target branch: TBD
+Status: In progress (Phase 3 complete; Phase 4 deferred)
+Target branch: feature/step1-internal-boundaries
 
 ## Goal
 
 Keep the user-facing Step1 workflow as "data organization", but split its internal responsibilities into smaller modules with explicit contracts.
 
 The current issue is not that Step1 performs multiple sub-steps. That is intentional and matches the real workflow. The issue is that many different responsibilities share `DataOrganizer`, so dataset-specific fixes accumulate in one large class and make future batches harder to reason about.
+
+## Guiding Principle
+
+- Workflow steps can stay broad when that matches the user workflow.
+- Module and function boundaries should be narrow enough to match internal responsibilities.
+- Data contracts must be explicit, especially where one sub-step feeds another.
+- Step internals should communicate through clear intermediate objects rather than shared implicit state on one large class.
+
+For Step1, the user-facing workflow remains one "data organization" step. The refactor goal is to stop treating `DataOrganizer` as the owner of every internal responsibility.
 
 ## Current Problems
 
@@ -71,9 +80,10 @@ Impact:
 
 Observed but lower priority:
 
-- `DuplicateRemover` also performs degeneracy/adduct annotation. This is closer to feature annotation than duplicate removal.
-- `FeatureFilter` owns gate decisions, deleted-feature export shape, zero-to-NaN cleanup, and marker column insertion.
-- GUI and CLI orchestration both duplicate file loading, metadata preservation, autosave/export, and step chaining.
+- Step3 `DuplicateRemover` owns duplicate/overlap merge behavior, protected row propagation, intensity merge policy, top-N filtering, Pearson correlation checks, adduct table loading, and degeneracy/adduct annotation. Degeneracy annotation is closer to feature annotation than duplicate removal, but should be split only after Step1 data contracts are stable.
+- Step4 `FeatureFilter` owns group/QC detection, detection ratio calculation, Wilson lower bound, stable/MNAR/QC ratio/intensity FC gates, deleted-feature export shape, zero-to-NaN cleanup, and marker column insertion. This is more coherent than Step1, but the gate decision table and export post-processing are likely future extraction points.
+- GUI `event_handlers.py` owns file loading, extra sheet loading, combined TSV preprocessing, Run All orchestration, async thread/UI queue handling, autosave, final export, downstream handoff reminders, busy state, and step switching. This should eventually split into controller/service layers, but not in this core data-contract branch.
+- CLI `run_cli()` duplicates GUI workflow responsibilities around validation, parameter resolution, loading, session metadata, auxiliary sheet preservation, Step1-4 orchestration, parquet handoff, output naming, and final export. A shared workflow runner is valuable, but should be a separate branch.
 
 These should not be mixed into the Step1 refactor unless they block the work.
 
@@ -200,9 +210,16 @@ Non-responsibilities:
 ### Phase 1: Stabilize Identity Boundary
 
 - Keep current `sample_identity.py`.
+- Move shared sample token extraction, raw header simplification, method sample simplification, and matching-key normalization into `sample_identity.py`.
 - Add missing tests for BC, EC, QC, ZBEE, program-prefix, and rerun suffix cases.
 - Add regression tests proving `SampleInfo.Sample_Name` equals RawIntensity sample columns after Step1.
 - Add optional trace fields only if they help debugging real datasets.
+
+Current branch status:
+
+- Done: `sample_identity.py` now centralizes matching-key normalization and identity helper behavior.
+- Done: BC, EC, QC, ZBEE, nested program-prefix, and rerun suffix regression coverage has been added.
+- Done: Step1 regression coverage proves SampleInfo names remain RawIntensity join keys while method names remain traceability fields.
 
 ### Phase 2: Extract MethodSequenceParser
 
@@ -210,17 +227,33 @@ Non-responsibilities:
 - Keep `DataOrganizer._parse_injection_sequence()` as a thin compatibility wrapper during migration.
 - Test parser fixtures without full Step1 matrix setup.
 
+Current branch status:
+
+- Done: `ms_core.preprocessing.method_sequence` owns `InjectionInfo`, DOCX fallback table extraction, injection row extraction, injection table selection, and injection volume parsing.
+- Done: `DataOrganizer` keeps compatibility wrappers so existing callers and tests can migrate gradually.
+- Done: focused parser tests cover direct table parsing, BC source-order renumbering, and injection-volume parsing.
+
 ### Phase 3: Extract SampleInfoBuilder
 
 - Move matching and SampleInfo row construction out of `DataOrganizer`.
 - Keep DataOrganizer responsible for calling builder and reordering columns.
 - Add tests for unmatched, ambiguous, and duplicate method rows.
 
+Current branch status:
+
+- Done: `ms_core.preprocessing.sample_info_builder` owns SampleInfo row construction, method-to-column matching, metadata-column exclusion, and display-column ordering.
+- Done: `DataOrganizer._build_sample_info()` is now a compatibility wrapper that delegates to `SampleInfoBuilder`.
+- Done: builder-focused tests cover unmatched raw columns, duplicate method matching keys, ambiguous BC DNA/RNA variant matching, metadata-column exclusion, and non-mutating injection-order renumbering.
+
 ### Phase 4: Extract CombinedTsvPreprocessor
 
 - Move combined TSV split and false-positive fix out of `DataOrganizer`.
 - Keep GUI/CLI behavior unchanged.
 - Make combined_fix an input-provider path that reuses shared identity and method sequence contracts.
+
+Current branch status:
+
+- Not started. Keep this separate from SampleInfoBuilder unless a shared contract forces a small preparatory change.
 
 ### Phase 5: Revisit Other Boundary Smells
 
@@ -229,6 +262,10 @@ Only after Step1 boundaries are stable:
 - Consider extracting Step3 degeneracy annotation.
 - Consider extracting Step4 gate decision table.
 - Consider a shared workflow runner for GUI and CLI.
+
+Current branch status:
+
+- Not in scope. These are documented follow-up candidates, not part of the current Step1 core-data-contract branch.
 
 ## Non-Goals
 
