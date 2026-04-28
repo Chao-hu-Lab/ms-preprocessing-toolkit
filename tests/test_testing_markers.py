@@ -34,9 +34,19 @@ def test_gui_marker_is_serial_by_default() -> None:
 def test_integration_and_perf_markers_can_overlap() -> None:
     markers = classify_test_markers(Path("tests") / "test_pipeline_baseline_contract.py")
     handoff_markers = classify_test_markers(Path("tests") / "test_final_export_handoff.py")
+    workflow_runner_markers = classify_test_markers(Path("tests") / "test_workflow_runner.py")
+    workflow_input_markers = classify_test_markers(
+        Path("tests") / "test_workflow_input_loader.py"
+    )
+    workflow_export_markers = classify_test_markers(
+        Path("tests") / "test_workflow_export_service.py"
+    )
 
     assert markers == {"integration", "perf"}
     assert handoff_markers == {"integration"}
+    assert workflow_runner_markers == {"integration"}
+    assert workflow_input_markers == {"integration"}
+    assert workflow_export_markers == {"integration"}
 
 
 def test_root_hygiene_is_serial_without_being_gui() -> None:
