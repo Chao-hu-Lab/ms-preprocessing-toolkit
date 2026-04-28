@@ -11,8 +11,10 @@ import pandas as pd
 
 from ms_preprocessing.config.settings import Settings
 from ms_preprocessing.gui.async_task_runner import AsyncTaskRunner
+from ms_preprocessing.gui.step_summary import summarize_step_result
 from ms_preprocessing.gui.validation import format_validation_warnings, has_blocking_warnings
 from ms_preprocessing.utils.results import ProcessingMetadata
+from ms_preprocessing.workflow.workflow_runner import WorkflowRunner, WorkflowRunResult
 
 if TYPE_CHECKING:
     from ms_preprocessing.workflow.combined_tsv_service import CombinedTsvService
@@ -110,6 +112,18 @@ class PipelineController:
         data: pd.DataFrame,
         params_by_step: list[dict[str, Any]],
     ) -> None:
+        if self._can_use_workflow_runner(params_by_step):
+            self._run_all_steps_with_workflow_runner(original_step, data, params_by_step)
+            return
+
+        self._run_all_steps_with_widgets(original_step, data, params_by_step)
+
+    def _run_all_steps_with_widgets(
+        self,
+        original_step: int,
+        data: pd.DataFrame,
+        params_by_step: list[dict[str, Any]],
+    ) -> None:
         host = self._host
         success = False
         try:
@@ -171,6 +185,104 @@ class PipelineController:
             host._log(f"Pipeline error: {exc}")
         finally:
             host._dispatch_to_ui(self.finish_run_all_steps, original_step, success)
+
+    def _run_all_steps_with_workflow_runner(
+        self,
+        original_step: int,
+        data: pd.DataFrame,
+        params_by_step: list[dict[str, Any]],
+    ) -> None:
+        host = self._host
+        success = False
+        try:
+            self.reset_pipeline_for_run_all()
+            runner = WorkflowRunner(file_handler=host.__dict__.get("_file_handler"))
+            result = runner.run(
+                data,
+                step="all",
+                resolved_parameters=self._resolved_parameters(params_by_step),
+                session=host._pipeline_session,
+                persist_intermediate=True,
+                progress_callback=lambda step_index, message: host._dispatch_to_ui(
+                    host._safe_update_action_bar_progress,
+                    0,
+                    f"Running Step {step_index + 1}/{len(host.step_widgets)}: {message}",
+                ),
+                log_callback=host._log,
+            )
+            if not result.success or result.data is None:
+                raise RuntimeError(result.message or "Run All failed")
+
+            self._apply_workflow_result(result, params_by_step)
+            host._dispatch_to_ui(host._safe_update_action_bar_progress, 100, "All steps complete!")
+            host._log("All steps completed successfully!")
+            success = True
+        except Exception as exc:
+            host._last_run_all = False
+            host._dispatch_to_ui(host._safe_update_action_bar_progress, 0, f"Pipeline error: {exc}")
+            host._log(f"Pipeline error: {exc}")
+        finally:
+            host._dispatch_to_ui(self.finish_run_all_steps, original_step, success)
+
+    def _apply_workflow_result(
+        self,
+        result: WorkflowRunResult,
+        params_by_step: list[dict[str, Any]],
+    ) -> None:
+        host = self._host
+        host._current_data = result.data
+        host._last_completed_step = result.last_completed_step_index
+        host._last_run_all = result.last_completed_step_index == len(Settings.WORKFLOW_STEPS) - 1
+        host._step_output_paths.clear()
+        host._step_output_paths.update(result.step_output_paths)
+        host._context = result.session.context
+        if result.last_completed_step_index is None:
+            host._completed_steps = set()
+        else:
+            host._completed_steps = set(range(result.last_completed_step_index + 1))
+
+        step_name_to_index = {spec[0]: index for index, spec in enumerate(Settings.WORKFLOW_STEPS)}
+        adapter_to_gui_step = {
+            "data_organizer": "data_organizer",
+            "istd_marker": "istd_marker",
+            "duplicate_remover": "duplicate_remover",
+            "feature_filter": "feature_filter",
+        }
+        for adapter_step, step_result in result.step_results.items():
+            step_index = step_name_to_index.get(adapter_to_gui_step.get(adapter_step, ""))
+            if step_index is None:
+                continue
+            host._log(f"Step {step_index + 1} completed")
+            summary_lines = summarize_step_result(
+                adapter_step,
+                step_result.statistics,
+                step_result.metadata.as_context_dict(),
+                params_by_step[step_index] if step_index < len(params_by_step) else {},
+            )
+            for line in summary_lines:
+                host._log(f"Step {step_index + 1} summary: {line}")
+            host._dispatch_to_ui(host._update_latest_result_summary, summary_lines)
+            host._dispatch_to_ui(host._update_run_context_summary)
+
+    @staticmethod
+    def _resolved_parameters(params_by_step: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        return {
+            "step1": dict(params_by_step[0]) if len(params_by_step) > 0 else {},
+            "step2": dict(params_by_step[1]) if len(params_by_step) > 1 else {},
+            "step3": dict(params_by_step[2]) if len(params_by_step) > 2 else {},
+            "step4": dict(params_by_step[3]) if len(params_by_step) > 3 else {},
+        }
+
+    def _can_use_workflow_runner(self, params_by_step: list[dict[str, Any]]) -> bool:
+        if len(params_by_step) != len(Settings.WORKFLOW_STEPS):
+            return False
+        widgets = self._host.__dict__.get("step_widgets", [])
+        if len(widgets) != len(Settings.WORKFLOW_STEPS):
+            return False
+        return all(
+            widget.__class__.__module__.startswith("ms_preprocessing.gui.widgets")
+            for widget in widgets
+        )
 
     def finish_run_all_steps(self, original_step: int, success: bool) -> None:
         host = self._host

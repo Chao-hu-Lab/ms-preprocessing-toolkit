@@ -191,6 +191,70 @@ def test_run_all_success_updates_state_paths_and_summaries(tmp_path) -> None:
     assert host.exported is True
 
 
+def test_run_all_uses_workflow_runner_for_real_gui_widget_set(monkeypatch, tmp_path) -> None:
+    host = _Host(tmp_path)
+
+    class _RealWidget:
+        __module__ = "ms_preprocessing.gui.widgets.fake_widget"
+
+        def get_parameters(self) -> dict:
+            return {"param": "value"}
+
+    host.step_widgets = [_RealWidget(), _RealWidget(), _RealWidget(), _RealWidget()]
+    captured: dict[str, object] = {}
+
+    class _FakeWorkflowRunner:
+        def __init__(self, *, file_handler=None) -> None:
+            captured["file_handler"] = file_handler
+
+        def run(self, data, **kwargs):
+            captured["data"] = data
+            captured.update(kwargs)
+            session = kwargs["session"]
+            session.step_output_paths[0] = tmp_path / "STEP1_input.parquet"
+            return __import__(
+                "ms_preprocessing.workflow.workflow_runner",
+                fromlist=["WorkflowRunResult"],
+            ).WorkflowRunResult(
+                success=True,
+                data=_frame("runner"),
+                step="all",
+                completed_steps=["data_organizer"],
+                last_completed_step_index=0,
+                step_results={
+                    "data_organizer": ProcessingResult(
+                        success=True,
+                        step="data_organizer",
+                        output_path=None,
+                        data=_frame("runner"),
+                        metadata=ProcessingMetadata(red_font_rows={3}),
+                        statistics={"features": 1},
+                    )
+                },
+                session=session,
+                step_output_paths=dict(session.step_output_paths),
+                validation_warnings=[],
+                errors=[],
+                message="Done",
+                final_export_ready=True,
+            )
+
+    import ms_preprocessing.gui.pipeline_controller as controller_module
+
+    monkeypatch.setattr(controller_module, "WorkflowRunner", _FakeWorkflowRunner)
+
+    PipelineController(host).run_all_steps_worker(0, host._original_data.copy(), [{"a": 1}] * 4)
+
+    assert captured["step"] == "all"
+    assert captured["persist_intermediate"] is True
+    assert captured["resolved_parameters"]["step1"] == {"a": 1}
+    assert host._current_data["stage"].iloc[0] == "runner"
+    assert host._completed_steps == {0}
+    assert host._last_completed_step == 0
+    assert host._step_output_paths[0].name == "STEP1_input.parquet"
+    assert host.latest_summaries[-1][0] == "Features: 1"
+
+
 def test_run_all_failure_reports_error_and_clears_busy_state(tmp_path) -> None:
     host = _Host(tmp_path)
     widget = _Widget("data_organizer", "step1")
