@@ -41,12 +41,14 @@ def test_integration_and_perf_markers_can_overlap() -> None:
     workflow_export_markers = classify_test_markers(
         Path("tests") / "test_workflow_export_service.py"
     )
+    combined_tsv_markers = classify_test_markers(Path("tests") / "test_combined_tsv_service.py")
 
     assert markers == {"integration", "perf"}
     assert handoff_markers == {"integration"}
     assert workflow_runner_markers == {"integration"}
     assert workflow_input_markers == {"integration"}
     assert workflow_export_markers == {"integration"}
+    assert combined_tsv_markers == {"integration"}
 
 
 def test_root_hygiene_is_serial_without_being_gui() -> None:
