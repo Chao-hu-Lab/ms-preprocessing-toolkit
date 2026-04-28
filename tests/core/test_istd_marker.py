@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 from ms_core.preprocessing.istd_marker import ISTDMarker
 
@@ -17,6 +19,37 @@ def _make_df(feature_ids: list[str], sample_values: dict[str, list]) -> pd.DataF
     return pd.DataFrame(data)
 
 
+def _write_xic_workbook(path: Path, *, mz: float = 261.1273, rt: float = 5.0) -> None:
+    targets = pd.DataFrame(
+        [
+            {
+                "Label": "d3-target",
+                "Role": "ISTD",
+                "ISTD Pair": None,
+                "m/z": mz,
+                "RT min": rt - 0.1,
+                "RT max": rt + 0.1,
+                "ppm tol": 20,
+            }
+        ]
+    )
+    summary = pd.DataFrame(
+        [
+            {
+                "Target": "d3-target",
+                "Role": "ISTD",
+                "Detected": 1,
+                "Total": 1,
+                "Detection %": "100%",
+                "Mean RT": rt,
+            }
+        ]
+    )
+    with pd.ExcelWriter(path) as writer:
+        targets.to_excel(writer, sheet_name="Targets", index=False)
+        summary.to_excel(writer, sheet_name="Summary", index=False)
+
+
 # ---------------------------------------------------------------------------
 # Sorting
 # ---------------------------------------------------------------------------
@@ -28,7 +61,7 @@ class TestSortByMz:
             {"case_S1": [10, 20, 30]},
         )
         marker = ISTDMarker()
-        result = marker.process(df, istd_mz_list=[])
+        result = marker.process(df, istd_features=set())
         assert result.success
         mz_values = [
             float(str(result.data.iat[i, 0]).split("/")[0])
@@ -39,7 +72,7 @@ class TestSortByMz:
     def test_preserves_sample_type_row(self):
         df = _make_df(["100.0000/1.0"], {"case_S1": [10]})
         marker = ISTDMarker()
-        result = marker.process(df)
+        result = marker.process(df, istd_features=set())
         assert result.success
         assert str(result.data.iat[0, 0]).lower() == "sample_type"
 
@@ -49,27 +82,31 @@ class TestSortByMz:
 # ---------------------------------------------------------------------------
 
 class TestISTDDetection:
-    def test_marks_matching_mz(self):
-        """Features matching known ISTD m/z should be identified."""
+    def test_marks_matching_xic_target(self, tmp_path):
+        """Features matching XIC ISTD targets should be identified."""
+        xic_path = tmp_path / "xic.xlsx"
+        _write_xic_workbook(xic_path)
         df = _make_df(
             ["261.1273/5.0", "500.0000/3.0"],
             {"case_S1": [1000, 2000], "case_S2": [1100, 2100]},
         )
         marker = ISTDMarker()
-        result = marker.process(df, istd_mz_list=[261.1273])
+        result = marker.process(df, xic_results_file=xic_path)
         assert result.success
         assert "261.1273/5.0" in result.metadata.get("istd_features", [])
 
-    def test_no_match_outside_tolerance(self):
-        """Features far from known ISTD m/z should NOT be marked."""
+    def test_no_match_outside_xic_tolerance(self, tmp_path):
+        """Features far from XIC ISTD targets should fail instead of marking rows."""
+        xic_path = tmp_path / "xic.xlsx"
+        _write_xic_workbook(xic_path)
         df = _make_df(
             ["999.9999/1.0"],
             {"case_S1": [1000]},
         )
         marker = ISTDMarker()
-        result = marker.process(df, istd_mz_list=[261.1273])
-        assert result.success
-        assert result.metadata.get("istd_features", []) == []
+        result = marker.process(df, xic_results_file=xic_path)
+        assert not result.success
+        assert "No ISTD features matched XIC targets" in result.message
 
 
 # ---------------------------------------------------------------------------
@@ -77,34 +114,30 @@ class TestISTDDetection:
 # ---------------------------------------------------------------------------
 
 class TestDuplicateDetection:
-    def test_detects_duplicate_of_istd(self):
-        """A non-ISTD feature within ppm + RT tolerance of an ISTD should be marked as duplicate."""
+    def test_does_not_detect_duplicate_of_istd_in_step2(self):
+        """Step 2 only marks the ISTD row; duplicate grouping belongs to Step 3."""
         istd_mz = 261.1273
-        # Create a feature that is within ppm+RT tolerance of the ISTD but
-        # does NOT itself match the ISTD m/z list (use a single known m/z).
-        # We explicitly provide the ISTD feature set so only one row is ISTD.
         close_mz = istd_mz + istd_mz * 5e-6  # 5 ppm away
         df = _make_df(
             [f"{istd_mz:.4f}/5.00", f"{close_mz:.4f}/5.10"],
             {"case_S1": [1000, 900], "case_S2": [1100, 800]},
         )
         marker = ISTDMarker()
-        # Pass explicit istd_features so only the first row is treated as ISTD
         result = marker.process(df, istd_features={f"{istd_mz:.4f}/5.00"})
         assert result.success
-        assert result.statistics.get("duplicates_marked", 0) >= 1
+        assert result.statistics.get("duplicates_marked", 0) == 0
+        assert result.metadata.get("duplicate_indices") == []
 
-    def test_no_duplicate_outside_tolerance(self):
-        """A feature far from all ISTDs should NOT be marked duplicate."""
+    def test_marks_only_explicit_istd_row(self):
         df = _make_df(
             ["261.1273/5.00", "999.0000/20.00"],
             {"case_S1": [1000, 500]},
         )
         marker = ISTDMarker()
-        result = marker.process(df, istd_mz_list=[261.1273])
+        result = marker.process(df, istd_features={"261.1273/5.00"})
         assert result.success
-        # Only ISTD duplicate detection (not the ISTD itself)
         assert result.statistics.get("duplicates_marked", 0) == 0
+        assert result.metadata.get("istd_features") == ["261.1273/5.00"]
 
 
 # ---------------------------------------------------------------------------
@@ -112,24 +145,26 @@ class TestDuplicateDetection:
 # ---------------------------------------------------------------------------
 
 class TestMetadataOutput:
-    def test_red_font_rows_populated_for_istd(self):
+    def test_red_font_rows_populated_for_istd(self, tmp_path):
+        xic_path = tmp_path / "xic.xlsx"
+        _write_xic_workbook(xic_path)
         df = _make_df(
             ["261.1273/5.00", "500.0000/3.00"],
             {"case_S1": [1000, 2000]},
         )
         marker = ISTDMarker()
-        result = marker.process(df, istd_mz_list=[261.1273])
+        result = marker.process(df, xic_results_file=xic_path)
         assert result.success
         assert len(result.metadata.get("red_font_rows", [])) >= 1
 
-    def test_keep_istd_rows_default(self):
-        """By default ISTD rows are kept (not removed)."""
+    def test_keeps_istd_rows(self):
+        """Step 2 marks ISTD rows but does not remove them."""
         df = _make_df(
             ["261.1273/5.00", "500.0000/3.00"],
             {"case_S1": [1000, 2000]},
         )
         marker = ISTDMarker()
-        result = marker.process(df, istd_mz_list=[261.1273], keep_istd_rows=True)
+        result = marker.process(df, istd_features={"261.1273/5.00"})
         assert result.success
         assert result.statistics.get("rows_removed", 0) == 0
 
@@ -148,7 +183,7 @@ class TestEdgeCases:
     def test_single_data_row(self):
         df = _make_df(["100.0000/1.0"], {"case_S1": [10]})
         marker = ISTDMarker()
-        result = marker.process(df)
+        result = marker.process(df, istd_features=set())
         assert result.success
 
     def test_no_slash_in_feature_id(self):

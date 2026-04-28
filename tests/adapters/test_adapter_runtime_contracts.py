@@ -48,21 +48,17 @@ def test_data_organizer_run_from_df_forwards_processing_arguments(monkeypatch) -
     }
 
 
-def test_istd_marker_run_from_df_applies_tolerances_and_path_inputs(monkeypatch) -> None:
+def test_istd_marker_run_from_df_forwards_only_xic_source(monkeypatch) -> None:
     import ms_preprocessing.adapters.istd_marker as module
 
     df = pd.DataFrame({"Mz/RT": ["Sample_Type", "100.0/1.0"], "S1": ["case", 1]})
     calls: dict[str, object] = {}
 
     class FakeProcessor:
-        def __init__(self) -> None:
-            self.config = SimpleNamespace(default_ppm_tolerance=20.0, default_rt_tolerance=1.0)
-
         def set_progress_callback(self, callback) -> None:
             calls["progress_callback"] = callback
 
         def process(self, input_df, **kwargs):
-            calls["processor"] = self
             calls["kwargs"] = kwargs
             return SimpleNamespace(success=True, data=input_df.copy(), metadata={}, statistics={})
 
@@ -71,21 +67,14 @@ def test_istd_marker_run_from_df_applies_tolerances_and_path_inputs(monkeypatch)
 
     result = module.run_from_df(
         df,
-        istd_mz_list=[261.1273],
-        istd_record_file="record.csv",
-        keep_istd_rows=False,
-        ppm_tolerance=5.0,
-        rt_tolerance=0.2,
+        xic_results_file="xic_results.xlsx",
     )
 
     assert result.success is True
     assert result.output_path == "istd.parquet"
-    processor = calls["processor"]
-    assert processor.config.default_ppm_tolerance == 5.0
-    assert processor.config.default_rt_tolerance == 0.2
-    assert calls["kwargs"]["istd_mz_list"] == [261.1273]
-    assert calls["kwargs"]["istd_record_file"] == Path("record.csv")
-    assert calls["kwargs"]["keep_istd_rows"] is False
+    assert calls["kwargs"] == {
+        "xic_results_file": Path("xic_results.xlsx"),
+    }
 
 
 def test_duplicate_remover_run_from_df_forwards_protected_rows(monkeypatch) -> None:
@@ -226,7 +215,8 @@ def test_adapter_run_from_df_returns_failure_when_processor_raises(
 
     monkeypatch.setattr(module, processor_attr, RaisingProcessor)
 
-    result = module.run_from_df(df)
+    kwargs = {"xic_results_file": "xic_results.xlsx"} if step == "istd_marker" else {}
+    result = module.run_from_df(df, **kwargs)
 
     assert result.success is False
     assert result.step == step
@@ -274,7 +264,8 @@ def test_adapter_run_from_df_keeps_success_when_handoff_persistence_raises(
     monkeypatch.setattr(module, processor_attr, SuccessfulProcessor)
     monkeypatch.setattr(module, "_save_output", lambda _df: (_ for _ in ()).throw(PermissionError("denied")))
 
-    result = module.run_from_df(df)
+    kwargs = {"xic_results_file": "xic_results.xlsx"} if module_name.endswith(".istd_marker") else {}
+    result = module.run_from_df(df, **kwargs)
 
     assert result.success is True
     assert result.data is not None

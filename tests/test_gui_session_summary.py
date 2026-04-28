@@ -63,8 +63,7 @@ class _SummaryHarness(MainWindowEventHandlersMixin, ctk.CTkFrame):
         self._context.update(
             {
                 "method_file": str(tmp_path / "method.docx"),
-                "istd_record_file": str(tmp_path / "istd_record.xlsx"),
-                "istd_record_date": "20260106",
+                "xic_results_file": str(tmp_path / "xic_results.xlsx"),
             }
         )
         self._step_output_paths = {}
@@ -132,8 +131,7 @@ def test_run_context_summary_includes_source_method_istd_and_latest_output(ctk_r
         assert "Step: 2" in text
         assert "Completed: 1" in text
         assert "Method: method.docx" in text
-        assert "ISTD: istd_record.xlsx" in text
-        assert "Date: 20260106" in text
+        assert "XIC: xic_results.xlsx" in text
         assert "Combined TSV: selected" in text
         assert "Latest output: ALL_input.xlsx" in text
         assert "\nFiles:" in text

@@ -17,9 +17,14 @@ from pathlib import Path
 from typing import Any
 
 METHOD_FILE_ENV = "MSPTK_METHOD_FILE"
-ISTD_RECORD_FILE_ENV = "MSPTK_ISTD_RECORD_FILE"
-ISTD_RECORD_DATE_ENV = "MSPTK_ISTD_RECORD_DATE"
+XIC_RESULTS_FILE_ENV = "MSPTK_XIC_RESULTS_FILE"
 LOCAL_REFERENCE_CONFIG_ENV = "MSPTK_LOCAL_REFERENCE_CONFIG"
+LEGACY_STEP2_ENV_VARS = ("MSPTK_ISTD_RECORD_FILE", "MSPTK_ISTD_RECORD_DATE")
+LEGACY_STEP2_CONFIG_KEYS = frozenset({"istd_record_file", "istd_record_date", "istd_mz_list"})
+STEP2_XIC_REQUIRED_MESSAGE = (
+    "Step2 now requires an XIC Extractor results workbook. "
+    "Please set xic_results_file or pass --xic-results-file."
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 LOCAL_CONFIG_PATH = PROJECT_ROOT / "config" / "local_reference_paths.json"
@@ -51,13 +56,20 @@ def _stringify_path(path_value: Path | None) -> str:
     return "" if path_value is None else str(path_value)
 
 
-def _resolve_text(env_var: str, local_value: Any, default_value: str) -> str:
-    override = os.getenv(env_var)
-    if override:
-        return str(override)
-    if local_value:
-        return str(local_value)
-    return default_value
+def get_legacy_step2_source_details() -> list[str]:
+    """Return active legacy Step2 env/config sources without failing import."""
+    config = _load_local_reference_config()
+    legacy_env = [env_var for env_var in LEGACY_STEP2_ENV_VARS if os.getenv(env_var)]
+    legacy_keys = sorted(LEGACY_STEP2_CONFIG_KEYS.intersection(config))
+    if not legacy_env and not legacy_keys:
+        return []
+
+    details: list[str] = []
+    if legacy_env:
+        details.append(f"legacy env var(s): {', '.join(legacy_env)}")
+    if legacy_keys:
+        details.append(f"legacy local config key(s): {', '.join(legacy_keys)}")
+    return details
 
 
 _LOCAL_REFERENCE_CONFIG = _load_local_reference_config()
@@ -66,14 +78,9 @@ DEFAULT_METHOD_FILE = _resolve_path(
     METHOD_FILE_ENV,
     _LOCAL_REFERENCE_CONFIG.get("method_file"),
 )
-DEFAULT_ISTD_RECORD_FILE = _resolve_path(
-    ISTD_RECORD_FILE_ENV,
-    _LOCAL_REFERENCE_CONFIG.get("istd_record_file"),
-)
-DEFAULT_ISTD_RECORD_DATE = _resolve_text(
-    ISTD_RECORD_DATE_ENV,
-    _LOCAL_REFERENCE_CONFIG.get("istd_record_date"),
-    "20260106",
+DEFAULT_XIC_RESULTS_FILE = _resolve_path(
+    XIC_RESULTS_FILE_ENV,
+    _LOCAL_REFERENCE_CONFIG.get("xic_results_file"),
 )
 
 STEP1_PARAMS: dict = {
@@ -83,11 +90,7 @@ STEP1_PARAMS: dict = {
 }
 
 STEP2_PARAMS: dict = {
-    "ppm_tolerance": 20.0,
-    "rt_tolerance": 1.5,
-    "istd_mz_list": [261.1273, 245.1324, 289.0841, 300.1605, 269.1436, 482.2087, 303.0913],
-    "istd_record_file": _stringify_path(DEFAULT_ISTD_RECORD_FILE),
-    "istd_record_date": DEFAULT_ISTD_RECORD_DATE,
+    "xic_results_file": _stringify_path(DEFAULT_XIC_RESULTS_FILE),
 }
 
 STEP3_PARAMS: dict = {

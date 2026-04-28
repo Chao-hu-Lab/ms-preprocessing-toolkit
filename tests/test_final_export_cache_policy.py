@@ -30,6 +30,10 @@ class _FakeFileHandler:
 
 
 def _make_cli_args(input_path: Path, output_path: Path) -> SimpleNamespace:
+    xic_results_file = input_path.with_name("xic_results.xlsx")
+    if not xic_results_file.exists():
+        xic_results_file.write_text("placeholder", encoding="utf-8")
+
     return SimpleNamespace(
         input=str(input_path),
         output=str(output_path),
@@ -37,10 +41,15 @@ def _make_cli_args(input_path: Path, output_path: Path) -> SimpleNamespace:
         method_file=None,
         step="all",
         mz_tol=None,
-        istd_mz=None,
-        istd_record_file=None,
-        istd_record_date=None,
+        xic_results_file=str(xic_results_file),
         rt_tol=None,
+        merge_mode=None,
+        enable_degeneracy_annotation=False,
+        degeneracy_ppm_tol=None,
+        degeneracy_rt_tol=None,
+        degeneracy_corr_threshold=None,
+        degeneracy_min_corr_points=None,
+        degeneracy_adduct_table_file=None,
         bg_threshold=None,
         intensity_fc_threshold=None,
         high_det_thresh=None,

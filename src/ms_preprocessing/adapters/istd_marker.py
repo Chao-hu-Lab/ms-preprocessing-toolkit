@@ -15,15 +15,10 @@ from ms_preprocessing.adapters import _capture_output_path, _persist_adapter_out
 from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
 
 _STEP = "istd_marker"
-_DEFAULT_ISTD_MZ: tuple[float, ...] | None = None
-
-
-def get_default_istd_mz() -> tuple[float, ...]:
-    """Expose default ISTD targets without leaking core imports into widgets."""
-    global _DEFAULT_ISTD_MZ
-    if _DEFAULT_ISTD_MZ is None:
-        _DEFAULT_ISTD_MZ = tuple(_ISTDMarker().config.default_istd_mz)
-    return _DEFAULT_ISTD_MZ
+_XIC_REQUIRED_ERROR = (
+    "Step2 now requires an XIC Extractor results workbook. "
+    "Please set xic_results_file or pass --xic-results-file."
+)
 
 
 def _read_input(input_path: str) -> pd.DataFrame:
@@ -43,6 +38,13 @@ def _save_output(df: pd.DataFrame) -> str | None:
         step_name=_STEP,
         preferred_root=_CoreSettings.get_parquet_cache_root() / "adapters",
     )
+
+
+def _coerce_optional_path(path_value: str | Path | None) -> Path | None:
+    if path_value is None:
+        return None
+    path_text = str(path_value).strip()
+    return Path(path_text) if path_text else None
 
 
 def _build_metadata(raw_meta: dict[str, Any]) -> ProcessingMetadata:
@@ -70,38 +72,47 @@ def _normalize_error(core_result: Any) -> str:
     return "Processing failed"
 
 
+def _merge_user_summary_stats(raw_stats: dict[str, Any], raw_meta: dict[str, Any]) -> dict[str, Any]:
+    stats = dict(raw_stats)
+    for key in (
+        "xic_source_path",
+        "xic_target_count",
+        "xic_skipped_targets",
+        "xic_targets_using_summary_rt",
+        "xic_targets_using_midpoint_rt",
+        "xic_istd_candidates",
+        "xic_istd_chosen_rows",
+    ):
+        if key in raw_meta:
+            stats[key] = raw_meta[key]
+    return stats
+
+
 def _run_processor(
     df: pd.DataFrame,
     *,
-    istd_features: set[str] | None = None,
-    custom_tolerances: dict[str, tuple[float, float]] | None = None,
-    istd_mz_list: list[float] | None = None,
-    istd_record_file: str | Path | None = None,
-    istd_record_date: str | None = None,
-    keep_istd_rows: bool = True,
-    ppm_tolerance: float | None = None,
-    rt_tolerance: float | None = None,
+    xic_results_file: str | Path | None = None,
     progress_callback: Callable[[float, str], None] | None = None,
-    **kwargs,
 ) -> ProcessingResult:
+    xic_path = _coerce_optional_path(xic_results_file)
+    if xic_path is None:
+        return ProcessingResult(
+            success=False,
+            step=_STEP,
+            output_path=None,
+            data=None,
+            metadata=ProcessingMetadata(),
+            error=_XIC_REQUIRED_ERROR,
+        )
+
     try:
         processor = _ISTDMarker()
         if progress_callback is not None:
             processor.set_progress_callback(progress_callback)
-        if ppm_tolerance is not None:
-            processor.config.default_ppm_tolerance = ppm_tolerance
-        if rt_tolerance is not None:
-            processor.config.default_rt_tolerance = rt_tolerance
 
         core_result = processor.process(
             df,
-            istd_features=istd_features,
-            custom_tolerances=custom_tolerances,
-            istd_mz_list=istd_mz_list,
-            istd_record_file=Path(istd_record_file) if istd_record_file else None,
-            istd_record_date=istd_record_date,
-            keep_istd_rows=keep_istd_rows,
-            **kwargs,
+            xic_results_file=xic_path,
         )
     except Exception as exc:
         return ProcessingResult(
@@ -125,23 +136,18 @@ def _run_processor(
         data=core_result.data,
         metadata=_build_metadata(raw_meta),
         error=None if core_result.success else _normalize_error(core_result),
-        statistics=dict(getattr(core_result, "statistics", {}) or {}),
+        statistics=_merge_user_summary_stats(
+            dict(getattr(core_result, "statistics", {}) or {}),
+            raw_meta,
+        ),
     )
 
 
 def run(
     input_path: str,
     *,
-    istd_features: set[str] | None = None,
-    custom_tolerances: dict[str, tuple[float, float]] | None = None,
-    istd_mz_list: list[float] | None = None,
-    istd_record_file: str | Path | None = None,
-    istd_record_date: str | None = None,
-    keep_istd_rows: bool = True,
-    ppm_tolerance: float | None = None,
-    rt_tolerance: float | None = None,
+    xic_results_file: str | Path | None = None,
     progress_callback: Callable[[float, str], None] | None = None,
-    **kwargs,
 ) -> ProcessingResult:
     """Read a file, run the processor, and return a typed result."""
     if not os.path.exists(input_path):
@@ -157,44 +163,20 @@ def run(
     df = _read_input(input_path)
     return _run_processor(
         df,
-        istd_features=istd_features,
-        custom_tolerances=custom_tolerances,
-        istd_mz_list=istd_mz_list,
-        istd_record_file=istd_record_file,
-        istd_record_date=istd_record_date,
-        keep_istd_rows=keep_istd_rows,
-        ppm_tolerance=ppm_tolerance,
-        rt_tolerance=rt_tolerance,
+        xic_results_file=xic_results_file,
         progress_callback=progress_callback,
-        **kwargs,
     )
 
 
 def run_from_df(
     df: pd.DataFrame,
     *,
-    istd_features: set[str] | None = None,
-    custom_tolerances: dict[str, tuple[float, float]] | None = None,
-    istd_mz_list: list[float] | None = None,
-    istd_record_file: str | Path | None = None,
-    istd_record_date: str | None = None,
-    keep_istd_rows: bool = True,
-    ppm_tolerance: float | None = None,
-    rt_tolerance: float | None = None,
+    xic_results_file: str | Path | None = None,
     progress_callback: Callable[[float, str], None] | None = None,
-    **kwargs,
 ) -> ProcessingResult:
     """Run the processor directly on an in-memory DataFrame."""
     return _run_processor(
         df,
-        istd_features=istd_features,
-        custom_tolerances=custom_tolerances,
-        istd_mz_list=istd_mz_list,
-        istd_record_file=istd_record_file,
-        istd_record_date=istd_record_date,
-        keep_istd_rows=keep_istd_rows,
-        ppm_tolerance=ppm_tolerance,
-        rt_tolerance=rt_tolerance,
+        xic_results_file=xic_results_file,
         progress_callback=progress_callback,
-        **kwargs,
     )

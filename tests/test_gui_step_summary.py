@@ -36,28 +36,23 @@ def test_step_summary_shortens_windows_paths_when_running_on_posix(monkeypatch) 
     assert all(r"C:\data\method.docx" not in line for line in lines)
 
 
-def test_step2_summary_accepts_future_xic_metadata() -> None:
+def test_step2_summary_reports_xic_metadata() -> None:
     lines = summarize_step_result(
         "istd_marker",
-        statistics={},
+        statistics={"istd_marked": 7},
         metadata={
-            "istd_record_file": "xic_results.xlsx",
-            "istd_record_date": "20260106",
-            "istd_record_source": "xic-extractor",
-            "istd_record_format": "xic-workbook",
-            "istd_target_count": 14,
-            "istd_pair_count": 7,
+            "xic_source_path": "xic_results.xlsx",
+            "xic_target_count": 14,
+            "xic_skipped_targets": [{"label": "bad", "reason": "missing ppm tol"}],
             "istd_warning_count": 12,
             "unexpected_future_key": "safe",
         },
     )
 
-    assert any("Record: xic_results.xlsx" in line for line in lines)
-    assert any("Date: 20260106" in line for line in lines)
-    assert any("Source: xic-extractor" in line for line in lines)
-    assert any("Format: xic-workbook" in line for line in lines)
+    assert any("XIC: xic_results.xlsx" in line for line in lines)
     assert any("Targets: 14" in line for line in lines)
-    assert any("Pairs: 7" in line for line in lines)
+    assert any("Marked: 7" in line for line in lines)
+    assert any("Skipped targets: 1" in line for line in lines)
     assert any("Warnings: 12" in line for line in lines)
 
 
