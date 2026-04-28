@@ -286,7 +286,7 @@ class PipelineController:
             if step_index is None or step_index >= len(host.step_widgets):
                 continue
             widget = host.step_widgets[step_index]
-            widget._data = current_input.copy() if isinstance(current_input, pd.DataFrame) else current_input
+            widget._data = current_input.copy(deep=False) if isinstance(current_input, pd.DataFrame) else current_input
             widget._last_parameters = (
                 dict(params_by_step[step_index]) if step_index < len(params_by_step) else {}
             )
@@ -308,7 +308,7 @@ class PipelineController:
             and isinstance(current_input, pd.DataFrame)
         ):
             next_widget = host.step_widgets[last_synced_index + 1]
-            next_widget._data = current_input.copy()
+            next_widget._data = current_input.copy(deep=False)
             if hasattr(next_widget, "set_context"):
                 next_widget.set_context(host._context)
 

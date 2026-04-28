@@ -56,7 +56,7 @@ class InputLoader:
             with pd.ExcelFile(path, engine="openpyxl") as workbook:
                 raw_sheet = InputLoader._resolve_raw_sheet(workbook.sheet_names, metadata)
                 return {
-                    sheet: pd.read_excel(path, sheet_name=sheet, engine="openpyxl")
+                    sheet: workbook.parse(sheet)
                     for sheet in workbook.sheet_names
                     if sheet != raw_sheet
                 }

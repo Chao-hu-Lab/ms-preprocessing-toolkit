@@ -78,7 +78,11 @@ def test_pipeline_session_creates_output_directory_only_when_final_export_path_i
 def test_build_step_output_path_does_not_register_path(tmp_path) -> None:
     from ms_preprocessing.gui.pipeline_session import PipelineSession
 
-    session = PipelineSession(output_dir=tmp_path / "OUTPUT", source_file=tmp_path / "input.xlsx")
+    session = PipelineSession(
+        output_dir=tmp_path / "OUTPUT",
+        source_file=tmp_path / "input.xlsx",
+        intermediate_dir=tmp_path / "cache",
+    )
 
     path = session.build_step_output_path(0)
 
@@ -86,6 +90,25 @@ def test_build_step_output_path_does_not_register_path(tmp_path) -> None:
     assert path.name.startswith("STEP1_input_")
     assert path.suffix == ".parquet"
     assert session.step_output_paths == {}
+
+
+def test_build_step_output_path_avoids_existing_intermediate_collision(tmp_path) -> None:
+    from ms_preprocessing.gui.pipeline_session import PipelineSession
+
+    session = PipelineSession(
+        output_dir=tmp_path / "OUTPUT",
+        source_file=tmp_path / "input.xlsx",
+        intermediate_dir=tmp_path / "cache",
+    )
+    first_path = session.build_step_output_path(0)
+    first_path.write_text("existing", encoding="utf-8")
+
+    second_path = session.build_step_output_path(0)
+
+    assert second_path != first_path
+    assert second_path.parent == session.intermediate_dir
+    assert second_path.name.startswith("STEP1_input_")
+    assert second_path.suffix == ".parquet"
 
 
 def test_gui_parameters_are_collected_in_single_pipeline_session_context(tmp_path) -> None:

@@ -153,9 +153,15 @@ class PipelineSession:
         """Build an intermediate path without registering it as a completed output."""
         self.intermediate_dir.mkdir(parents=True, exist_ok=True)
         stem = self._get_base_stem(self.source_file) if self.source_file else "output"
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         step_prefix = f"STEP{step_index + 1}"
-        return self.intermediate_dir / f"{step_prefix}_{stem}_{timestamp}.parquet"
+        base_name = f"{step_prefix}_{stem}_{timestamp}"
+        candidate = self.intermediate_dir / f"{base_name}.parquet"
+        counter = 1
+        while candidate.exists():
+            candidate = self.intermediate_dir / f"{base_name}_{counter}.parquet"
+            counter += 1
+        return candidate
 
     def build_final_export_path(
         self,
