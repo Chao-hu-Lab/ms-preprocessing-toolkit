@@ -197,8 +197,18 @@ def test_run_all_uses_workflow_runner_for_real_gui_widget_set(monkeypatch, tmp_p
     class _RealWidget:
         __module__ = "ms_preprocessing.gui.widgets.fake_widget"
 
+        def __init__(self) -> None:
+            self._data = None
+            self._result = None
+            self._processing_result = None
+            self._last_parameters = {}
+            self.context = {}
+
         def get_parameters(self) -> dict:
             return {"param": "value"}
+
+        def set_context(self, context: dict) -> None:
+            self.context = dict(context)
 
     host.step_widgets = [_RealWidget(), _RealWidget(), _RealWidget(), _RealWidget()]
     captured: dict[str, object] = {}
@@ -253,6 +263,58 @@ def test_run_all_uses_workflow_runner_for_real_gui_widget_set(monkeypatch, tmp_p
     assert host._last_completed_step == 0
     assert host._step_output_paths[0].name == "STEP1_input.parquet"
     assert host.latest_summaries[-1][0] == "Features: 1"
+    assert host.step_widgets[0]._data["stage"].iloc[0] == "input"
+    assert host.step_widgets[0]._result["stage"].iloc[0] == "runner"
+    assert host.step_widgets[0]._processing_result.step == "data_organizer"
+    assert host.step_widgets[0]._last_parameters == {"a": 1}
+    assert host.step_widgets[0].context == host._context
+
+
+def test_run_all_workflow_runner_path_rejects_raw_combined_tsv(monkeypatch, tmp_path) -> None:
+    host = _Host(tmp_path)
+    host._original_data = pd.DataFrame(
+        {
+            "Mz": [1.0],
+            "RT": [2.0],
+            "SampleA": [10],
+            "MZmine ID": ["id1"],
+            "mz": [1.0],
+            "rt": [2.0],
+            "SampleA.1": [99],
+        }
+    )
+
+    class _RealDataOrganizerWidget:
+        __module__ = "ms_preprocessing.gui.widgets.data_organizer_widget"
+
+        def get_parameters(self) -> dict:
+            return {}
+
+        def _looks_like_raw_combined_tsv(self, df: pd.DataFrame) -> bool:
+            return "MZmine ID" in df.columns
+
+    class _RealWidget:
+        __module__ = "ms_preprocessing.gui.widgets.fake_widget"
+
+        def get_parameters(self) -> dict:
+            return {}
+
+    class _FailingWorkflowRunner:
+        def __init__(self, *, file_handler=None) -> None:
+            _ = file_handler
+
+        def run(self, *_args, **_kwargs):
+            raise AssertionError("WorkflowRunner should not run for raw combined TSV")
+
+    import ms_preprocessing.gui.pipeline_controller as controller_module
+
+    monkeypatch.setattr(controller_module, "WorkflowRunner", _FailingWorkflowRunner)
+    host.step_widgets = [_RealDataOrganizerWidget(), _RealWidget(), _RealWidget(), _RealWidget()]
+
+    PipelineController(host).run_all_steps_worker(0, host._original_data.copy(), [{}] * 4)
+
+    assert any("combined_fix" in line for line in host.logs)
+    assert host._last_run_all is False
 
 
 def test_run_all_failure_reports_error_and_clears_busy_state(tmp_path) -> None:

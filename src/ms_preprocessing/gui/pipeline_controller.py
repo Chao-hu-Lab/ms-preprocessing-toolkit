@@ -195,6 +195,7 @@ class PipelineController:
         host = self._host
         success = False
         try:
+            self._raise_if_raw_combined_tsv_input(data)
             self.reset_pipeline_for_run_all()
             runner = WorkflowRunner(file_handler=host.__dict__.get("_file_handler"))
             result = runner.run(
@@ -263,6 +264,64 @@ class PipelineController:
                 host._log(f"Step {step_index + 1} summary: {line}")
             host._dispatch_to_ui(host._update_latest_result_summary, summary_lines)
             host._dispatch_to_ui(host._update_run_context_summary)
+
+        self._sync_widgets_from_workflow_result(result, params_by_step)
+
+    def _sync_widgets_from_workflow_result(
+        self,
+        result: WorkflowRunResult,
+        params_by_step: list[dict[str, Any]],
+    ) -> None:
+        host = self._host
+        current_input = host._original_data.copy() if host._original_data is not None else result.data
+        step_name_to_index = {
+            "data_organizer": 0,
+            "istd_marker": 1,
+            "duplicate_remover": 2,
+            "feature_filter": 3,
+        }
+        last_synced_index: int | None = None
+        for adapter_step, step_result in result.step_results.items():
+            step_index = step_name_to_index.get(adapter_step)
+            if step_index is None or step_index >= len(host.step_widgets):
+                continue
+            widget = host.step_widgets[step_index]
+            widget._data = current_input.copy() if isinstance(current_input, pd.DataFrame) else current_input
+            widget._last_parameters = (
+                dict(params_by_step[step_index]) if step_index < len(params_by_step) else {}
+            )
+            widget._processing_result = step_result
+            widget._last_metadata = {
+                **step_result.metadata.as_context_dict(),
+                "statistics": dict(step_result.statistics or {}),
+            }
+            output_data = step_result.data if step_result.data is not None else current_input
+            widget._result = output_data
+            if hasattr(widget, "set_context"):
+                widget.set_context(host._context)
+            current_input = output_data
+            last_synced_index = step_index
+
+        if (
+            last_synced_index is not None
+            and last_synced_index + 1 < len(host.step_widgets)
+            and isinstance(current_input, pd.DataFrame)
+        ):
+            next_widget = host.step_widgets[last_synced_index + 1]
+            next_widget._data = current_input.copy()
+            if hasattr(next_widget, "set_context"):
+                next_widget.set_context(host._context)
+
+    def _raise_if_raw_combined_tsv_input(self, data: pd.DataFrame) -> None:
+        widgets = self._host.__dict__.get("step_widgets", [])
+        if not widgets:
+            return
+        detector = getattr(widgets[0], "_looks_like_raw_combined_tsv", None)
+        if callable(detector) and detector(data):
+            raise RuntimeError(
+                "偵測到 raw combined TSV。請先在「Combined TSV 前處理」選擇 TSV 與方法檔，"
+                "按「產生 combined_fix」，再用產出的 .xlsx 跑一般 Toolkit 流程。"
+            )
 
     @staticmethod
     def _resolved_parameters(params_by_step: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
