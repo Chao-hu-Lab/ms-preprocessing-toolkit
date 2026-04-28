@@ -169,6 +169,7 @@ Relevant workflows:
   - `skills/ms-quality-gate/SKILL.md`
   - `skills/release-checklist/SKILL.md`
   - `skills/submodule-update/SKILL.md`
+  - `skills/merge-quality-gate/SKILL.md`
   - `skills/commit-outline/SKILL.md`
   - `skills/root-hygiene/SKILL.md`
 
