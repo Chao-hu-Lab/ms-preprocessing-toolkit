@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 import pandas as pd
 
 if TYPE_CHECKING:
-    from ms_preprocessing.gui.pipeline_session import PipelineSession
+    from ms_preprocessing.workflow.pipeline_session import PipelineSession
 
 
 class ValidationError(Exception):

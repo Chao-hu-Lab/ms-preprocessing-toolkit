@@ -1,0 +1,3 @@
+display_name: Merge Quality Gate
+short_description: Pre-merge PR gate for toolkit
+default_prompt: Run the merge quality gate for the current PR and report blockers before merge.

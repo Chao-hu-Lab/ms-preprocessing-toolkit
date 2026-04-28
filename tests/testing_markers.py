@@ -21,6 +21,7 @@ ADAPTER_TEST_FILES = frozenset(
 
 INTEGRATION_TEST_FILES = frozenset(
     {
+        "test_combined_tsv_service.py",
         "test_cli_parquet_chain.py",
         "test_final_export_handoff.py",
         "test_final_export_cache_policy.py",
@@ -29,6 +30,9 @@ INTEGRATION_TEST_FILES = frozenset(
         "test_parquet_compat.py",
         "test_pipeline_baseline_contract.py",
         "test_regressions.py",
+        "test_workflow_export_service.py",
+        "test_workflow_input_loader.py",
+        "test_workflow_runner.py",
     }
 )
 
