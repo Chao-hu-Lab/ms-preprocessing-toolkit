@@ -168,7 +168,8 @@ class TestDataOrganizer:
 
         sample_info = organizer._build_sample_info(df, injection_info)
 
-        assert list(sample_info["Sample_Name"]) == ["EC013", "EC301"]
+        assert list(sample_info["Sample_Name"]) == ["EC013_2", "EC0301"]
+        assert list(sample_info["Method_Sample_Name"]) == ["EC013", "EC301"]
         assert list(sample_info["Injection_Order"]) == [1, 2]
         assert "row ID" not in sample_info["Sample_Name"].tolist()
 
