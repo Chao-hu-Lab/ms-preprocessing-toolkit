@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from ms_preprocessing.gui.pipeline_session import PipelineSession
 from ms_preprocessing.utils.file_handler import FileHandler
+from ms_preprocessing.workflow.pipeline_session import PipelineSession
 
 
 _STEP_INDEX = {

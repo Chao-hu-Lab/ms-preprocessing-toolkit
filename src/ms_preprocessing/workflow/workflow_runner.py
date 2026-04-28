@@ -13,7 +13,6 @@ from ms_preprocessing.adapters import data_organizer as _adapter_do
 from ms_preprocessing.adapters import duplicate_remover as _adapter_dr
 from ms_preprocessing.adapters import feature_filter as _adapter_ff
 from ms_preprocessing.adapters import istd_marker as _adapter_istd
-from ms_preprocessing.gui.pipeline_session import PipelineSession
 from ms_preprocessing.pipeline_validation import (
     format_validation_warnings,
     has_blocking_warnings,
@@ -23,6 +22,7 @@ from ms_preprocessing.pipeline_validation import (
 )
 from ms_preprocessing.utils.file_handler import FileHandler
 from ms_preprocessing.utils.results import ProcessingResult
+from ms_preprocessing.workflow.pipeline_session import PipelineSession
 
 
 @dataclass(frozen=True)

@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from ms_preprocessing.gui.pipeline_session import PipelineSession
 from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
+from ms_preprocessing.workflow.pipeline_session import PipelineSession
 from ms_preprocessing.workflow.workflow_runner import WorkflowRunner
 
 
@@ -38,6 +38,17 @@ def _params(base: Path | None = None) -> dict[str, dict]:
         "step3": {"mz_tolerance_ppm": 20.0, "rt_tolerance": 0.1},
         "step4": {"high_det_thresh": 0.8, "low_det_thresh": 0.2},
     }
+
+
+def test_workflow_layer_does_not_import_gui_pipeline_session() -> None:
+    workflow_root = Path("src/ms_preprocessing/workflow")
+    offenders = [
+        path
+        for path in workflow_root.glob("*.py")
+        if "ms_preprocessing.gui.pipeline_session" in path.read_text(encoding="utf-8")
+    ]
+
+    assert offenders == []
 
 
 def test_workflow_runner_runs_all_steps_in_adapter_order(monkeypatch, project_temp_dir) -> None:

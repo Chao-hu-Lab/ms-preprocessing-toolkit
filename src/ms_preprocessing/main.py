@@ -394,7 +394,6 @@ def run_cli(args):
         return 1
 
     from ms_preprocessing.config.settings import Settings
-    from ms_preprocessing.gui.pipeline_session import PipelineSession
     from ms_preprocessing.pipeline_validation import (
         format_validation_warnings,
         has_blocking_warnings,
@@ -402,6 +401,7 @@ def run_cli(args):
     import ms_preprocessing.utils.file_handler as file_handler_module
     from ms_preprocessing.workflow.export_service import ExportService
     from ms_preprocessing.workflow.input_loader import InputLoader
+    from ms_preprocessing.workflow.pipeline_session import PipelineSession
     from ms_preprocessing.workflow.workflow_runner import WorkflowRunner
 
     try:
