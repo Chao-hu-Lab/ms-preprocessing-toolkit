@@ -1,6 +1,6 @@
 # GUI PipelineController Slimming Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` to implement this plan task-by-task.
+> Implement this plan task-by-task, validating behavior after each change.
 
 **Goal:** Slim `PipelineController` and remaining `event_handlers.py` glue without changing current GUI behavior.
 

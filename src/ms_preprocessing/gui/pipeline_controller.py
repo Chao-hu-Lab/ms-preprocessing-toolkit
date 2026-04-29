@@ -80,7 +80,7 @@ class PipelineController:
     def schedule_step_output_save(
         self,
         step_index: int,
-        data: pd.DataFrame,
+        data: pd.DataFrame | None,
         *,
         next_step_index: int | None = None,
     ) -> None:
