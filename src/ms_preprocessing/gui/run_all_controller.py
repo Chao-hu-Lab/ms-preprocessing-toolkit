@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import copy
-from typing import Any
+from collections.abc import Callable
+from typing import Any, Protocol
 
 import pandas as pd
 
@@ -11,6 +12,27 @@ from ms_preprocessing.config.settings import Settings
 from ms_preprocessing.gui.async_task_runner import AsyncTaskRunner
 from ms_preprocessing.gui.step_summary import summarize_step_result
 from ms_preprocessing.gui.validation import format_validation_warnings, has_blocking_warnings
+from ms_preprocessing.utils.file_handler import FileHandler
+from ms_preprocessing.workflow.pipeline_session import PipelineSession
+from ms_preprocessing.workflow.workflow_runner import WorkflowRunResult
+
+
+class WorkflowRunnerLike(Protocol):
+    def run(
+        self,
+        data: pd.DataFrame,
+        *,
+        step: str,
+        resolved_parameters: dict[str, dict],
+        session: PipelineSession,
+        persist_intermediate: bool = False,
+        progress_callback: Callable[[int, str], None] | None = None,
+        log_callback: Callable[[str], None] | None = None,
+    ) -> WorkflowRunResult: ...
+
+
+class WorkflowRunnerFactory(Protocol):
+    def __call__(self, *, file_handler: FileHandler | None = None) -> WorkflowRunnerLike: ...
 
 
 class RunAllController:
@@ -21,7 +43,7 @@ class RunAllController:
         host: Any,
         *,
         async_runner: AsyncTaskRunner | None = None,
-        workflow_runner_cls: type[Any],
+        workflow_runner_cls: WorkflowRunnerFactory,
     ) -> None:
         self._host = host
         self._async_runner = async_runner or AsyncTaskRunner(host)
@@ -219,7 +241,7 @@ class RunAllController:
 
     def _apply_workflow_result(
         self,
-        result: Any,
+        result: WorkflowRunResult,
         params_by_step: list[dict[str, Any]],
     ) -> None:
         host = self._host
@@ -261,7 +283,7 @@ class RunAllController:
 
     def _sync_widgets_from_workflow_result(
         self,
-        result: Any,
+        result: WorkflowRunResult,
         params_by_step: list[dict[str, Any]],
     ) -> None:
         host = self._host
