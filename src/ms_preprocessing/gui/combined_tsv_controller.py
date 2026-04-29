@@ -41,7 +41,6 @@ class CombinedTsvController:
             host._show_error(f"Combined TSV file not found:\n{raw_path}")
             return
 
-        loaded_path: Path | None = None
         host._set_pipeline_busy_state(True)
         try:
             host._log(f"Creating combined_fix file from: {raw_path}")

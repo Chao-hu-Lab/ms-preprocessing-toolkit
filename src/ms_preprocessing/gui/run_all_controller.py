@@ -234,7 +234,7 @@ class RunAllController:
         else:
             host._completed_steps = set(range(result.last_completed_step_index + 1))
 
-        step_name_to_index = {spec[0]: index for index, spec in enumerate(Settings.WORKFLOW_STEPS)}
+        step_name_to_index = self._step_name_to_index()
         adapter_to_gui_step = {
             "data_organizer": "data_organizer",
             "istd_marker": "istd_marker",
@@ -266,12 +266,7 @@ class RunAllController:
     ) -> None:
         host = self._host
         current_input = host._original_data.copy() if host._original_data is not None else result.data
-        step_name_to_index = {
-            "data_organizer": 0,
-            "istd_marker": 1,
-            "duplicate_remover": 2,
-            "feature_filter": 3,
-        }
+        step_name_to_index = self._step_name_to_index()
         last_synced_index: int | None = None
         for adapter_step, step_result in result.step_results.items():
             step_index = step_name_to_index.get(adapter_step)
@@ -323,6 +318,10 @@ class RunAllController:
             "step3": dict(params_by_step[2]) if len(params_by_step) > 2 else {},
             "step4": dict(params_by_step[3]) if len(params_by_step) > 3 else {},
         }
+
+    @staticmethod
+    def _step_name_to_index() -> dict[str, int]:
+        return {spec[0]: index for index, spec in enumerate(Settings.WORKFLOW_STEPS)}
 
     def _can_use_workflow_runner(self, params_by_step: list[dict[str, Any]]) -> bool:
         if len(params_by_step) != len(Settings.WORKFLOW_STEPS):
