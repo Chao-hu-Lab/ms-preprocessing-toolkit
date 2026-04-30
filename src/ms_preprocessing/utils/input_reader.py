@@ -25,6 +25,7 @@ class InputReader:
         df = pd.read_excel(file_path, sheet_name=sheet_name, header=header_row, engine="openpyxl")
 
         red_font_rows: set[int] = set()
+        wb = None
         try:
             wb = load_workbook(file_path, data_only=False)
             if isinstance(sheet_name, int):
@@ -44,9 +45,11 @@ class InputReader:
                             b = int(rgb[-2:], 16)
                             if r > 200 and g < 100 and b < 100:
                                 red_font_rows.add(row_idx - header_row - 2)
-            wb.close()
         except Exception as exc:
             logger.warning("Failed to extract red-font formatting: %s", exc)
+        finally:
+            if wb is not None:
+                wb.close()
 
         return df, red_font_rows
 

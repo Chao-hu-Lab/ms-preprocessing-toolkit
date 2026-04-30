@@ -37,28 +37,30 @@ class ExcelFormattingWriter:
             return
 
         wb = load_workbook(file_path)
-        ws = wb[sheet_name]
+        try:
+            ws = wb[sheet_name]
 
-        yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-        blue_font = Font(color="0070C0")
-        red_font = Font(color="FF0000")
+            yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+            blue_font = Font(color="0070C0")
+            red_font = Font(color="FF0000")
 
-        if highlight_rows:
-            for row_idx in highlight_rows:
-                excel_row = row_idx + 2
-                for col in range(1, ws.max_column + 1):
-                    ws.cell(row=excel_row, column=col).fill = yellow_fill
+            if highlight_rows:
+                for row_idx in highlight_rows:
+                    excel_row = row_idx + 2
+                    for col in range(1, ws.max_column + 1):
+                        ws.cell(row=excel_row, column=col).fill = yellow_fill
 
-        if blue_font_cells:
-            for row_idx, col_idx in blue_font_cells:
-                excel_row = row_idx + 2
-                excel_col = col_idx + 1
-                ws.cell(row=excel_row, column=excel_col).font = blue_font
+            if blue_font_cells:
+                for row_idx, col_idx in blue_font_cells:
+                    excel_row = row_idx + 2
+                    excel_col = col_idx + 1
+                    ws.cell(row=excel_row, column=excel_col).font = blue_font
 
-        if red_font_rows:
-            for row_idx in red_font_rows:
-                excel_row = row_idx + 2
-                ws.cell(row=excel_row, column=1).font = red_font
+            if red_font_rows:
+                for row_idx in red_font_rows:
+                    excel_row = row_idx + 2
+                    ws.cell(row=excel_row, column=1).font = red_font
 
-        wb.save(file_path)
-        wb.close()
+            wb.save(file_path)
+        finally:
+            wb.close()
