@@ -131,13 +131,13 @@ python main.py --help
 | `--disable-ratio-rescue` | 停用 Step 4 檢出率倍數救援 | false |
 | `--method-file` | 上機順序 Word 檔案 (.docx) | - |
 
-Step 2 不再支援 `--istd-mz`、`--istd-record-file` 或 `--istd-record-date`。本機預設路徑請使用 `MSPTK_XIC_RESULTS_FILE` 或目前工作目錄下 `config/local_reference.yml` 的 `references.xic_results_file`。`config/local_reference_paths.json` 仍是過渡期 fallback。
+Step 2 不再支援 `--istd-mz`、`--istd-record-file` 或 `--istd-record-date`。本機預設路徑請使用 `MSPTK_XIC_RESULTS_FILE` 或 config 目錄下 `local_reference.yml` 的 `references.xic_results_file`。`local_reference_paths.json` 仍是過渡期 fallback。
 
 ### YAML profiles 與本機 reference
 
-內建 Run All profiles 是程式資源，位於 `src/ms_preprocessing/resources/builtin_profiles/`，目前提供 `loose`、`default`、`strict`，不建議使用者直接修改。使用者自己的 workflow profile 放在目前工作目錄的 `config/presets/*.yml`；GUI 會在 Run All preset 選單中列出這些檔名，CLI 可用 `--profile <name>` 呼叫。打包版 exe 若工作目錄沒有 `config/`，會改找 exe 旁邊的 `config/`。若只想針對單次批次使用某個檔案，使用 `--profile-file <path>`。若要把設定集中放在其他位置，可用 `MSPTK_CONFIG_DIR` 指向包含 `presets/` 與 `local_reference.yml` 的 config 目錄。
+內建 Run All profiles 是程式資源，位於 `src/ms_preprocessing/resources/builtin_profiles/`，目前提供 `loose`、`default`、`strict`，不建議使用者直接修改。使用者自己的 workflow profile 放在 config 目錄的 `presets/*.yml`；GUI 會在 Run All preset 選單中列出這些檔名，CLI 可用 `--profile <name>` 呼叫。config 目錄解析順序是 `MSPTK_CONFIG_DIR`、目前工作目錄的 `config/`、打包版 exe 旁邊的 `config/`、source checkout 根目錄的 `config/`。若只想針對單次批次使用某個檔案，使用 `--profile-file <path>`。
 
-本機路徑放在目前工作目錄的 `config/local_reference.yml`：
+本機路徑放在 config 目錄的 `local_reference.yml`：
 
 ```yaml
 version: 1

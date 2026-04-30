@@ -30,8 +30,16 @@ STEP2_XIC_REQUIRED_MESSAGE = (
     "Please set xic_results_file or pass --xic-results-file."
 )
 
-LOCAL_REFERENCE_YAML_PATH = user_config_dir() / "local_reference.yml"
-LOCAL_REFERENCE_JSON_PATH = user_config_dir() / "local_reference_paths.json"
+def _local_reference_yaml_path() -> Path:
+    return user_config_dir() / "local_reference.yml"
+
+
+def _local_reference_json_path() -> Path:
+    return user_config_dir() / "local_reference_paths.json"
+
+
+LOCAL_REFERENCE_YAML_PATH = _local_reference_yaml_path()
+LOCAL_REFERENCE_JSON_PATH = _local_reference_json_path()
 LOCAL_CONFIG_PATH = LOCAL_REFERENCE_JSON_PATH
 
 
@@ -39,10 +47,12 @@ def _reference_config_path() -> Path | None:
     override = os.getenv(LOCAL_REFERENCE_CONFIG_ENV)
     if override:
         return Path(override)
-    if LOCAL_REFERENCE_YAML_PATH.exists():
-        return LOCAL_REFERENCE_YAML_PATH
-    if LOCAL_REFERENCE_JSON_PATH.exists():
-        return LOCAL_REFERENCE_JSON_PATH
+    yaml_path = _local_reference_yaml_path()
+    json_path = _local_reference_json_path()
+    if yaml_path.exists():
+        return yaml_path
+    if json_path.exists():
+        return json_path
     return None
 
 

@@ -232,3 +232,44 @@ def test_profile_loader_discovers_profiles_from_config_dir_env(
     monkeypatch.setattr(profile_loader, "LOCAL_PROFILE_DIR", None)
 
     assert "lab" in profile_loader.list_pipeline_profiles()
+
+
+def test_built_in_profiles_resolve_source_checkout_local_reference_when_cwd_differs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout_dir = tmp_path / "checkout"
+    config_dir = checkout_dir / "config"
+    package_dir = checkout_dir / "src" / "ms_preprocessing" / "config"
+    config_dir.mkdir(parents=True)
+    package_dir.mkdir(parents=True)
+    (config_dir / "local_reference.yml").write_text(
+        "\n".join(
+            [
+                "version: 1",
+                "references:",
+                '  method_file: "checkout-method.docx"',
+                '  xic_results_file: "checkout-xic.xlsx"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+    fake_path_resolver = package_dir / "path_resolver.py"
+    fake_path_resolver.write_text("", encoding="utf-8")
+
+    from ms_preprocessing.config import path_resolver
+
+    outside_dir = tmp_path / "outside"
+    outside_dir.mkdir()
+    monkeypatch.chdir(outside_dir)
+    monkeypatch.delenv("MSPTK_CONFIG_DIR", raising=False)
+    monkeypatch.delenv("MSPTK_LOCAL_REFERENCE_CONFIG", raising=False)
+    monkeypatch.delenv("MSPTK_METHOD_FILE", raising=False)
+    monkeypatch.delenv("MSPTK_XIC_RESULTS_FILE", raising=False)
+    monkeypatch.setattr(path_resolver, "__file__", str(fake_path_resolver))
+    monkeypatch.setattr(profile_loader, "LOCAL_PROFILE_DIR", None)
+
+    profile = profile_loader.get_pipeline_profile("default")
+
+    assert profile["step1"]["method_file"] == "checkout-method.docx"
+    assert profile["step2"]["xic_results_file"] == "checkout-xic.xlsx"

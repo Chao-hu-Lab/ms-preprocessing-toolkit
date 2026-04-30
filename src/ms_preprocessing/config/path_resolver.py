@@ -9,6 +9,18 @@ from pathlib import Path
 CONFIG_DIR_ENV = "MSPTK_CONFIG_DIR"
 
 
+def _source_checkout_config_dir() -> Path | None:
+    """Return the source checkout config directory when running from a repo."""
+
+    current_file = Path(__file__).resolve()
+    for parent in current_file.parents:
+        config_dir = parent / "config"
+        package_dir = parent / "src" / "ms_preprocessing"
+        if config_dir.exists() and package_dir.exists():
+            return config_dir
+    return None
+
+
 def user_config_dir() -> Path:
     """Return the directory for local user configuration files.
 
@@ -26,5 +38,9 @@ def user_config_dir() -> Path:
 
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent / "config"
+
+    source_config = _source_checkout_config_dir()
+    if source_config is not None:
+        return source_config
 
     return cwd_config
