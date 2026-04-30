@@ -48,10 +48,16 @@ class PipelineSession:
     def record_step_parameters(self, step_index: int, params: dict[str, Any]) -> None:
         self.step_parameters[step_index] = dict(params or {})
 
-    def update_context_from_metadata(self, metadata: dict[str, Any] | None) -> None:
+    def update_context_from_metadata(
+        self,
+        metadata: ProcessingMetadata | dict[str, Any] | None,
+    ) -> None:
         """Backward-compatible metadata merge for dict-based callers."""
         if not metadata:
             return
+
+        if isinstance(metadata, ProcessingMetadata):
+            metadata = metadata.as_context_dict()
 
         self._merge_formatting_metadata(
             red_font_rows=set(metadata.get("red_font_rows") or []) if "red_font_rows" in metadata else None,
@@ -134,7 +140,6 @@ class PipelineSession:
 
     def save_step_output(self, step_index: int, data: pd.DataFrame, file_handler) -> Path:
         """Persist step output as parquet intermediate for workflow chaining."""
-        self._sync_metadata_from_context()
         path = self.build_step_output_path(step_index)
 
         file_handler.save_data(
@@ -203,20 +208,6 @@ class PipelineSession:
         self.context.clear()
         self.context.update(next_context)
 
-    def _sync_metadata_from_context(self) -> None:
-        self.metadata.red_font_rows = set(self.context.get("red_font_rows") or [])
-        self.metadata.protected_rows = set(
-            self.context.get("protected_rows") or self.context.get("red_font_rows") or []
-        )
-        self.metadata.blue_font_cells = list(self.context.get("blue_font_cells") or [])
-        self.metadata.highlight_rows = set(self.context.get("highlight_rows") or [])
-        sample_info = self.context.get("sample_info")
-        self.metadata.sample_info = sample_info if isinstance(sample_info, pd.DataFrame) else None
-        deleted_feature_df = self.context.get("deleted_feature_df")
-        self.metadata.deleted_feature_df = (
-            deleted_feature_df if isinstance(deleted_feature_df, pd.DataFrame) else None
-        )
-        self._metadata_refs = dict(self.context.get("metadata_refs", self._metadata_refs))
 
     def _merge_formatting_metadata(
         self,

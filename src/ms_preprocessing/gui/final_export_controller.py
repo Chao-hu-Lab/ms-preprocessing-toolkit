@@ -106,27 +106,10 @@ class FinalExportController:
 
     def _export_session_view(self) -> Any:
         session = self._host._pipeline_session
-        context = self._session_context(session)
         metadata = getattr(session, "metadata", None)
         if not isinstance(metadata, ProcessingMetadata):
-            metadata = ProcessingMetadata(
-                red_font_rows=set(context.get("red_font_rows") or []),
-                protected_rows=set(
-                    context.get("protected_rows") or context.get("red_font_rows") or []
-                ),
-                blue_font_cells=list(context.get("blue_font_cells") or []),
-                highlight_rows=set(context.get("highlight_rows") or []),
-                sample_info=context.get("sample_info"),
-                deleted_feature_df=context.get("deleted_feature_df"),
-            )
+            metadata = ProcessingMetadata()
         return _ExportSessionView(session=session, metadata=metadata)
-
-    def _session_context(self, session: Any) -> dict[str, Any]:
-        context = session.__dict__.get("context") if hasattr(session, "__dict__") else None
-        if isinstance(context, dict):
-            return context
-        host_context = self._host.__dict__.get("_context")
-        return host_context if isinstance(host_context, dict) else {}
 
     def _export_deleted_feature(self) -> bool:
         step_widgets = self._host.__dict__.get("step_widgets", [])

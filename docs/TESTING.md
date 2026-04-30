@@ -23,10 +23,10 @@ must point here instead of duplicating long test policy.
 | `ms-core/` | submodule | `ms-core/tests/` | core processing logic and algorithm internals |
 | toolkit to `ms-core` bridge | toolkit | `tests/adapters/`, `tests/test_ms_core_api_contract.py` | public API and adapter contract only |
 
-`tests/core/` is transitional. It currently contains direct `ms_core` behavior
-tests in the top-level repo. Do not add new tests there unless the change is
-explicitly a migration step. New `ms-core` algorithm/internal tests should be
-added in `ms-core/tests/` and committed in the submodule first.
+Do not recreate `tests/core/` in the top-level repo. Algorithm/internal
+`ms-core` tests belong in `ms-core/tests/` and should be committed in the
+submodule first. The top-level suite should only assert toolkit behavior,
+adapter/API contracts, GUI, CLI, IO, and export flows.
 
 ## Test Layers
 

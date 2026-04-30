@@ -25,6 +25,29 @@ class ProcessingMetadata:
     sample_info: pd.DataFrame | None = None
     deleted_feature_df: pd.DataFrame | None = None
 
+    @classmethod
+    def from_mapping(cls, metadata: dict[str, Any] | None) -> "ProcessingMetadata":
+        """Build typed metadata from a legacy metadata/context mapping."""
+        if not metadata:
+            return cls()
+
+        sample_info = metadata.get("sample_info")
+        deleted_feature_df = metadata.get("deleted_feature_df")
+        protected_rows = metadata.get("protected_rows")
+        if protected_rows is None:
+            protected_rows = metadata.get("red_font_rows")
+
+        return cls(
+            red_font_rows=set(metadata.get("red_font_rows") or []),
+            protected_rows=set(protected_rows or []),
+            blue_font_cells=list(metadata.get("blue_font_cells") or []),
+            highlight_rows=set(metadata.get("highlight_rows") or []),
+            sample_info=sample_info if isinstance(sample_info, pd.DataFrame) else None,
+            deleted_feature_df=(
+                deleted_feature_df if isinstance(deleted_feature_df, pd.DataFrame) else None
+            ),
+        )
+
     def as_context_dict(self) -> dict[str, Any]:
         """Return a backward-compatible dict for legacy GUI callers."""
         return {

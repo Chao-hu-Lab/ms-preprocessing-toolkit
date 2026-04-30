@@ -25,6 +25,7 @@ from ms_preprocessing.gui.validation import (
     ValidationWarning,
     format_validation_warnings,
 )
+from ms_preprocessing.workflow.parameter_resolver import ParameterResolver, WorkflowValidationService
 
 if TYPE_CHECKING:
     class _MainWindowEventHost(Protocol):
@@ -115,12 +116,11 @@ class MainWindowEventHandlersMixin:
         if label is None:
             return
 
-        context = self.__dict__.get("_context", {}) or {}
         step1_params = self._safe_step_params(0)
         step2_params = self._safe_step_params(1)
 
-        method_file = context.get("method_file") or step1_params.get("method_file")
-        xic_results_file = context.get("xic_results_file") or step2_params.get("xic_results_file")
+        method_file = step1_params.get("method_file")
+        xic_results_file = step2_params.get("xic_results_file")
 
         lines = [
             "Run: "
@@ -200,21 +200,22 @@ class MainWindowEventHandlersMixin:
         self: _MainWindowEventHost,
         params_by_step: list[dict[str, Any]],
     ) -> list[ValidationWarning]:
+        resolved = ParameterResolver.from_gui_step_params(params_by_step)
+        service = WorkflowValidationService()
         warnings: list[ValidationWarning] = []
-        for index, params in enumerate(params_by_step):
-            if index >= len(self.__dict__.get("step_widgets", [])):
+        step_specs = (
+            (0, "organize", "Step 1"),
+            (1, "istd", "Step 2"),
+            (3, "filter", "Step 4"),
+        )
+        for index, step_name, label in step_specs:
+            if index >= len(params_by_step):
                 continue
-            validator = getattr(self.step_widgets[index], "validate_parameters", None)
-            if not callable(validator):
-                continue
-            step_warnings = validator(params)
-            if not isinstance(step_warnings, (list, tuple)):
-                continue
-            for warning in step_warnings:
+            for warning in service.collect(step_name, resolved):
                 warnings.append(
                     ValidationWarning(
                         code=warning.code,
-                        message=f"Step {index + 1}: {warning.message}",
+                        message=f"{label}: {warning.message}",
                         blocking=warning.blocking,
                     )
                 )
@@ -354,7 +355,22 @@ class MainWindowEventHandlersMixin:
 
     def _snapshot_context(self: _MainWindowEventHost, context: dict[str, Any]) -> dict[str, Any]:
         """Copy source metadata so reruns can rebuild a clean pipeline session."""
-        return copy.deepcopy(context)
+        _ = context
+        return copy.deepcopy(self._pipeline_session.metadata.as_context_dict())
+
+    def _set_widget_session_metadata(self: _MainWindowEventHost, widget: Any) -> None:
+        session = self.__dict__.get("_pipeline_session")
+        if session is None:
+            return
+
+        metadata_setter = getattr(widget, "set_metadata", None)
+        if callable(metadata_setter):
+            metadata_setter(session.metadata)
+            return
+
+        context_setter = getattr(widget, "set_context", None)
+        if callable(context_setter):
+            context_setter(session.metadata.as_context_dict())
 
     def _reset_pipeline_for_run_all(self: _MainWindowEventHost) -> None:
         """Start Run All from the originally loaded source metadata, not prior run state."""
@@ -431,7 +447,7 @@ class MainWindowEventHandlersMixin:
             if 0 <= step_index < len(self.step_widgets):
                 self.step_widgets[step_index].set_input_file(filepath)
                 self.step_widgets[step_index].set_data(df)
-                self.step_widgets[step_index].set_context(self._context)
+                self._set_widget_session_metadata(self.step_widgets[step_index])
 
             load_format = metadata.get("format", "unknown")
             self._log(f"Loaded successfully: {len(df)} rows, {len(df.columns)} columns (format: {load_format})")
@@ -467,7 +483,7 @@ class MainWindowEventHandlersMixin:
 
         self._current_step = step_index
         self._show_step(step_index)
-        self.step_widgets[step_index].set_context(self._context)
+        self._set_widget_session_metadata(self.step_widgets[step_index])
 
         for index, (button, status_label) in enumerate(
             zip(self.step_buttons, self._step_status_labels, strict=True)
@@ -528,7 +544,7 @@ class MainWindowEventHandlersMixin:
 
         if next_step < len(self.step_widgets):
             self.step_widgets[next_step].set_data(result_data)
-            self.step_widgets[next_step].set_context(self._context)
+            self._set_widget_session_metadata(self.step_widgets[next_step])
             self._switch_step(next_step)
             self._safe_update_action_bar_progress(
                 100,

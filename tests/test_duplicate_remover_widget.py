@@ -78,6 +78,7 @@ def test_duplicate_remover_widget_run_processing_forwards_parameters(widget, mon
     widget.degeneracy_min_points_entry.delete(0, "end")
     widget.degeneracy_min_points_entry.insert(0, "4")
     widget.adduct_table_entry.insert(0, "custom_rules.xlsx")
+    widget.set_metadata(ProcessingMetadata(protected_rows={2, 5}))
     input_df = pd.DataFrame(
         {
             "Mz/RT": ["Sample_Type", "100.0/1.0"],
@@ -99,3 +100,4 @@ def test_duplicate_remover_widget_run_processing_forwards_parameters(widget, mon
     assert captured["degeneracy_correlation_threshold"] == pytest.approx(0.92)
     assert captured["degeneracy_min_correlation_points"] == 4
     assert captured["degeneracy_adduct_table_file"] == "custom_rules.xlsx"
+    assert captured["protected_rows"] == {2, 5}

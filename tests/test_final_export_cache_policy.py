@@ -271,7 +271,7 @@ def test_gui_final_export_does_not_request_parquet_cache_by_default(project_temp
         assert kwargs.get("save_parquet_cache") is False
 
 
-def test_gui_final_export_uses_live_pipeline_session_context_when_window_alias_is_stale(project_temp_dir) -> None:
+def test_gui_final_export_uses_live_pipeline_session_metadata_when_window_alias_is_stale(project_temp_dir) -> None:
     with project_temp_dir() as temp_dir:
         base = Path(temp_dir)
         sample_info = pd.DataFrame({"Sample_Name": ["S1"]})
@@ -294,13 +294,13 @@ def test_gui_final_export_uses_live_pipeline_session_context_when_window_alias_i
         window._pipeline_session = Mock()
         window._pipeline_session.build_final_export_path.return_value = base / "ALL_input.xlsx"
         window._pipeline_session.set_source_file.return_value = None
-        window._pipeline_session.context = {
-            "sample_info": sample_info,
-            "deleted_feature_df": deleted_feature,
-            "highlight_rows": {7},
-            "blue_font_cells": ["C3"],
-            "red_font_rows": {5},
-        }
+        window._pipeline_session.metadata = ProcessingMetadata(
+            sample_info=sample_info,
+            deleted_feature_df=deleted_feature,
+            highlight_rows={7},
+            blue_font_cells=["C3"],
+            red_font_rows={5},
+        )
         step4_widget = Mock()
         step4_widget._export_deleted_var = Mock()
         step4_widget._export_deleted_var.get.return_value = True

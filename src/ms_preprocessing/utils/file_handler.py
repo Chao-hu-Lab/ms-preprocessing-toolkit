@@ -6,20 +6,20 @@ commonly used in mass spectrometry data processing.
 """
 
 import importlib.util
-import json
 import logging
 from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
-from openpyxl import load_workbook
-from openpyxl.styles import Font, PatternFill
 
 from ms_preprocessing.config.settings import Settings
+from ms_preprocessing.utils.excel_formatting_writer import ExcelFormattingWriter
 from ms_preprocessing.utils.intermediate_store import IntermediateStore
+from ms_preprocessing.utils.input_reader import InputReader
+from ms_preprocessing.utils.output_writer import OutputWriter
+from ms_preprocessing.utils.parquet_cache_store import ParquetCacheStore
 from ms_preprocessing.utils.parquet_compat import (
     normalize_dataframe_for_parquet,
-    write_parquet_with_normalized_fallback,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,6 +38,10 @@ class FileHandler:
     def __init__(self):
         """Initialize the FileHandler."""
         self._last_loaded_path: Path | None = None
+        self._input_reader = InputReader()
+        self._excel_writer = ExcelFormattingWriter()
+        self._output_writer = OutputWriter()
+        self._parquet_cache_store = ParquetCacheStore()
 
     @staticmethod
     def is_supported_format(file_path: str | Path) -> bool:
@@ -126,38 +130,7 @@ class FileHandler:
         Returns:
             Tuple of (DataFrame, set of red-font row indices).
         """
-        # Load with pandas
-        df = pd.read_excel(file_path, sheet_name=sheet_name, header=header_row, engine="openpyxl")
-
-        # Extract red font information for protection logic
-        red_font_rows: set = set()
-        try:
-            wb = load_workbook(file_path, data_only=False)
-            if isinstance(sheet_name, int):
-                ws = wb.worksheets[sheet_name]
-            else:
-                ws = wb[sheet_name] if sheet_name else wb.active
-
-            # Check each row for red font (starting from data rows)
-            for row_idx in range(header_row + 2, ws.max_row + 1):
-                cell = ws.cell(row=row_idx, column=1)
-                if cell.font and cell.font.color:
-                    color = cell.font.color
-                    if color.type == "rgb" and color.rgb:
-                        # Check for red color (various shades)
-                        rgb = color.rgb
-                        if isinstance(rgb, str) and len(rgb) >= 6:
-                            r = int(rgb[-6:-4], 16)
-                            g = int(rgb[-4:-2], 16)
-                            b = int(rgb[-2:], 16)
-                            if r > 200 and g < 100 and b < 100:
-                                # Adjust for pandas DataFrame index (0-based, excluding header)
-                                red_font_rows.add(row_idx - header_row - 2)
-            wb.close()
-        except Exception as exc:
-            logger.warning("Failed to extract red-font formatting: %s", exc)
-
-        return df, red_font_rows
+        return InputReader.load_excel(file_path, sheet_name=sheet_name, header_row=header_row)
 
     def save_data(
         self,
@@ -211,25 +184,18 @@ class FileHandler:
                 except Exception as exc:
                     logger.warning("Parquet cache save failed (non-fatal): %s", exc)
         elif suffix == ".csv":
-            df.to_csv(path, index=index)
+            self._output_writer.save_delimited(df, path, index=index, sep=",")
         elif suffix in {".tsv", ".txt"}:
-            df.to_csv(path, sep="\t", index=index)
+            self._output_writer.save_delimited(df, path, index=index, sep="\t")
         elif suffix == ".parquet":
-            parquet_meta = {
-                "red_font_rows": sorted(red_font_rows) if red_font_rows else [],
-                "blue_font_cells": blue_font_cells or [],
-                "highlight_rows": sorted(highlight_rows) if highlight_rows else [],
-            }
-            try:
-                IntermediateStore.save(
-                    df=df,
-                    parquet_path=path,
-                    metadata=parquet_meta,
-                    index=index,
-                )
-            except Exception as exc:
-                logger.warning("Intermediate store save failed, falling back to raw parquet write: %s", exc)
-                write_parquet_with_normalized_fallback(df, path, index=index)
+            self._output_writer.save_parquet(
+                df,
+                path,
+                index=index,
+                highlight_rows=highlight_rows,
+                blue_font_cells=blue_font_cells,
+                red_font_rows=red_font_rows,
+            )
         else:
             # Default to Excel format
             path = path.with_suffix(".xlsx")
@@ -249,49 +215,16 @@ class FileHandler:
         extra_sheets: dict | None = None,
     ) -> None:
         """Save DataFrame to Excel with optional formatting."""
-        # First save with pandas
-        if extra_sheets:
-            with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
-                df.to_excel(writer, sheet_name=sheet_name, index=index)
-                for sheet, sheet_df in extra_sheets.items():
-                    if sheet_df is None:
-                        continue
-                    sheet_df.to_excel(writer, sheet_name=sheet, index=index)
-        else:
-            df.to_excel(file_path, sheet_name=sheet_name, index=index)
-
-        # Then apply formatting if needed
-        if highlight_rows or blue_font_cells or red_font_rows:
-            wb = load_workbook(file_path)
-            ws = wb[sheet_name]
-
-            yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-            blue_font = Font(color="0070C0")
-            red_font = Font(color="FF0000")
-
-            # Apply yellow highlight to specified rows
-            if highlight_rows:
-                for row_idx in highlight_rows:
-                    # Account for header row (Excel is 1-indexed, header is row 1)
-                    excel_row = row_idx + 2
-                    for col in range(1, ws.max_column + 1):
-                        ws.cell(row=excel_row, column=col).fill = yellow_fill
-
-            # Apply blue font to specified cells
-            if blue_font_cells:
-                for row_idx, col_idx in blue_font_cells:
-                    excel_row = row_idx + 2
-                    excel_col = col_idx + 1
-                    ws.cell(row=excel_row, column=excel_col).font = blue_font
-
-            # Apply red font to specified rows (Mz/RT column)
-            if red_font_rows:
-                for row_idx in red_font_rows:
-                    excel_row = row_idx + 2
-                    ws.cell(row=excel_row, column=1).font = red_font
-
-            wb.save(file_path)
-            wb.close()
+        self._excel_writer.save(
+            df,
+            file_path,
+            sheet_name=sheet_name,
+            index=index,
+            highlight_rows=highlight_rows,
+            blue_font_cells=blue_font_cells,
+            red_font_rows=red_font_rows,
+            extra_sheets=extra_sheets,
+        )
 
     @staticmethod
     def generate_output_path(
@@ -330,7 +263,7 @@ class FileHandler:
 
     @staticmethod
     def _parquet_meta_path(parquet_path: Path) -> Path:
-        return parquet_path.with_suffix(parquet_path.suffix + ".meta.json")
+        return ParquetCacheStore.meta_path(parquet_path)
 
     def _save_parquet_cache(
         self,
@@ -341,52 +274,21 @@ class FileHandler:
         red_font_rows: set | None = None,
     ) -> None:
         """Save a parquet cache with metadata sidecar for formatting."""
-        meta = {
-            "red_font_rows": sorted(red_font_rows) if red_font_rows else [],
-            "blue_font_cells": blue_font_cells or [],
-            "highlight_rows": sorted(highlight_rows) if highlight_rows else [],
-        }
-
-        try:
-            IntermediateStore.save(
-                df=df,
-                parquet_path=parquet_path,
-                metadata=meta,
-                index=False,
-            )
-        except Exception as exc:
-            logger.warning("Parquet cache save failed (non-fatal): %s", exc)
+        self._parquet_cache_store.save_cache(
+            df,
+            parquet_path,
+            highlight_rows=highlight_rows,
+            blue_font_cells=blue_font_cells,
+            red_font_rows=red_font_rows,
+        )
 
     def _load_parquet_meta(self, parquet_path: Path) -> dict | None:
         """Load parquet metadata sidecar if it exists."""
-        meta_path = self._parquet_meta_path(parquet_path)
-        if not meta_path.exists():
-            return None
-        try:
-            data = json.loads(meta_path.read_text(encoding="utf-8"))
-            # Normalize
-            return {
-                "red_font_rows": data.get("red_font_rows", []),
-                "blue_font_cells": data.get("blue_font_cells", []),
-                "highlight_rows": data.get("highlight_rows", []),
-            }
-        except Exception as exc:
-            logger.warning("Failed to load parquet meta: %s", exc)
-            return None
+        return self._parquet_cache_store.load_meta(parquet_path)
 
     def _resolve_parquet_cache(self, excel_path: Path) -> Path | None:
         """Return parquet cache if it exists and is newer than Excel."""
-        parquet_path = excel_path.with_suffix(".parquet")
-        meta_path = self._parquet_meta_path(parquet_path)
-        if not parquet_path.exists() or not meta_path.exists():
-            return None
-        try:
-            if parquet_path.stat().st_mtime >= excel_path.stat().st_mtime:
-                return parquet_path
-        except Exception as exc:
-            logger.debug("Parquet cache resolution failed: %s", exc)
-            return None
-        return None
+        return self._parquet_cache_store.resolve_cache(excel_path)
 
     @staticmethod
     def _normalize_for_parquet(df: pd.DataFrame) -> pd.DataFrame:

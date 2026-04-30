@@ -132,9 +132,14 @@ def test_run_all_steps_checks_pipeline_prerequisites_before_processing() -> None
 
 def test_run_all_steps_rebuilds_clean_pipeline_session_from_loaded_source(tmp_path) -> None:
     class _Widget:
-        def __init__(self, result: ProcessingResult) -> None:
+        def __init__(
+            self,
+            result: ProcessingResult,
+            parameters: dict[str, object] | None = None,
+        ) -> None:
             self._template_result = result
             self._processing_result = result
+            self._parameters = dict(parameters or {})
             self.contexts: list[dict[str, object]] = []
 
         def set_data(self, data: pd.DataFrame) -> None:
@@ -152,7 +157,7 @@ def test_run_all_steps_rebuilds_clean_pipeline_session_from_loaded_source(tmp_pa
             _ = path
 
         def get_parameters(self) -> dict:
-            return {}
+            return dict(self._parameters)
 
         def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
             _ = params
@@ -163,6 +168,8 @@ def test_run_all_steps_rebuilds_clean_pipeline_session_from_loaded_source(tmp_pa
             return self._processing_result
 
     data = pd.DataFrame({"Mz/RT": ["Sample_Type", "100.0/1.0"], "S1": ["case", 123]})
+    xic_results_file = tmp_path / "xic_results.xlsx"
+    xic_results_file.write_text("placeholder", encoding="utf-8")
     window = MainWindow.__new__(MainWindow)
     window._output_dir = tmp_path / "OUTPUT"
     window._source_file = tmp_path / "input.xlsx"
@@ -209,7 +216,8 @@ def test_run_all_steps_rebuilds_clean_pipeline_session_from_loaded_source(tmp_pa
                 output_path=None,
                 data=data.copy(),
                 metadata=ProcessingMetadata(red_font_rows={7}, protected_rows={7}),
-            )
+            ),
+            {"xic_results_file": str(xic_results_file)},
         ),
         _Widget(
             ProcessingResult(
@@ -317,17 +325,25 @@ def test_run_all_step_completion_updates_latest_result_summary(tmp_path) -> None
 def test_run_all_blocks_before_worker_when_validation_has_blocking_warning(tmp_path) -> None:
     window = MainWindow.__new__(MainWindow)
     data = pd.DataFrame({"Mz/RT": ["Sample_Type", "100.0/1.0"], "S1": ["case", 123]})
+    xic_results_file = tmp_path / "xic_results.xlsx"
+    xic_results_file.write_text("placeholder", encoding="utf-8")
     widget = Mock()
     widget.get_parameters.return_value = {"high_det_thresh": 0.3, "low_det_thresh": 0.7}
     widget.validate_parameters.return_value = [
         ValidationWarning("invalid_mnar_threshold_order", "High threshold must exceed low threshold", True)
     ]
+    step1_widget = Mock()
+    step1_widget.get_parameters.return_value = {}
+    step2_widget = Mock()
+    step2_widget.get_parameters.return_value = {"xic_results_file": str(xic_results_file)}
+    step3_widget = Mock()
+    step3_widget.get_parameters.return_value = {}
 
     logs: list[str] = []
     window._current_data = data.copy()
     window._original_data = data.copy()
     window._current_step = 0
-    window.step_widgets = [widget]
+    window.step_widgets = [step1_widget, step2_widget, step3_widget, widget]
     window._log = logs.append
     window._show_error = Mock()
     window._set_pipeline_busy_state = Mock()
@@ -343,17 +359,25 @@ def test_run_all_blocks_before_worker_when_validation_has_blocking_warning(tmp_p
 def test_run_all_nonblocking_validation_can_be_cancelled_before_worker(tmp_path) -> None:
     window = MainWindow.__new__(MainWindow)
     data = pd.DataFrame({"Mz/RT": ["Sample_Type", "100.0/1.0"], "S1": ["case", 123]})
+    xic_results_file = tmp_path / "xic_results.xlsx"
+    xic_results_file.write_text("placeholder", encoding="utf-8")
     widget = Mock()
     widget.get_parameters.return_value = {"enable_qc_ratio_threshold": False}
     widget.validate_parameters.return_value = [
         ValidationWarning("qc_ratio_gate_disabled", "QC_ratio gate is disabled")
     ]
+    step1_widget = Mock()
+    step1_widget.get_parameters.return_value = {}
+    step2_widget = Mock()
+    step2_widget.get_parameters.return_value = {"xic_results_file": str(xic_results_file)}
+    step3_widget = Mock()
+    step3_widget.get_parameters.return_value = {}
 
     logs: list[str] = []
     window._current_data = data.copy()
     window._original_data = data.copy()
     window._current_step = 0
-    window.step_widgets = [widget]
+    window.step_widgets = [step1_widget, step2_widget, step3_widget, widget]
     window._log = logs.append
     window._confirm_validation_warnings = Mock(return_value=False)
     window._set_pipeline_busy_state = Mock()

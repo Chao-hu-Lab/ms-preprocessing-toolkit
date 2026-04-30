@@ -13,15 +13,10 @@ from ms_preprocessing.adapters import data_organizer as _adapter_do
 from ms_preprocessing.adapters import duplicate_remover as _adapter_dr
 from ms_preprocessing.adapters import feature_filter as _adapter_ff
 from ms_preprocessing.adapters import istd_marker as _adapter_istd
-from ms_preprocessing.pipeline_validation import (
-    format_validation_warnings,
-    has_blocking_warnings,
-    validate_step1_params,
-    validate_step2_params,
-    validate_step4_params,
-)
+from ms_preprocessing.pipeline_validation import format_validation_warnings, has_blocking_warnings
 from ms_preprocessing.utils.file_handler import FileHandler
 from ms_preprocessing.utils.results import ProcessingResult
+from ms_preprocessing.workflow.parameter_resolver import WorkflowValidationService
 from ms_preprocessing.workflow.pipeline_session import PipelineSession
 
 
@@ -209,19 +204,12 @@ class WorkflowRunner:
 
     @staticmethod
     def _restore_protected_rows(session: PipelineSession, protected_rows: set[int]) -> None:
-        if protected_rows and not session.metadata.protected_rows:
+        if protected_rows and not protected_rows.issubset(session.metadata.protected_rows):
             session.update_context_from_metadata({"protected_rows": protected_rows})
 
     @staticmethod
     def _collect_validation_warnings(step: str, resolved: dict[str, dict]) -> list:
-        warnings = []
-        if step in {"organize", "all"}:
-            warnings.extend(validate_step1_params(resolved.get("step1", {})))
-        if step in {"istd", "all"}:
-            warnings.extend(validate_step2_params(resolved.get("step2", {})))
-        if step in {"filter", "all"}:
-            warnings.extend(validate_step4_params(resolved.get("step4", {})))
-        return warnings
+        return WorkflowValidationService().collect(step, resolved)
 
     @staticmethod
     def _result(

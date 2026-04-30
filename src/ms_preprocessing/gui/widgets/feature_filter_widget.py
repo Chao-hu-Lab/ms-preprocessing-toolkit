@@ -543,9 +543,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
             enable_mnar_gate=params.get("enable_mnar_gate", True),
             allow_single_group_stable=params.get("allow_single_group_stable", False),
             signal_threshold=params.get("signal_threshold", 5000),
-            protected_rows=set(
-                self._context.get("protected_rows") or self._context.get("red_font_rows") or []
-            ),
+            protected_rows=set(self.metadata.protected_rows or self.metadata.red_font_rows),
             progress_callback=self.update_progress,
         )
 
