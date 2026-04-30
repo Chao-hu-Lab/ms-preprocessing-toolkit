@@ -10,8 +10,9 @@ from typing import Any, TypedDict
 
 import yaml
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-LOCAL_PROFILE_DIR = PROJECT_ROOT / "config" / "presets"
+from ms_preprocessing.config.path_resolver import user_config_dir
+
+LOCAL_PROFILE_DIR: Path | None = None
 _BUILTIN_PROFILE_PACKAGE = "ms_preprocessing.config.presets"
 _PLACEHOLDER_RE = re.compile(r"^\$\{local\.([A-Za-z_][A-Za-z0-9_]*)\}$")
 _RUNTIME_FILE_KEYS = {"input", "input_file", "output", "output_file"}
@@ -47,6 +48,63 @@ _STEP_ALLOWED_KEYS: dict[str, set[str]] = {
         "enable_mnar_gate",
         "enable_ratio_rescue",
     },
+}
+
+_STRING_KEYS: dict[str, set[str]] = {
+    "step1": {"mode", "method_file"},
+    "step2": {"xic_results_file"},
+    "step3": {"merge_mode", "degeneracy_adduct_table_file"},
+    "step4": set(),
+}
+_BOOL_KEYS: dict[str, set[str]] = {
+    "step1": {"auto_detect"},
+    "step2": set(),
+    "step3": {"preserve_red_font", "enable_degeneracy_annotation"},
+    "step4": {
+        "enable_background_threshold",
+        "enable_qc_ratio_threshold",
+        "enable_intensity_fc_threshold",
+        "enable_mnar_gate",
+        "enable_ratio_rescue",
+    },
+}
+_NUMERIC_RANGES: dict[str, dict[str, tuple[float | None, float | None]]] = {
+    "step1": {},
+    "step2": {},
+    "step3": {
+        "mz_tolerance_ppm": (0.0, None),
+        "rt_tolerance": (0.0, None),
+        "degeneracy_ppm_tolerance": (0.0, None),
+        "degeneracy_rt_tolerance": (0.0, None),
+        "degeneracy_correlation_threshold": (0.0, 1.0),
+    },
+    "step4": {
+        "signal_threshold": (0.0, None),
+        "background_threshold": (0.0, 1.0),
+        "high_det_thresh": (0.0, 1.0),
+        "low_det_thresh": (0.0, 1.0),
+        "qc_ratio_threshold": (0.0, 1.0),
+        "intensity_fc_threshold": (1.0, None),
+        "ratio_rescue_threshold": (1.0, None),
+    },
+}
+_INT_RANGES: dict[str, dict[str, tuple[int, int | None]]] = {
+    "step1": {},
+    "step2": {},
+    "step3": {"degeneracy_min_correlation_points": (1, None)},
+    "step4": {},
+}
+_NULLABLE_INT_RANGES: dict[str, dict[str, tuple[int, int | None]]] = {
+    "step1": {},
+    "step2": {},
+    "step3": {"top_n": (1, None)},
+    "step4": {},
+}
+_ENUM_VALUES: dict[str, dict[str, set[str]]] = {
+    "step1": {},
+    "step2": {},
+    "step3": {"merge_mode": {"per_sample_max", "fill_gaps"}},
+    "step4": {},
 }
 
 
@@ -193,14 +251,79 @@ def _validate_steps(raw_steps: dict[str, object], *, source: str) -> PipelinePro
         if missing_keys:
             missing = ", ".join(sorted(missing_keys))
             raise ValueError(f"Invalid profile {source}: missing {step_name} key(s): {missing}")
+        _validate_step_values(step_name, raw_step, source=source)
         steps[step_name] = dict(raw_step)
     return copy.deepcopy(steps)  # type: ignore[return-value]
 
 
+def _validate_step_values(step_name: str, raw_step: dict[object, object], *, source: str) -> None:
+    for key in _STRING_KEYS[step_name]:
+        value = raw_step[key]
+        if not isinstance(value, str):
+            raise ValueError(f"Invalid profile {source}: {step_name}.{key} must be a string")
+
+    for key in _BOOL_KEYS[step_name]:
+        value = raw_step[key]
+        if not isinstance(value, bool):
+            raise ValueError(f"Invalid profile {source}: {step_name}.{key} must be true/false")
+
+    for key, (minimum, maximum) in _NUMERIC_RANGES[step_name].items():
+        _validate_numeric_value(step_name, key, raw_step[key], minimum, maximum, source=source)
+
+    for key, (minimum, maximum) in _INT_RANGES[step_name].items():
+        _validate_int_value(step_name, key, raw_step[key], minimum, maximum, source=source)
+
+    for key, (minimum, maximum) in _NULLABLE_INT_RANGES[step_name].items():
+        value = raw_step[key]
+        if value is not None:
+            _validate_int_value(step_name, key, value, minimum, maximum, source=source)
+
+    for key, choices in _ENUM_VALUES[step_name].items():
+        value = raw_step[key]
+        if value not in choices:
+            allowed = ", ".join(sorted(choices))
+            raise ValueError(
+                f"Invalid profile {source}: {step_name}.{key} must be one of: {allowed}"
+            )
+
+
+def _validate_numeric_value(
+    step_name: str,
+    key: str,
+    value: object,
+    minimum: float | None,
+    maximum: float | None,
+    *,
+    source: str,
+) -> None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"Invalid profile {source}: {step_name}.{key} must be a number")
+    numeric = float(value)
+    if minimum is not None and numeric < minimum:
+        raise ValueError(f"Invalid profile {source}: {step_name}.{key} must be >= {minimum}")
+    if maximum is not None and numeric > maximum:
+        raise ValueError(f"Invalid profile {source}: {step_name}.{key} must be <= {maximum}")
+
+
+def _validate_int_value(
+    step_name: str,
+    key: str,
+    value: object,
+    minimum: int,
+    maximum: int | None,
+    *,
+    source: str,
+) -> None:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"Invalid profile {source}: {step_name}.{key} must be an integer")
+    if value < minimum:
+        raise ValueError(f"Invalid profile {source}: {step_name}.{key} must be >= {minimum}")
+    if maximum is not None and value > maximum:
+        raise ValueError(f"Invalid profile {source}: {step_name}.{key} must be <= {maximum}")
+
+
 def _resolve_placeholders(steps: PipelineProfile) -> PipelineProfile:
     from ms_preprocessing.config import pipeline_defaults
-
-    local_values = pipeline_defaults._load_local_reference_config()
 
     def resolve(value: object) -> object:
         if not isinstance(value, str):
@@ -208,7 +331,7 @@ def _resolve_placeholders(steps: PipelineProfile) -> PipelineProfile:
         match = _PLACEHOLDER_RE.match(value)
         if match is None:
             return value
-        return str(local_values.get(match.group(1), ""))
+        return pipeline_defaults.resolve_reference_value(match.group(1))
 
     return {
         step_name: {key: resolve(value) for key, value in params.items()}
@@ -243,13 +366,20 @@ def _read_builtin_profile_text(name: str) -> str | None:
 
 
 def _local_profile_paths() -> dict[str, Path]:
-    if not LOCAL_PROFILE_DIR.exists():
+    local_profile_dir = _local_profile_dir()
+    if not local_profile_dir.exists():
         return {}
     paths: dict[str, Path] = {}
-    for path in sorted(LOCAL_PROFILE_DIR.glob("*.yml")) + sorted(LOCAL_PROFILE_DIR.glob("*.yaml")):
+    for path in sorted(local_profile_dir.glob("*.yml")) + sorted(
+        local_profile_dir.glob("*.yaml")
+    ):
         if path.is_file() and ".example." not in path.name:
             paths[path.stem] = path
     return paths
+
+
+def _local_profile_dir() -> Path:
+    return LOCAL_PROFILE_DIR if LOCAL_PROFILE_DIR is not None else user_config_dir() / "presets"
 
 
 def _format_number(value: float) -> str:

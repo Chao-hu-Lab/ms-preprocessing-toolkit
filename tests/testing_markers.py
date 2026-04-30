@@ -30,6 +30,8 @@ INTEGRATION_TEST_FILES = frozenset(
         "test_parquet_compat.py",
         "test_parameter_resolver.py",
         "test_pipeline_baseline_contract.py",
+        "test_pipeline_profiles.py",
+        "test_feature_filter_presets.py",
         "test_profile_loader.py",
         "test_regressions.py",
         "test_workflow_export_service.py",

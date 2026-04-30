@@ -53,6 +53,10 @@ def test_integration_and_perf_markers_can_overlap() -> None:
         Path("tests") / "test_parameter_resolver.py"
     )
     profile_loader_markers = classify_test_markers(Path("tests") / "test_profile_loader.py")
+    pipeline_profile_markers = classify_test_markers(Path("tests") / "test_pipeline_profiles.py")
+    feature_filter_preset_markers = classify_test_markers(
+        Path("tests") / "test_feature_filter_presets.py"
+    )
 
     assert markers == {"integration", "perf"}
     assert handoff_markers == {"integration"}
@@ -63,6 +67,8 @@ def test_integration_and_perf_markers_can_overlap() -> None:
     assert golden_contract_markers == {"integration"}
     assert parameter_resolver_markers == {"integration"}
     assert profile_loader_markers == {"integration"}
+    assert pipeline_profile_markers == {"integration"}
+    assert feature_filter_preset_markers == {"integration"}
 
 
 def test_root_hygiene_is_serial_without_being_gui() -> None:

@@ -18,6 +18,8 @@ from typing import Any
 
 import yaml
 
+from ms_preprocessing.config.path_resolver import user_config_dir
+
 METHOD_FILE_ENV = "MSPTK_METHOD_FILE"
 XIC_RESULTS_FILE_ENV = "MSPTK_XIC_RESULTS_FILE"
 LOCAL_REFERENCE_CONFIG_ENV = "MSPTK_LOCAL_REFERENCE_CONFIG"
@@ -28,9 +30,8 @@ STEP2_XIC_REQUIRED_MESSAGE = (
     "Please set xic_results_file or pass --xic-results-file."
 )
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-LOCAL_REFERENCE_YAML_PATH = PROJECT_ROOT / "config" / "local_reference.yml"
-LOCAL_REFERENCE_JSON_PATH = PROJECT_ROOT / "config" / "local_reference_paths.json"
+LOCAL_REFERENCE_YAML_PATH = user_config_dir() / "local_reference.yml"
+LOCAL_REFERENCE_JSON_PATH = user_config_dir() / "local_reference_paths.json"
 LOCAL_CONFIG_PATH = LOCAL_REFERENCE_JSON_PATH
 
 
@@ -82,6 +83,19 @@ def _resolve_path(env_var: str, local_value: str | None) -> Path | None:
 
 def _stringify_path(path_value: Path | None) -> str:
     return "" if path_value is None else str(path_value)
+
+
+def resolve_reference_value(key: str) -> str:
+    """Resolve a local reference value with env overrides where applicable."""
+    config = _load_local_reference_config()
+    if key == "method_file":
+        return _stringify_path(_resolve_path(METHOD_FILE_ENV, config.get("method_file")))
+    if key == "xic_results_file":
+        return _stringify_path(
+            _resolve_path(XIC_RESULTS_FILE_ENV, config.get("xic_results_file"))
+        )
+    value = config.get(key)
+    return "" if value is None else str(value)
 
 
 def get_legacy_step2_source_details() -> list[str]:

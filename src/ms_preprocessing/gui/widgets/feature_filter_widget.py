@@ -522,7 +522,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
         }
 
     def _confirm_small_group_run(self, small_groups: dict[str, int]) -> bool:
-        """Show Wilson CI warning for small biological groups.
+        """Show observed-ratio warning for small biological groups.
 
         Extracted as a separate method so tests can monkeypatch it without
         needing a real Tk dialog.
@@ -536,8 +536,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
             tkinter.messagebox.askokcancel(
                 "小樣本警告",
                 f"偵測到以下組別樣本數不足（建議 N≥10）：\n{group_lines}\n\n"
-                "系統將自動套用 Wilson CI 校正，小 N 組別需更高比例才能通過門檻。\n"
-                "例：N=5 時，80% 門檻實際需要近 100% 檢出。\n\n"
+                "Step 4 會使用觀測檢出率，不做小樣本統計校正；小 N 組別的比例會更容易受單一樣本影響。\n\n"
                 "確認要繼續嗎？",
                 parent=self,
             )

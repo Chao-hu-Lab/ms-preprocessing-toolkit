@@ -11,6 +11,7 @@ REFERENCE_ENV_VARS = (
     "MSPTK_METHOD_FILE",
     "MSPTK_XIC_RESULTS_FILE",
     "MSPTK_LOCAL_REFERENCE_CONFIG",
+    "MSPTK_CONFIG_DIR",
     "MSPTK_ISTD_RECORD_FILE",
     "MSPTK_ISTD_RECORD_DATE",
 )
@@ -132,6 +133,60 @@ def test_pipeline_defaults_follow_local_reference_config(tmp_path, monkeypatch) 
             assert defaults.STEP2_PARAMS["xic_results_file"] == "local-xic.xlsx"
             assert result["method_file"] == "local-method.docx"
             assert result["xic_results_file"] == "local-xic.xlsx"
+    finally:
+        _reload_reference_modules()
+
+
+def test_pipeline_defaults_follow_cwd_config_reference(tmp_path, monkeypatch) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "local_reference.yml").write_text(
+        "\n".join(
+            [
+                "version: 1",
+                "references:",
+                '  method_file: "cwd-method.docx"',
+                '  xic_results_file: "cwd-xic.xlsx"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        with monkeypatch.context() as env:
+            _clear_reference_env(env)
+            env.chdir(tmp_path)
+            defaults, _benchmark = _reload_reference_modules()
+
+            assert defaults.STEP1_PARAMS["method_file"] == "cwd-method.docx"
+            assert defaults.STEP2_PARAMS["xic_results_file"] == "cwd-xic.xlsx"
+    finally:
+        _reload_reference_modules()
+
+
+def test_pipeline_defaults_follow_config_dir_override(tmp_path, monkeypatch) -> None:
+    config_dir = tmp_path / "lab-config"
+    config_dir.mkdir()
+    (config_dir / "local_reference.yml").write_text(
+        "\n".join(
+            [
+                "version: 1",
+                "references:",
+                '  method_file: "override-method.docx"',
+                '  xic_results_file: "override-xic.xlsx"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        with monkeypatch.context() as env:
+            _clear_reference_env(env)
+            env.setenv("MSPTK_CONFIG_DIR", str(config_dir))
+            defaults, _benchmark = _reload_reference_modules()
+
+            assert defaults.STEP1_PARAMS["method_file"] == "override-method.docx"
+            assert defaults.STEP2_PARAMS["xic_results_file"] == "override-xic.xlsx"
     finally:
         _reload_reference_modules()
 

@@ -42,6 +42,32 @@ def test_profile_loader_substitutes_local_reference_placeholders(
     assert profile["step2"]["xic_results_file"] == "xic.xlsx"
 
 
+def test_profile_loader_env_reference_overrides_local_placeholders(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    reference_path = tmp_path / "local_reference.yml"
+    reference_path.write_text(
+        "\n".join(
+            [
+                "version: 1",
+                "references:",
+                '  method_file: "local-method.docx"',
+                '  xic_results_file: "local-xic.xlsx"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("MSPTK_LOCAL_REFERENCE_CONFIG", str(reference_path))
+    monkeypatch.setenv("MSPTK_METHOD_FILE", "env-method.docx")
+    monkeypatch.setenv("MSPTK_XIC_RESULTS_FILE", "env-xic.xlsx")
+
+    profile = profile_loader.get_pipeline_profile("default")
+
+    assert profile["step1"]["method_file"] == "env-method.docx"
+    assert profile["step2"]["xic_results_file"] == "env-xic.xlsx"
+
+
 def test_profile_loader_rejects_runtime_input_keys(tmp_path: Path) -> None:
     profile_path = tmp_path / "bad.yml"
     profile_path.write_text(
@@ -103,6 +129,34 @@ def test_profile_loader_rejects_unknown_step4_key(tmp_path: Path) -> None:
         profile_loader.load_pipeline_profile_file(profile_path)
 
 
+@pytest.mark.parametrize(
+    ("old", "new", "expected_error"),
+    [
+        ("background_threshold: 0.33", "background_threshold: abc", "step4.background_threshold"),
+        ('enable_ratio_rescue: true', 'enable_ratio_rescue: "true"', "step4.enable_ratio_rescue"),
+        (
+            "degeneracy_min_correlation_points: 3",
+            "degeneracy_min_correlation_points: 0",
+            "step3.degeneracy_min_correlation_points",
+        ),
+    ],
+)
+def test_profile_loader_rejects_invalid_profile_values(
+    tmp_path: Path,
+    old: str,
+    new: str,
+    expected_error: str,
+) -> None:
+    profile_path = tmp_path / "bad.yml"
+    profile_text = Path("src/ms_preprocessing/config/presets/default.yml").read_text(
+        encoding="utf-8"
+    )
+    profile_path.write_text(profile_text.replace(old, new), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=expected_error):
+        profile_loader.load_pipeline_profile_file(profile_path)
+
+
 def test_profile_loader_discovers_local_profiles(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -140,3 +194,41 @@ def test_profile_loader_ignores_local_example_profiles(
     monkeypatch.setattr(profile_loader, "LOCAL_PROFILE_DIR", local_dir)
 
     assert "lab.example" not in profile_loader.list_pipeline_profiles()
+
+
+def test_profile_loader_discovers_profiles_from_cwd_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_dir = tmp_path / "config" / "presets"
+    config_dir.mkdir(parents=True)
+    profile_path = config_dir / "lab.yml"
+    profile_text = Path("src/ms_preprocessing/config/presets/default.yml").read_text(encoding="utf-8")
+    profile_path.write_text(
+        profile_text.replace("name: default", "name: lab"),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("MSPTK_CONFIG_DIR", raising=False)
+    monkeypatch.setattr(profile_loader, "LOCAL_PROFILE_DIR", None)
+
+    assert "lab" in profile_loader.list_pipeline_profiles()
+
+
+def test_profile_loader_discovers_profiles_from_config_dir_env(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_dir = tmp_path / "lab-config"
+    local_dir = config_dir / "presets"
+    local_dir.mkdir(parents=True)
+    profile_path = local_dir / "lab.yml"
+    profile_text = Path("src/ms_preprocessing/config/presets/default.yml").read_text(encoding="utf-8")
+    profile_path.write_text(
+        profile_text.replace("name: default", "name: lab"),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("MSPTK_CONFIG_DIR", str(config_dir))
+    monkeypatch.setattr(profile_loader, "LOCAL_PROFILE_DIR", None)
+
+    assert "lab" in profile_loader.list_pipeline_profiles()

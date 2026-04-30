@@ -81,7 +81,7 @@ Impact:
 Observed but lower priority:
 
 - Step3 `DuplicateRemover` owns duplicate/overlap merge behavior, protected row propagation, intensity merge policy, top-N filtering, Pearson correlation checks, adduct table loading, and degeneracy/adduct annotation. Degeneracy annotation is closer to feature annotation than duplicate removal, but should be split only after Step1 data contracts are stable.
-- Step4 `FeatureFilter` owns group/QC detection, detection ratio calculation, Wilson lower bound, stable/MNAR/QC ratio/intensity FC gates, deleted-feature export shape, zero-to-NaN cleanup, and marker column insertion. This is more coherent than Step1, but the gate decision table and export post-processing are likely future extraction points.
+- Step4 `FeatureFilter` owns group/QC detection, observed detection ratio calculation, stable/MNAR/QC ratio/intensity FC gates, deleted-feature export shape, zero-to-NaN cleanup, and marker column insertion. This is more coherent than Step1, but the gate decision table and export post-processing are likely future extraction points.
 - GUI `event_handlers.py` owns file loading, extra sheet loading, combined TSV preprocessing, Run All orchestration, async thread/UI queue handling, autosave, final export, downstream handoff reminders, busy state, and step switching. This should eventually split into controller/service layers, but not in this core data-contract branch.
 - CLI `run_cli()` duplicates GUI workflow responsibilities around validation, parameter resolution, loading, session metadata, auxiliary sheet preservation, Step1-4 orchestration, parquet handoff, output naming, and final export. A shared workflow runner is valuable, but should be a separate branch.
 
