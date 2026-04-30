@@ -120,7 +120,7 @@ def test_profile_loader_rejects_runtime_input_keys(tmp_path: Path) -> None:
 def test_profile_loader_rejects_unknown_step4_key(tmp_path: Path) -> None:
     profile_path = tmp_path / "bad.yml"
     profile_path.write_text(
-        Path("src/ms_preprocessing/config/presets/default.yml").read_text(encoding="utf-8")
+        Path("src/ms_preprocessing/resources/builtin_profiles/default.yml").read_text(encoding="utf-8")
         + "\n    diff_threshold: 0.3\n",
         encoding="utf-8",
     )
@@ -148,7 +148,7 @@ def test_profile_loader_rejects_invalid_profile_values(
     expected_error: str,
 ) -> None:
     profile_path = tmp_path / "bad.yml"
-    profile_text = Path("src/ms_preprocessing/config/presets/default.yml").read_text(
+    profile_text = Path("src/ms_preprocessing/resources/builtin_profiles/default.yml").read_text(
         encoding="utf-8"
     )
     profile_path.write_text(profile_text.replace(old, new), encoding="utf-8")
@@ -164,7 +164,7 @@ def test_profile_loader_discovers_local_profiles(
     local_dir = tmp_path / "presets"
     local_dir.mkdir()
     profile_path = local_dir / "lab.yml"
-    profile_text = Path("src/ms_preprocessing/config/presets/default.yml").read_text(encoding="utf-8")
+    profile_text = Path("src/ms_preprocessing/resources/builtin_profiles/default.yml").read_text(encoding="utf-8")
     profile_path.write_text(
         profile_text.replace("name: default", "name: lab").replace(
             "ratio_rescue_threshold: 3.0",
@@ -188,7 +188,7 @@ def test_profile_loader_ignores_local_example_profiles(
     local_dir.mkdir()
     profile_path = local_dir / "lab.example.yml"
     profile_path.write_text(
-        Path("src/ms_preprocessing/config/presets/default.yml").read_text(encoding="utf-8"),
+        Path("src/ms_preprocessing/resources/builtin_profiles/default.yml").read_text(encoding="utf-8"),
         encoding="utf-8",
     )
     monkeypatch.setattr(profile_loader, "LOCAL_PROFILE_DIR", local_dir)
@@ -203,7 +203,7 @@ def test_profile_loader_discovers_profiles_from_cwd_config(
     config_dir = tmp_path / "config" / "presets"
     config_dir.mkdir(parents=True)
     profile_path = config_dir / "lab.yml"
-    profile_text = Path("src/ms_preprocessing/config/presets/default.yml").read_text(encoding="utf-8")
+    profile_text = Path("src/ms_preprocessing/resources/builtin_profiles/default.yml").read_text(encoding="utf-8")
     profile_path.write_text(
         profile_text.replace("name: default", "name: lab"),
         encoding="utf-8",
@@ -223,7 +223,7 @@ def test_profile_loader_discovers_profiles_from_config_dir_env(
     local_dir = config_dir / "presets"
     local_dir.mkdir(parents=True)
     profile_path = local_dir / "lab.yml"
-    profile_text = Path("src/ms_preprocessing/config/presets/default.yml").read_text(encoding="utf-8")
+    profile_text = Path("src/ms_preprocessing/resources/builtin_profiles/default.yml").read_text(encoding="utf-8")
     profile_path.write_text(
         profile_text.replace("name: default", "name: lab"),
         encoding="utf-8",

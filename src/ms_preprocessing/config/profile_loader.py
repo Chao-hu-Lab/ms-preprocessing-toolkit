@@ -13,7 +13,7 @@ import yaml
 from ms_preprocessing.config.path_resolver import user_config_dir
 
 LOCAL_PROFILE_DIR: Path | None = None
-_BUILTIN_PROFILE_PACKAGE = "ms_preprocessing.config.presets"
+_BUILTIN_PROFILE_PACKAGE = "ms_preprocessing.resources.builtin_profiles"
 _PLACEHOLDER_RE = re.compile(r"^\$\{local\.([A-Za-z_][A-Za-z0-9_]*)\}$")
 _RUNTIME_FILE_KEYS = {"input", "input_file", "output", "output_file"}
 _BUILTIN_PROFILE_ORDER = ("loose", "default", "strict")

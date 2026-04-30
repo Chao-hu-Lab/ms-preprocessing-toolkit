@@ -52,8 +52,8 @@ def test_parquet_cache_default_enabled() -> None:
 def test_pyinstaller_spec_bundles_builtin_yaml_profiles() -> None:
     spec = (ROOT / "ms-preprocessing.spec").read_text(encoding="utf-8")
 
-    assert "src/ms_preprocessing/config/presets" in spec
-    assert "ms_preprocessing/config/presets" in spec
+    assert "src/ms_preprocessing/resources/builtin_profiles" in spec
+    assert "ms_preprocessing/resources/builtin_profiles" in spec
 
 
 def test_docs_reference_unified_parquet_pipeline_and_zero_missing_behavior() -> None:

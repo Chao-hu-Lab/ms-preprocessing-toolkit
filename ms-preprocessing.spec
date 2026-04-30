@@ -18,7 +18,7 @@ block_cipher = None
 
 # ms-core submodule src — lets PyInstaller discover ms_core.* during static analysis
 ms_core_src = str(Path("ms-core/src").resolve())
-profile_presets_dir = str(Path("src/ms_preprocessing/config/presets").resolve())
+builtin_profiles_dir = str(Path("src/ms_preprocessing/resources/builtin_profiles").resolve())
 
 a = Analysis(
     ["src/ms_preprocessing/main.py"],
@@ -28,7 +28,7 @@ a = Analysis(
         # customtkinter themes and assets must be bundled
         (customtkinter.__path__[0], "customtkinter/"),
         # built-in YAML profiles are loaded through importlib.resources
-        (profile_presets_dir, "ms_preprocessing/config/presets"),
+        (builtin_profiles_dir, "ms_preprocessing/resources/builtin_profiles"),
     ],
     hiddenimports=[
         "customtkinter",

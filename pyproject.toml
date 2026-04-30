@@ -63,7 +63,7 @@ Issues = "https://github.com/yourusername/ms-preprocessing-toolkit/issues"
 where = ["src"]
 
 [tool.setuptools.package-data]
-ms_preprocessing = ["config/presets/*.yml"]
+ms_preprocessing = ["resources/builtin_profiles/*.yml"]
 
 [tool.black]
 line-length = 100

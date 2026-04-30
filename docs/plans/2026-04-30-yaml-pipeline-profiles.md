@@ -12,7 +12,7 @@
 
 ## Decisions
 
-- Built-in profiles are packaged YAML files under `src/ms_preprocessing/config/presets/`.
+- Built-in profiles are packaged YAML resources under `src/ms_preprocessing/resources/builtin_profiles/`, separate from user-facing local config.
 - User/local profiles are discovered from `config/presets/*.yml` and `config/presets/*.yaml`.
 - CLI additionally accepts `--profile-file <path>` for one-off batch runs.
 - GUI profile dropdown lists built-in profiles plus discovered local profile names, not arbitrary `--profile-file` paths.
@@ -33,9 +33,9 @@
 
 **Files:**
 - Modify: `pyproject.toml`
-- Create: `src/ms_preprocessing/config/presets/loose.yml`
-- Create: `src/ms_preprocessing/config/presets/default.yml`
-- Create: `src/ms_preprocessing/config/presets/strict.yml`
+- Create: `src/ms_preprocessing/resources/builtin_profiles/loose.yml`
+- Create: `src/ms_preprocessing/resources/builtin_profiles/default.yml`
+- Create: `src/ms_preprocessing/resources/builtin_profiles/strict.yml`
 
 **Step 1: Add PyYAML dependency**
 
