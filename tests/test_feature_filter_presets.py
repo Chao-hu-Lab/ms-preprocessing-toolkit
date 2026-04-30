@@ -45,3 +45,26 @@ def test_step4_presets_do_not_contain_diff_threshold(name: str) -> None:
 
     assert "diff_threshold" not in params
     assert "enable_diff_threshold" not in params
+
+
+@pytest.mark.parametrize(
+    ("name", "expected_ratio_rescue"),
+    [
+        ("loose", 1.5),
+        ("default", 2.0),
+        ("strict", 3.0),
+    ],
+)
+def test_step4_presets_expose_ratio_rescue_threshold(
+    name: str, expected_ratio_rescue: float
+) -> None:
+    params = get_step4_preset(name)
+
+    assert params["ratio_rescue_threshold"] == pytest.approx(expected_ratio_rescue)
+
+
+@pytest.mark.parametrize("name", ["loose", "default", "strict"])
+def test_step4_presets_enable_ratio_rescue_by_default(name: str) -> None:
+    params = get_step4_preset(name)
+
+    assert params["enable_ratio_rescue"] is True

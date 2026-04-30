@@ -161,6 +161,30 @@ class FeatureFilterWidget(BaseProcessingWidget):
             self.qc_ratio_entry,
         )
 
+        self.ratio_rescue_enabled_var = tk.BooleanVar(value=True)
+        self.ratio_rescue_enabled_switch = self._create_threshold_switch(
+            row=6,
+            text="檢出率倍數救援門檻",
+            variable=self.ratio_rescue_enabled_var,
+        )
+        self.ratio_rescue_slider = self._create_threshold_slider(
+            row=6,
+            default_value=2.0,
+            on_change=self._update_ratio_rescue,
+            from_=1.0,
+            to=10.0,
+        )
+        self.ratio_rescue_entry = self._create_threshold_entry(
+            row=6,
+            default_value=2.0,
+            on_apply=self._apply_ratio_rescue,
+        )
+        self._threshold_controls["ratio_rescue"] = (
+            self.ratio_rescue_enabled_var,
+            self.ratio_rescue_slider,
+            self.ratio_rescue_entry,
+        )
+
         self.criteria_textbox = ctk.CTkTextbox(
             self._content_frame,
             height=84,
@@ -210,9 +234,15 @@ class FeatureFilterWidget(BaseProcessingWidget):
             "   若至少一組檢出率 ≥ 出現組檢出率下限，且至少另一組檢出率 ≤ 缺失組檢出率上限，\n"
             "   代表此 feature 在某組中高頻率出現、在另一組中接近缺失（MNAR 特徵），予以保留並標記。\n"
             "   輸出欄位 is_Presence_Absence_Marker = True 的特徵即屬此類。\n\n"
-            "5. QC 檢出率門檻（QC gate）\n"
+            "5. 檢出率倍數救援（Detection ratio rescue gate）\n"
+            "   救援落在死區的特徵：兩組檢出率均高於缺失組檢出率上限，但組間檢出率倍數差異仍明顯。\n"
+            "   條件：max(各組檢出率) / min(各組檢出率) ≥ 倍數救援門檻，\n"
+            "         且 min(各組檢出率) > 缺失組檢出率上限。\n"
+            "   被救援的 feature 同樣標記 is_Presence_Absence_Marker = True，且不受 QC 檢出率門檻限制。\n\n"
+            "6. QC 檢出率門檻（QC gate）\n"
             "   QC 檢出率 = QC 中高於訊號強度門檻的樣本數 / QC 總樣本數\n"
-            "   若 QC 檢出率 = 0，或低於你設定的 QC 檢出率門檻，代表這個 feature 在 QC 中表現不穩定，會被移除。"
+            "   若 QC 檢出率 = 0，或低於你設定的 QC 檢出率門檻，代表這個 feature 在 QC 中表現不穩定，會被移除。\n"
+            "   存在/缺失標記與檢出率倍數救援的 feature 不會被本規則刪除。"
         )
         self.criteria_textbox.insert("1.0", content)
         inner_text = getattr(self.criteria_textbox, "_textbox", None)
@@ -226,7 +256,8 @@ class FeatureFilterWidget(BaseProcessingWidget):
                 "2. 穩定檢出率門檻（Stable detection gate）",
                 "3. 強度倍率門檻（Intensity FC gate）",
                 "4. 存在/缺失標記（MNAR presence/absence gate）",
-                "5. QC 檢出率門檻（QC gate）",
+                "5. 檢出率倍數救援（Detection ratio rescue gate）",
+                "6. QC 檢出率門檻（QC gate）",
             ]:
                 start = "1.0"
                 while True:
@@ -354,6 +385,9 @@ class FeatureFilterWidget(BaseProcessingWidget):
     def _update_qc_ratio(self, value: float) -> None:
         self._sync_entry_from_slider(float(value), self.qc_ratio_entry)
 
+    def _update_ratio_rescue(self, value: float) -> None:
+        self._sync_entry_from_slider(float(value), self.ratio_rescue_entry)
+
     def _apply_bg(self) -> float:
         return self._commit_entry_to_slider(self.bg_entry, self.bg_slider)
 
@@ -369,6 +403,9 @@ class FeatureFilterWidget(BaseProcessingWidget):
     def _apply_qc_ratio(self) -> float:
         return self._commit_entry_to_slider(self.qc_ratio_entry, self.qc_ratio_slider)
 
+    def _apply_ratio_rescue(self) -> float:
+        return self._commit_entry_to_slider(self.ratio_rescue_entry, self.ratio_rescue_slider)
+
     def get_parameters(self) -> dict:
         """Get current parameter values."""
         return {
@@ -378,10 +415,12 @@ class FeatureFilterWidget(BaseProcessingWidget):
             "low_det_thresh": self._apply_low_det(),
             "qc_ratio_threshold": self._apply_qc_ratio(),
             "intensity_fc_threshold": self._apply_intensity_fc(),
+            "ratio_rescue_threshold": self._apply_ratio_rescue(),
             "enable_background_threshold": bool(self.bg_enabled_var.get()),
             "enable_qc_ratio_threshold": bool(self.qc_ratio_enabled_var.get()),
             "enable_intensity_fc_threshold": bool(self.intensity_fc_enabled_var.get()),
             "enable_mnar_gate": bool(self.mnar_enabled_var.get()),
+            "enable_ratio_rescue": bool(self.ratio_rescue_enabled_var.get()),
             "allow_single_group_stable": self._allow_single_group_stable,
         }
 
@@ -402,6 +441,12 @@ class FeatureFilterWidget(BaseProcessingWidget):
             params,
             "intensity_fc_threshold",
             "enable_intensity_fc_threshold",
+        )
+        self._apply_threshold_value(
+            "ratio_rescue",
+            params,
+            "ratio_rescue_threshold",
+            "enable_ratio_rescue",
         )
         if "enable_mnar_gate" in params:
             self.mnar_enabled_var.set(bool(params["enable_mnar_gate"]))
@@ -537,10 +582,12 @@ class FeatureFilterWidget(BaseProcessingWidget):
             low_det_thresh=params.get("low_det_thresh"),
             qc_ratio_threshold=params.get("qc_ratio_threshold"),
             intensity_fc_threshold=params.get("intensity_fc_threshold"),
+            ratio_rescue_threshold=params.get("ratio_rescue_threshold"),
             enable_background_threshold=params.get("enable_background_threshold", True),
             enable_qc_ratio_threshold=params.get("enable_qc_ratio_threshold", True),
             enable_intensity_fc_threshold=params.get("enable_intensity_fc_threshold", False),
             enable_mnar_gate=params.get("enable_mnar_gate", True),
+            enable_ratio_rescue=params.get("enable_ratio_rescue", True),
             allow_single_group_stable=params.get("allow_single_group_stable", False),
             signal_threshold=params.get("signal_threshold", 5000),
             protected_rows=set(self.metadata.protected_rows or self.metadata.red_font_rows),

@@ -139,6 +139,7 @@ class ParameterResolver:
                     if args.intensity_fc_threshold is not None
                     else step4.get("intensity_fc_threshold")
                 ),
+                "ratio_rescue_threshold": step4.get("ratio_rescue_threshold"),
                 "qc_ratio_threshold": (
                     args.qc_ratio_threshold
                     if args.qc_ratio_threshold is not None
@@ -150,6 +151,7 @@ class ParameterResolver:
                     "enable_intensity_fc_threshold",
                     False,
                 ),
+                "enable_ratio_rescue": step4.get("enable_ratio_rescue", True),
             },
         }
 

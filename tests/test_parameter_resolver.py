@@ -94,10 +94,12 @@ def test_gui_parameter_resolver_returns_canonical_step_keyed_values() -> None:
             "high_det_thresh": 0.3,
             "low_det_thresh": 0.7,
             "intensity_fc_threshold": 2.0,
+            "ratio_rescue_threshold": 2.0,
             "qc_ratio_threshold": 0.25,
             "enable_background_threshold": True,
             "enable_qc_ratio_threshold": True,
             "enable_intensity_fc_threshold": False,
+            "enable_ratio_rescue": True,
         },
     }
 

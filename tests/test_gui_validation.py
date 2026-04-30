@@ -113,6 +113,7 @@ def test_step4_disabling_default_on_gates_returns_nonblocking_warnings() -> None
             "enable_qc_ratio_threshold": False,
             "enable_mnar_gate": False,
             "enable_intensity_fc_threshold": False,
+            "enable_ratio_rescue": False,
         }
     )
 
@@ -120,8 +121,23 @@ def test_step4_disabling_default_on_gates_returns_nonblocking_warnings() -> None
         "background_gate_disabled",
         "qc_ratio_gate_disabled",
         "mnar_gate_disabled",
+        "ratio_rescue_gate_disabled",
     }
     assert all(warning.blocking is False for warning in warnings)
+
+
+def test_step4_invalid_ratio_rescue_threshold_returns_blocking_warning() -> None:
+    warnings = validate_step4_params(
+        {
+            "high_det_thresh": 0.8,
+            "low_det_thresh": 0.2,
+            "ratio_rescue_threshold": 0.5,
+        }
+    )
+
+    assert any(
+        w.code == "invalid_ratio_rescue_threshold" and w.blocking is True for w in warnings
+    )
 
 
 def test_validation_warning_helpers_report_blocking_and_format_messages() -> None:

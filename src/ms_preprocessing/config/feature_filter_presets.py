@@ -29,9 +29,11 @@ class Step4Params(TypedDict):
     low_det_thresh: float
     qc_ratio_threshold: float
     intensity_fc_threshold: float
+    ratio_rescue_threshold: float
     enable_background_threshold: bool
     enable_qc_ratio_threshold: bool
     enable_intensity_fc_threshold: bool
+    enable_ratio_rescue: bool
 
 
 # ── 寬鬆 ──────────────────────────────────────────────────────────────────────
@@ -44,9 +46,11 @@ _LOOSE: Step4Params = {
     "low_det_thresh":                  0.2,
     "qc_ratio_threshold":              0.00,
     "intensity_fc_threshold":          1.5,
+    "ratio_rescue_threshold":          1.5,
     "enable_background_threshold":     True,
     "enable_qc_ratio_threshold":       True,
     "enable_intensity_fc_threshold":   False,
+    "enable_ratio_rescue":             True,
 }
 
 # ── 預設 ──────────────────────────────────────────────────────────────────────
@@ -59,9 +63,11 @@ _DEFAULT: Step4Params = {
     "low_det_thresh":                  0.2,
     "qc_ratio_threshold":              0.25,
     "intensity_fc_threshold":          2.0,
+    "ratio_rescue_threshold":          2.0,
     "enable_background_threshold":     True,
     "enable_qc_ratio_threshold":       True,
     "enable_intensity_fc_threshold":   False,
+    "enable_ratio_rescue":             True,
 }
 
 # ── 嚴謹 ──────────────────────────────────────────────────────────────────────
@@ -74,9 +80,11 @@ _STRICT: Step4Params = {
     "low_det_thresh":                  0.2,
     "qc_ratio_threshold":              0.50,
     "intensity_fc_threshold":          3.0,
+    "ratio_rescue_threshold":          3.0,
     "enable_background_threshold":     True,
     "enable_qc_ratio_threshold":       True,
     "enable_intensity_fc_threshold":   False,
+    "enable_ratio_rescue":             True,
 }
 
 

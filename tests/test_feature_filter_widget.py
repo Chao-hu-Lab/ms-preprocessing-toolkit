@@ -29,12 +29,15 @@ def test_feature_filter_widget_defaults_keep_fc_gate_disabled(widget) -> None:
     assert widget.bg_enabled_switch.get() == 1
     assert widget.intensity_fc_enabled_switch.get() == 0
     assert widget.qc_ratio_enabled_switch.get() == 1
+    assert widget.ratio_rescue_enabled_switch.get() == 1
     assert params["enable_background_threshold"] is True
     assert params["enable_intensity_fc_threshold"] is False
     assert params["enable_qc_ratio_threshold"] is True
+    assert params["enable_ratio_rescue"] is True
     assert params["high_det_thresh"] == pytest.approx(0.8)
     assert params["low_det_thresh"] == pytest.approx(0.2)
     assert params["qc_ratio_threshold"] == pytest.approx(0.25)
+    assert params["ratio_rescue_threshold"] == pytest.approx(2.0)
 
 
 def test_feature_filter_widget_disables_matching_inputs_when_toggle_is_off(widget) -> None:
@@ -103,9 +106,49 @@ def test_feature_filter_widget_apply_parameters_updates_visible_controls(widget)
     assert params["low_det_thresh"] == pytest.approx(0.2)
     assert params["qc_ratio_threshold"] == pytest.approx(0.50)
     assert params["intensity_fc_threshold"] == pytest.approx(3.0, abs=0.01)
+    assert params["ratio_rescue_threshold"] == pytest.approx(3.0, abs=0.01)
     assert params["enable_background_threshold"] is True
     assert params["enable_qc_ratio_threshold"] is True
     assert params["enable_intensity_fc_threshold"] is False
+    assert params["enable_ratio_rescue"] is True
+
+
+def test_feature_filter_widget_run_processing_forwards_ratio_rescue_kwargs(
+    widget, monkeypatch
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_run_from_df(data, **kwargs):
+        captured.update(kwargs)
+        return ProcessingResult(
+            success=True,
+            step="feature_filter",
+            output_path=None,
+            data=data.copy(),
+            metadata=ProcessingMetadata(),
+            statistics={},
+        )
+
+    monkeypatch.setattr(feature_filter_adapter, "run_from_df", fake_run_from_df)
+    input_df = pd.DataFrame(
+        {
+            "Mz/RT": ["Sample_Type", "100.0/1.0"],
+            "Tolerance": ["na", "na"],
+            "Case1": ["case", 9000],
+            "Control1": ["control", 9000],
+            "QC1": ["qc", 9000],
+        }
+    )
+
+    widget.run_processing(
+        input_df,
+        signal_threshold=5000,
+        ratio_rescue_threshold=2.5,
+        enable_ratio_rescue=True,
+    )
+
+    assert captured["ratio_rescue_threshold"] == 2.5
+    assert captured["enable_ratio_rescue"] is True
 
 
 def test_feature_filter_widget_validates_mnar_threshold_order(widget) -> None:
