@@ -21,13 +21,22 @@ def test_step4_presets_use_expected_qc_ratio_thresholds(name: str, expected_qc_r
     assert params["qc_ratio_threshold"] == pytest.approx(expected_qc_ratio)
 
 
-@pytest.mark.parametrize("name", ["loose", "default", "strict"])
-def test_step4_presets_have_mnar_thresholds(name: str) -> None:
+@pytest.mark.parametrize(
+    ("name", "expected_high", "expected_low"),
+    [
+        ("loose", 0.3, 0.1),
+        ("default", 0.8, 0.2),
+        ("strict", 0.8, 0.2),
+    ],
+)
+def test_step4_presets_have_mnar_thresholds(
+    name: str, expected_high: float, expected_low: float
+) -> None:
     """All presets must expose high_det_thresh and low_det_thresh for the MNAR gate."""
     params = get_step4_preset(name)
 
-    assert params["high_det_thresh"] == pytest.approx(0.8)
-    assert params["low_det_thresh"] == pytest.approx(0.2)
+    assert params["high_det_thresh"] == pytest.approx(expected_high)
+    assert params["low_det_thresh"] == pytest.approx(expected_low)
     assert params["high_det_thresh"] > params["low_det_thresh"]
 
 
@@ -50,8 +59,8 @@ def test_step4_presets_do_not_contain_diff_threshold(name: str) -> None:
 @pytest.mark.parametrize(
     ("name", "expected_ratio_rescue"),
     [
-        ("loose", 1.5),
-        ("default", 2.0),
+        ("loose", 2.0),
+        ("default", 3.0),
         ("strict", 3.0),
     ],
 )

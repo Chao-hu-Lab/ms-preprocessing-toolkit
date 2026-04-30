@@ -16,6 +16,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 METHOD_FILE_ENV = "MSPTK_METHOD_FILE"
 XIC_RESULTS_FILE_ENV = "MSPTK_XIC_RESULTS_FILE"
 LOCAL_REFERENCE_CONFIG_ENV = "MSPTK_LOCAL_REFERENCE_CONFIG"
@@ -27,20 +29,46 @@ STEP2_XIC_REQUIRED_MESSAGE = (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-LOCAL_CONFIG_PATH = PROJECT_ROOT / "config" / "local_reference_paths.json"
+LOCAL_REFERENCE_YAML_PATH = PROJECT_ROOT / "config" / "local_reference.yml"
+LOCAL_REFERENCE_JSON_PATH = PROJECT_ROOT / "config" / "local_reference_paths.json"
+LOCAL_CONFIG_PATH = LOCAL_REFERENCE_JSON_PATH
+
+
+def _reference_config_path() -> Path | None:
+    override = os.getenv(LOCAL_REFERENCE_CONFIG_ENV)
+    if override:
+        return Path(override)
+    if LOCAL_REFERENCE_YAML_PATH.exists():
+        return LOCAL_REFERENCE_YAML_PATH
+    if LOCAL_REFERENCE_JSON_PATH.exists():
+        return LOCAL_REFERENCE_JSON_PATH
+    return None
+
+
+def _extract_reference_config(data: object) -> dict[str, Any]:
+    if not isinstance(data, dict):
+        return {}
+    references = data.get("references")
+    if isinstance(references, dict):
+        return references
+    return data
 
 
 def _load_local_reference_config() -> dict[str, Any]:
-    config_path = Path(os.getenv(LOCAL_REFERENCE_CONFIG_ENV, str(LOCAL_CONFIG_PATH)))
-    if not config_path.exists():
+    config_path = _reference_config_path()
+    if config_path is None or not config_path.exists():
         return {}
 
     try:
-        data = json.loads(config_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        text = config_path.read_text(encoding="utf-8")
+        if config_path.suffix.lower() in {".yml", ".yaml"}:
+            data = yaml.safe_load(text) or {}
+        else:
+            data = json.loads(text)
+    except (OSError, json.JSONDecodeError, yaml.YAMLError):
         return {}
 
-    return data if isinstance(data, dict) else {}
+    return _extract_reference_config(data)
 
 
 def _resolve_path(env_var: str, local_value: str | None) -> Path | None:

@@ -386,9 +386,11 @@ def test_cli_default_profile_uses_integrated_step_parameters(monkeypatch, projec
         assert captured["step4"]["low_det_thresh"] == 0.2
         assert captured["step4"]["qc_ratio_threshold"] == 0.25
         assert captured["step4"]["intensity_fc_threshold"] == 2.0
+        assert captured["step4"]["ratio_rescue_threshold"] == 3.0
         assert captured["step4"]["enable_background_threshold"] is True
         assert captured["step4"]["enable_qc_ratio_threshold"] is True
         assert captured["step4"]["enable_intensity_fc_threshold"] is False
+        assert captured["step4"]["enable_ratio_rescue"] is True
 
 
 def test_cli_xic_results_file_override_reaches_step2(monkeypatch, project_temp_dir) -> None:

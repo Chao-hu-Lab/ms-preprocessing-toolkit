@@ -100,6 +100,9 @@ ms-preprocessing
 # 執行全部流程
 python main.py --input data.xlsx --output processed.xlsx --xic-results-file xic_results.xlsx
 
+# 使用一次性的 YAML profile 檔案
+python main.py --input data.xlsx --output processed.xlsx --profile-file config/presets/lab-default.yml
+
 # 執行特定步驟
 python main.py --input data.xlsx --step istd --xic-results-file xic_results.xlsx
 
@@ -114,6 +117,8 @@ python main.py --help
 | `--input, -i` | 輸入檔案路徑 | - |
 | `--output, -o` | 輸出檔案路徑 | 自動生成 |
 | `--step` | 執行步驟 (organize/istd/duplicate-removal/filter/all) | all |
+| `--profile` | 使用已安裝或 `config/presets/` 中的 named profile | default |
+| `--profile-file` | 使用指定 YAML profile 檔案；適合一次性批次執行 | - |
 | `--mz-tol` | Step 3 重複訊號刪除 m/z 容差 (ppm) | 20 |
 | `--xic-results-file` | XIC Extractor 結果 workbook (.xlsx)，Step 2 必填來源 | - |
 | `--rt-tol` | Step 3 重複訊號刪除 RT 容差 (分鐘) | profile 預設 |
@@ -122,9 +127,26 @@ python main.py --help
 | `--low-det-thresh` | MNAR 缺失組檢出率上限 | 0.20 |
 | `--qc-ratio-threshold` | QC 檢出率門檻 | profile 預設 |
 | `--intensity-fc-threshold` | 強度倍率門檻 | profile 預設 |
+| `--ratio-rescue-threshold` | 檢出率倍數救援門檻 | profile 預設 |
+| `--disable-ratio-rescue` | 停用 Step 4 檢出率倍數救援 | false |
 | `--method-file` | 上機順序 Word 檔案 (.docx) | - |
 
-Step 2 不再支援 `--istd-mz`、`--istd-record-file` 或 `--istd-record-date`。本機預設路徑請使用 `MSPTK_XIC_RESULTS_FILE` 或 `config/local_reference_paths.json` 的 `xic_results_file`。
+Step 2 不再支援 `--istd-mz`、`--istd-record-file` 或 `--istd-record-date`。本機預設路徑請使用 `MSPTK_XIC_RESULTS_FILE` 或 `config/local_reference.yml` 的 `references.xic_results_file`。`config/local_reference_paths.json` 仍是過渡期 fallback。
+
+### YAML profiles 與本機 reference
+
+內建 Run All profiles 位於 `src/ms_preprocessing/config/presets/`，目前提供 `loose`、`default`、`strict`。使用者可把自己的 workflow profile 放在 `config/presets/*.yml`；GUI 會在 Run All preset 選單中列出這些檔名，CLI 可用 `--profile <name>` 呼叫。若只想針對單次批次使用某個檔案，使用 `--profile-file <path>`。
+
+本機路徑放在 `config/local_reference.yml`：
+
+```yaml
+version: 1
+references:
+  method_file: "C:\\path\\to\\method.docx"
+  xic_results_file: "C:\\path\\to\\xic_results.xlsx"
+```
+
+profile 可用 `${local.method_file}`、`${local.xic_results_file}` 引用上述路徑。`input`、`input_file`、`output`、`output_file` 不允許出現在 profile 中；資料輸入與輸出必須由 GUI 選檔或 CLI runtime 參數提供。
 
 ## 專案結構
 

@@ -1,0 +1,4 @@
+version: 1
+references:
+  method_file: "C:\\path\\to\\your\\method-file.docx"
+  xic_results_file: "C:\\path\\to\\your\\xic-results.xlsx"

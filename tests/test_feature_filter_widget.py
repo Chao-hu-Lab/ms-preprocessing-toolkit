@@ -201,6 +201,10 @@ def test_feature_filter_widget_uses_consistent_form_alignment(widget) -> None:
     assert widget.high_det_entry.cget("justify") == "center"
     assert widget.low_det_entry.cget("justify") == "center"
     assert widget.qc_ratio_entry.cget("justify") == "center"
+    assert widget.ratio_rescue_enabled_switch.grid_info()["column"] == 0
+    assert widget.ratio_rescue_slider.grid_info()["column"] == 2
+    assert widget.ratio_rescue_entry.grid_info()["column"] == 3
+    assert widget.ratio_rescue_entry.cget("justify") == "center"
     assert widget.bg_enabled_switch.winfo_manager() == "grid"
     assert widget.qc_ratio_enabled_switch.winfo_manager() == "grid"
     assert widget.qc_ratio_slider.winfo_manager() == "grid"
@@ -240,11 +244,13 @@ def test_feature_filter_widget_omits_redundant_mnar_section_heading(widget) -> N
 def test_feature_filter_widget_explains_rules_in_plainer_lab_language(widget) -> None:
     criteria_text = widget.criteria_textbox.get("1.0", "end")
 
-    assert "穩定檢出、強度倍率、存在/缺失標記是正向保留條件" in criteria_text
+    assert "穩定檢出、強度倍率、存在/缺失標記、檢出率倍數救援是正向保留條件" in criteria_text
     assert "QC 檢出率是負向覆寫條件" in criteria_text
     assert "至少 2 個實驗組的檢出率都大於等於此門檻" in criteria_text
     assert "出現組檢出率下限" in criteria_text
     assert "缺失組檢出率上限" in criteria_text
+    assert "每個組別檢出率至少 10%" in criteria_text
+    assert "獨立於 MNAR 缺失組檢出率上限" in criteria_text
     assert "fold-change = 最大組平均強度 / 最小組平均強度" in criteria_text
 
 

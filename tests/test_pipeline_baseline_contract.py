@@ -136,6 +136,64 @@ def test_pipeline_defaults_follow_local_reference_config(tmp_path, monkeypatch) 
         _reload_reference_modules()
 
 
+def test_pipeline_defaults_follow_yaml_local_reference_config(tmp_path, monkeypatch) -> None:
+    config_path = tmp_path / "local_reference.yml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "version: 1",
+                "references:",
+                '  method_file: "yaml-method.docx"',
+                '  xic_results_file: "yaml-xic.xlsx"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        with monkeypatch.context() as env:
+            _clear_reference_env(env)
+            env.setenv("MSPTK_LOCAL_REFERENCE_CONFIG", str(config_path))
+            defaults, benchmark = _reload_reference_modules()
+
+            assert defaults.DEFAULT_METHOD_FILE == Path("yaml-method.docx")
+            assert defaults.DEFAULT_XIC_RESULTS_FILE == Path("yaml-xic.xlsx")
+            assert defaults.STEP1_PARAMS["method_file"] == "yaml-method.docx"
+            assert defaults.STEP2_PARAMS["xic_results_file"] == "yaml-xic.xlsx"
+            result = benchmark.run_benchmark(input_path="dummy.xlsx", dry_run=True)
+            assert result["method_file"] == "yaml-method.docx"
+            assert result["xic_results_file"] == "yaml-xic.xlsx"
+    finally:
+        _reload_reference_modules()
+
+
+def test_yaml_local_reference_config_reports_legacy_step2_keys(tmp_path, monkeypatch) -> None:
+    config_path = tmp_path / "local_reference.yml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "version: 1",
+                "references:",
+                '  method_file: "yaml-method.docx"',
+                '  xic_results_file: "yaml-xic.xlsx"',
+                '  istd_record_file: "legacy.xlsx"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        with monkeypatch.context() as env:
+            _clear_reference_env(env)
+            env.setenv("MSPTK_LOCAL_REFERENCE_CONFIG", str(config_path))
+            defaults, _ = _reload_reference_modules()
+
+            details = defaults.get_legacy_step2_source_details()
+            assert any("istd_record_file" in detail for detail in details)
+    finally:
+        _reload_reference_modules()
+
+
 def test_pipeline_defaults_are_empty_without_local_or_env_overrides(tmp_path, monkeypatch) -> None:
     missing_config_path = tmp_path / "missing-local-reference-paths.json"
 

@@ -36,7 +36,7 @@ class ParameterResolver:
 
     @staticmethod
     def from_cli_args(args: Any) -> dict[str, dict[str, Any]]:
-        from ms_preprocessing.config import get_pipeline_profile
+        from ms_preprocessing.config import get_pipeline_profile, load_pipeline_profile_file
 
         legacy_flags = legacy_step2_cli_flags(args)
         if legacy_flags:
@@ -45,7 +45,12 @@ class ParameterResolver:
                 f"{', '.join(legacy_flags)}."
             )
 
-        profile = get_pipeline_profile(args.profile)
+        profile_file = getattr(args, "profile_file", None)
+        profile = (
+            load_pipeline_profile_file(profile_file)
+            if profile_file
+            else get_pipeline_profile(args.profile)
+        )
         step1 = dict(profile["step1"])
         step2 = dict(profile["step2"])
         step3 = dict(profile["step3"])
@@ -60,6 +65,8 @@ class ParameterResolver:
         degeneracy_corr_threshold = getattr(args, "degeneracy_corr_threshold", None)
         degeneracy_min_corr_points = getattr(args, "degeneracy_min_corr_points", None)
         degeneracy_adduct_table_file = getattr(args, "degeneracy_adduct_table_file", None)
+        ratio_rescue_threshold = getattr(args, "ratio_rescue_threshold", None)
+        disable_ratio_rescue = bool(getattr(args, "disable_ratio_rescue", False))
 
         return {
             "step1": {
@@ -139,7 +146,11 @@ class ParameterResolver:
                     if args.intensity_fc_threshold is not None
                     else step4.get("intensity_fc_threshold")
                 ),
-                "ratio_rescue_threshold": step4.get("ratio_rescue_threshold"),
+                "ratio_rescue_threshold": (
+                    ratio_rescue_threshold
+                    if ratio_rescue_threshold is not None
+                    else step4.get("ratio_rescue_threshold")
+                ),
                 "qc_ratio_threshold": (
                     args.qc_ratio_threshold
                     if args.qc_ratio_threshold is not None
@@ -151,7 +162,10 @@ class ParameterResolver:
                     "enable_intensity_fc_threshold",
                     False,
                 ),
-                "enable_ratio_rescue": step4.get("enable_ratio_rescue", True),
+                "enable_mnar_gate": step4.get("enable_mnar_gate", True),
+                "enable_ratio_rescue": (
+                    False if disable_ratio_rescue else step4.get("enable_ratio_rescue", True)
+                ),
             },
         }
 

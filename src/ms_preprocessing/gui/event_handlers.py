@@ -303,7 +303,11 @@ class MainWindowEventHandlersMixin:
         *,
         log: bool = True,
     ) -> None:
-        profile = get_pipeline_profile(profile_name)
+        try:
+            profile = get_pipeline_profile(profile_name)
+        except ValueError as exc:
+            self._log(f"Profile error: {exc}")
+            return
         for index, step_key in enumerate(("step1", "step2", "step3", "step4")):
             if index >= len(self.__dict__.get("step_widgets", [])):
                 break

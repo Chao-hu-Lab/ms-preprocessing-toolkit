@@ -8,8 +8,10 @@ from unittest.mock import Mock
 
 import customtkinter as ctk
 import pandas as pd
+import pytest
 
 from ms_preprocessing.adapters import data_organizer as data_organizer_adapter
+import ms_preprocessing.config.profile_loader as profile_loader
 from ms_preprocessing.config.pipeline_profiles import get_pipeline_profile
 from ms_preprocessing.gui.event_handlers import MainWindowEventHandlersMixin
 from ms_preprocessing.gui.main_window import MainWindow
@@ -654,6 +656,86 @@ def test_pipeline_profile_selection_applies_step_parameters_to_all_widgets() -> 
     assert any("Applied Run All preset: strict" in message for message in logs)
     assert any("QC檢出: 0.50" in message for message in logs)
     assert any("強度倍率: off" in message for message in logs)
+
+
+def test_pipeline_profile_selection_applies_local_yaml_profile(monkeypatch, tmp_path) -> None:
+    profile_dir = tmp_path / "presets"
+    profile_dir.mkdir()
+    (profile_dir / "lab.yml").write_text(
+        """
+version: 1
+name: lab
+description: Local lab profile
+steps:
+  step1:
+    mode: normalization
+    auto_detect: true
+    method_file: lab-method.docx
+  step2:
+    xic_results_file: lab-xic.xlsx
+  step3:
+    mz_tolerance_ppm: 11.0
+    rt_tolerance: 0.2
+    merge_mode: fill_gaps
+    preserve_red_font: true
+    top_n: null
+    enable_degeneracy_annotation: false
+    degeneracy_ppm_tolerance: 11.0
+    degeneracy_rt_tolerance: 0.03
+    degeneracy_correlation_threshold: 0.7
+    degeneracy_min_correlation_points: 4
+    degeneracy_adduct_table_file: ""
+  step4:
+    signal_threshold: 7000.0
+    background_threshold: 0.42
+    high_det_thresh: 0.7
+    low_det_thresh: 0.12
+    qc_ratio_threshold: 0.2
+    intensity_fc_threshold: 2.3
+    ratio_rescue_threshold: 4.0
+    enable_background_threshold: true
+    enable_qc_ratio_threshold: true
+    enable_intensity_fc_threshold: false
+    enable_mnar_gate: true
+    enable_ratio_rescue: true
+""".lstrip(),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(profile_loader, "LOCAL_PROFILE_DIR", profile_dir)
+    window = MainWindow.__new__(MainWindow)
+    window.step_widgets = [Mock(), Mock(), Mock(), Mock()]
+    window.run_all_profile_var = Mock()
+    logs: list[str] = []
+    window._log = logs.append
+
+    window._on_pipeline_profile_selected("lab")
+
+    window.step_widgets[0].apply_parameters.assert_called_once_with(
+        {"mode": "normalization", "auto_detect": True, "method_file": "lab-method.docx"}
+    )
+    window.step_widgets[1].apply_parameters.assert_called_once_with(
+        {"xic_results_file": "lab-xic.xlsx"}
+    )
+    assert window.step_widgets[2].apply_parameters.call_args.args[0]["merge_mode"] == "fill_gaps"
+    assert window.step_widgets[3].apply_parameters.call_args.args[0][
+        "background_threshold"
+    ] == pytest.approx(0.42)
+    window.run_all_profile_var.set.assert_called_once_with("lab")
+    assert any("Applied Run All preset: lab" in message for message in logs)
+
+
+def test_pipeline_profile_selection_logs_profile_errors_without_applying() -> None:
+    window = MainWindow.__new__(MainWindow)
+    window.step_widgets = [Mock(), Mock(), Mock(), Mock()]
+    window.run_all_profile_var = Mock()
+    logs: list[str] = []
+    window._log = logs.append
+
+    window._on_pipeline_profile_selected("missing")
+
+    assert all(not widget.apply_parameters.called for widget in window.step_widgets)
+    window.run_all_profile_var.set.assert_not_called()
+    assert any("Profile error:" in message for message in logs)
 
 
 class _RunAllAsyncHarness(MainWindowEventHandlersMixin, ctk.CTkFrame):
