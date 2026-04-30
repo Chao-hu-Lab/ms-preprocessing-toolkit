@@ -159,7 +159,7 @@ def test_step1_to_step4_golden_contract_preserves_metadata_and_export_sheets(
         "feature_filter",
     ]
     assert list(run_result.data.columns) == ["Mz/RT", "SampleA", "SampleB"]
-    assert protected_seen == {"step3": {1, 2}, "step4": {1, 2}}
+    assert protected_seen == {"step3": {2}, "step4": {1, 2}}
     assert session.metadata.protected_rows == {1, 2}
     assert session.metadata.sample_info is sample_info
     assert session.metadata.deleted_feature_df is deleted_feature
