@@ -155,11 +155,21 @@ class ParameterResolver:
 
     @staticmethod
     def from_gui_step_params(params_by_step: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        from ms_preprocessing.config import get_pipeline_profile
+
+        profile = get_pipeline_profile("default")
+        step3 = dict(profile["step3"])
+        step4 = dict(profile["step4"])
+        if len(params_by_step) > 2:
+            step3.update(dict(params_by_step[2]))
+        if len(params_by_step) > 3:
+            step4.update(dict(params_by_step[3]))
+
         return {
             "step1": dict(params_by_step[0]) if len(params_by_step) > 0 else {},
             "step2": dict(params_by_step[1]) if len(params_by_step) > 1 else {},
-            "step3": dict(params_by_step[2]) if len(params_by_step) > 2 else {},
-            "step4": dict(params_by_step[3]) if len(params_by_step) > 3 else {},
+            "step3": step3,
+            "step4": step4,
         }
 
 

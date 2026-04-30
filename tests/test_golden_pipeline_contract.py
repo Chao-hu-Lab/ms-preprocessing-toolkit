@@ -104,13 +104,17 @@ def test_step1_to_step4_golden_contract_preserves_metadata_and_export_sheets(
 
     def _run_step3(data, **kwargs):
         protected_seen["step3"] = set(kwargs["protected_rows"])
-        return _result("duplicate_remover", ProcessingMetadata(protected_rows={1, 2}))
+        return _result(
+            "duplicate_remover",
+            ProcessingMetadata(red_font_rows={1, 2}, protected_rows={1, 2}),
+        )
 
     def _run_step4(data, **kwargs):
         protected_seen["step4"] = set(kwargs["protected_rows"])
         return _result(
             "feature_filter",
             ProcessingMetadata(
+                red_font_rows={1},
                 protected_rows={1, 2},
                 deleted_feature_df=deleted_feature,
             ),
@@ -169,5 +173,5 @@ def test_step1_to_step4_golden_contract_preserves_metadata_and_export_sheets(
     extra_sheets = file_handler.calls[-1][2]["extra_sheets"]
     assert extra_sheets["SampleInfo"] is sample_info
     assert extra_sheets["deleted_feature"] is deleted_feature
-    assert file_handler.calls[-1][2]["red_font_rows"] == set()
+    assert file_handler.calls[-1][2]["red_font_rows"] == {1}
     assert file_handler.calls[-1][2]["save_parquet_cache"] is False

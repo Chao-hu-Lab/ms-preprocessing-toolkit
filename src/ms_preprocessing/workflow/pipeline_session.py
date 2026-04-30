@@ -128,9 +128,14 @@ class PipelineSession:
         if new_metadata.sample_info is not None:
             self.metadata.sample_info = new_metadata.sample_info
             self._metadata_refs["sample_info_ref"] = "SampleInfo"
-        if new_metadata.deleted_feature_df is not None:
+        if new_metadata.deleted_feature_df is not None or result.step == "feature_filter":
             self.metadata.deleted_feature_df = new_metadata.deleted_feature_df
-            self._metadata_refs["deleted_feature_ref"] = "deleted_feature"
+            self._metadata_refs["deleted_feature_ref"] = (
+                "deleted_feature"
+                if isinstance(self.metadata.deleted_feature_df, pd.DataFrame)
+                and not self.metadata.deleted_feature_df.empty
+                else None
+            )
 
         self.completed_steps.add(result.step)
         if result.output_path:

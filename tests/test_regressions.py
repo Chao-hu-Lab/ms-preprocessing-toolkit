@@ -7,10 +7,10 @@ from unittest.mock import Mock, patch
 
 import pandas as pd
 from ms_core.preprocessing.duplicate_remover import DuplicateRemover
-from ms_core.utils.file_handler import FileHandler
 
 from ms_preprocessing.gui.main_window import MainWindow
 from ms_preprocessing.gui.pipeline_session import PipelineSession
+from ms_preprocessing.utils.file_handler import FileHandler
 
 
 def test_duplicate_remover_handles_cross_rt_bin_duplicates() -> None:
@@ -64,7 +64,7 @@ def test_load_data_preserves_red_font_rows_from_cache_or_excel() -> None:
     fake_meta = {"red_font_rows": [1], "blue_font_cells": [], "highlight_rows": []}
 
     with (
-        patch("ms_core.utils.file_handler.Settings.SAVE_PARQUET_CACHE", True),
+        patch("ms_preprocessing.utils.file_handler.Settings.SAVE_PARQUET_CACHE", True),
         patch.object(handler, "_resolve_parquet_cache", return_value=Path("cache.parquet")),
         patch("pathlib.Path.exists", return_value=True),
         patch("pandas.read_parquet", return_value=fake_df),

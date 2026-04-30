@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from ms_preprocessing.workflow.parameter_resolver import (
     ParameterResolver,
+    STEP2_XIC_REQUIRED_MESSAGE,
     WorkflowValidationService,
 )
 
@@ -59,7 +62,7 @@ def test_cli_parameter_resolver_preserves_existing_override_contract() -> None:
     assert resolved["step4"]["low_det_thresh"] == 0.1
 
 
-def test_gui_parameter_resolver_returns_step_keyed_raw_values() -> None:
+def test_gui_parameter_resolver_returns_canonical_step_keyed_values() -> None:
     params = ParameterResolver.from_gui_step_params(
         [
             {"method_file": "method.docx"},
@@ -72,9 +75,50 @@ def test_gui_parameter_resolver_returns_step_keyed_raw_values() -> None:
     assert params == {
         "step1": {"method_file": "method.docx"},
         "step2": {"xic_results_file": "xic.xlsx"},
-        "step3": {"mz_tolerance_ppm": 20.0},
-        "step4": {"high_det_thresh": 0.3, "low_det_thresh": 0.7},
+        "step3": {
+            "mz_tolerance_ppm": 20.0,
+            "rt_tolerance": 0.1,
+            "merge_mode": "per_sample_max",
+            "preserve_red_font": True,
+            "top_n": None,
+            "enable_degeneracy_annotation": False,
+            "degeneracy_ppm_tolerance": 20.0,
+            "degeneracy_rt_tolerance": 0.05,
+            "degeneracy_correlation_threshold": 0.8,
+            "degeneracy_min_correlation_points": 3,
+            "degeneracy_adduct_table_file": "",
+        },
+        "step4": {
+            "signal_threshold": 5000,
+            "background_threshold": 0.33,
+            "high_det_thresh": 0.3,
+            "low_det_thresh": 0.7,
+            "intensity_fc_threshold": 2.0,
+            "qc_ratio_threshold": 0.25,
+            "enable_background_threshold": True,
+            "enable_qc_ratio_threshold": True,
+            "enable_intensity_fc_threshold": False,
+        },
     }
+
+
+@pytest.mark.parametrize(
+    ("attr", "flag"),
+    [
+        ("istd_mz", "--istd-mz"),
+        ("istd_record_file", "--istd-record-file"),
+        ("istd_record_date", "--istd-record-date"),
+    ],
+)
+def test_cli_parameter_resolver_rejects_legacy_step2_flags(attr: str, flag: str) -> None:
+    args = _base_cli_args(**{attr: "legacy-value"})
+
+    with pytest.raises(ValueError) as exc_info:
+        ParameterResolver.from_cli_args(args)
+
+    message = str(exc_info.value)
+    assert STEP2_XIC_REQUIRED_MESSAGE in message
+    assert flag in message
 
 
 def test_workflow_validation_service_collects_prefixed_gui_warnings() -> None:
