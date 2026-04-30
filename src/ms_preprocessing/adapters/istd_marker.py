@@ -11,7 +11,13 @@ import pandas as pd
 from ms_core.preprocessing import ISTDMarker as _ISTDMarker
 from ms_core.preprocessing import Settings as _CoreSettings
 
-from ms_preprocessing.adapters import _capture_output_path, _persist_adapter_output
+from ms_preprocessing.adapters import (
+    _capture_output_path,
+    capture_adapter_output,
+    formatting_metadata_from_core,
+    normalize_core_error,
+    read_input_frame,
+)
 from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
 
 _STEP = "istd_marker"
@@ -21,19 +27,8 @@ _XIC_REQUIRED_ERROR = (
 )
 
 
-def _read_input(input_path: str) -> pd.DataFrame:
-    suffix = input_path.lower()
-    if suffix.endswith(".parquet"):
-        return pd.read_parquet(input_path)
-    if suffix.endswith(".csv"):
-        return pd.read_csv(input_path)
-    if suffix.endswith((".tsv", ".txt")):
-        return pd.read_csv(input_path, sep="\t")
-    return pd.read_excel(input_path)
-
-
 def _save_output(df: pd.DataFrame) -> str | None:
-    return _persist_adapter_output(
+    return capture_adapter_output(
         df,
         step_name=_STEP,
         preferred_root=_CoreSettings.get_parquet_cache_root() / "adapters",
@@ -48,28 +43,10 @@ def _coerce_optional_path(path_value: str | Path | None) -> Path | None:
 
 
 def _build_metadata(raw_meta: dict[str, Any]) -> ProcessingMetadata:
-    red_font_rows = set(raw_meta.get("red_font_rows") or raw_meta.get("istd_rows") or [])
-    protected_rows = set(
-        raw_meta.get("protected_rows") or raw_meta.get("istd_rows") or red_font_rows
+    return formatting_metadata_from_core(
+        raw_meta,
+        red_aliases=("istd_rows",),
     )
-
-    return ProcessingMetadata(
-        red_font_rows=red_font_rows,
-        protected_rows=protected_rows,
-        blue_font_cells=list(raw_meta.get("blue_font_cells", [])),
-        highlight_rows=set(raw_meta.get("highlight_rows", [])),
-    )
-
-
-def _normalize_error(core_result: Any) -> str:
-    if getattr(core_result, "message", None):
-        return str(core_result.message)
-
-    errors = getattr(core_result, "errors", None) or []
-    if errors:
-        return "; ".join(str(error) for error in errors)
-
-    return "Processing failed"
 
 
 def _merge_user_summary_stats(raw_stats: dict[str, Any], raw_meta: dict[str, Any]) -> dict[str, Any]:
@@ -135,7 +112,7 @@ def _run_processor(
         output_path=output_path,
         data=core_result.data,
         metadata=_build_metadata(raw_meta),
-        error=None if core_result.success else _normalize_error(core_result),
+        error=None if core_result.success else normalize_core_error(core_result),
         statistics=_merge_user_summary_stats(
             dict(getattr(core_result, "statistics", {}) or {}),
             raw_meta,
@@ -160,7 +137,7 @@ def run(
             error=f"Input file not found: {input_path}",
         )
 
-    df = _read_input(input_path)
+    df = read_input_frame(input_path)
     return _run_processor(
         df,
         xic_results_file=xic_results_file,

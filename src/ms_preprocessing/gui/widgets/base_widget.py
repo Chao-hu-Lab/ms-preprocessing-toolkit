@@ -20,7 +20,7 @@ from ms_preprocessing.gui.validation import (
     has_blocking_warnings,
 )
 from ms_preprocessing.utils.perf import format_perf_delta, take_snapshot
-from ms_preprocessing.utils.results import ProcessingResult
+from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
 
 
 class BaseProcessingWidget(ctk.CTkFrame, ABC):
@@ -55,6 +55,7 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
         self._data: pd.DataFrame | None = None
         self._result: pd.DataFrame | None = None
         self._processing_result: ProcessingResult | None = None
+        self._metadata: ProcessingMetadata = ProcessingMetadata()
         self._context: dict = {}
         self._last_metadata: dict = {}
         self._last_parameters: dict = {}
@@ -228,7 +229,15 @@ class BaseProcessingWidget(ctk.CTkFrame, ABC):
             self.input_entry.insert(0, path)
 
     def set_context(self, context: dict | None) -> None:
-        self._context = context or {}
+        self.set_metadata(ProcessingMetadata.from_mapping(context))
+
+    def set_metadata(self, metadata: ProcessingMetadata | None) -> None:
+        self._metadata = metadata or ProcessingMetadata()
+        self._context = self._metadata.as_context_dict()
+
+    @property
+    def metadata(self) -> ProcessingMetadata:
+        return self._metadata
 
     def get_metadata(self) -> dict:
         return self._last_metadata or {}

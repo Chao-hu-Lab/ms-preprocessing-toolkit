@@ -70,6 +70,7 @@ def test_feature_filter_widget_run_processing_passes_toggle_flags(widget, monkey
             "QC1": ["qc", 9000],
         }
     )
+    widget.set_metadata(ProcessingMetadata(protected_rows={3}))
 
     result = widget.run_processing(
         input_df,
@@ -88,6 +89,7 @@ def test_feature_filter_widget_run_processing_passes_toggle_flags(widget, monkey
     assert captured["enable_background_threshold"] is True
     assert captured["enable_intensity_fc_threshold"] is False
     assert captured["enable_qc_ratio_threshold"] is False
+    assert captured["protected_rows"] == {3}
 
 
 def test_feature_filter_widget_apply_parameters_updates_visible_controls(widget) -> None:

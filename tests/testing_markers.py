@@ -14,7 +14,6 @@ SMOKE_TEST_FILES = frozenset(
 
 ADAPTER_TEST_FILES = frozenset(
     {
-        "test_cross_project_adapter_contracts.py",
         "test_ms_core_api_contract.py",
     }
 )
@@ -25,9 +24,11 @@ INTEGRATION_TEST_FILES = frozenset(
         "test_cli_parquet_chain.py",
         "test_final_export_handoff.py",
         "test_final_export_cache_policy.py",
+        "test_golden_pipeline_contract.py",
         "test_integration_parquet_pipeline.py",
         "test_intermediate_store_bridge.py",
         "test_parquet_compat.py",
+        "test_parameter_resolver.py",
         "test_pipeline_baseline_contract.py",
         "test_regressions.py",
         "test_workflow_export_service.py",

@@ -267,7 +267,7 @@ def test_run_all_uses_workflow_runner_for_real_gui_widget_set(monkeypatch, tmp_p
     assert host.step_widgets[0]._result["stage"].iloc[0] == "runner"
     assert host.step_widgets[0]._processing_result.step == "data_organizer"
     assert host.step_widgets[0]._last_parameters == {"a": 1}
-    assert host.step_widgets[0].context == host._context
+    assert host.step_widgets[0].context == host._pipeline_session.metadata.as_context_dict()
 
 
 def test_run_all_workflow_runner_path_rejects_raw_combined_tsv(monkeypatch, tmp_path) -> None:

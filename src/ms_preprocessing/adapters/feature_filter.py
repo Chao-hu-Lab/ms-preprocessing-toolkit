@@ -10,72 +10,31 @@ import pandas as pd
 from ms_core.preprocessing import FeatureFilter as _FeatureFilter
 from ms_core.preprocessing import Settings as _CoreSettings
 
-from ms_preprocessing.adapters import _capture_output_path, _persist_adapter_output
+from ms_preprocessing.adapters import (
+    _capture_output_path,
+    capture_adapter_output,
+    deleted_features_to_dataframe,
+    formatting_metadata_from_core,
+    normalize_core_error,
+    read_input_frame,
+)
 from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
 
 _STEP = "feature_filter"
 
 
-def _read_input(input_path: str) -> pd.DataFrame:
-    suffix = input_path.lower()
-    if suffix.endswith(".parquet"):
-        return pd.read_parquet(input_path)
-    if suffix.endswith(".csv"):
-        return pd.read_csv(input_path)
-    if suffix.endswith((".tsv", ".txt")):
-        return pd.read_csv(input_path, sep="\t")
-    return pd.read_excel(input_path)
-
-
 def _save_output(df: pd.DataFrame) -> str | None:
-    return _persist_adapter_output(
+    return capture_adapter_output(
         df,
         step_name=_STEP,
         preferred_root=_CoreSettings.get_parquet_cache_root() / "adapters",
     )
 
 
-def _deleted_features_to_dataframe(raw_meta: dict[str, Any]) -> pd.DataFrame | None:
-    deleted_feature_df = raw_meta.get("deleted_feature_df")
-    if isinstance(deleted_feature_df, pd.DataFrame):
-        return deleted_feature_df
-
-    deleted_features = raw_meta.get("deleted_features") or []
-    if not deleted_features:
-        return None
-
-    try:
-        first = deleted_features[0]
-        if isinstance(first, pd.Series):
-            return pd.DataFrame(
-                [row.tolist() for row in deleted_features], columns=list(first.index)
-            )
-        return pd.DataFrame(deleted_features)
-    except Exception:
-        return None
-
-
 def _build_metadata(raw_meta: dict[str, Any]) -> ProcessingMetadata:
-    red_font_rows = set(raw_meta.get("red_font_rows", []))
-    protected_rows = set(raw_meta.get("protected_rows") or raw_meta.get("red_font_rows") or [])
-
-    return ProcessingMetadata(
-        red_font_rows=red_font_rows,
-        protected_rows=protected_rows,
-        highlight_rows=set(raw_meta.get("highlight_rows", [])),
-        deleted_feature_df=_deleted_features_to_dataframe(raw_meta),
-    )
-
-
-def _normalize_error(core_result: Any) -> str:
-    if getattr(core_result, "message", None):
-        return str(core_result.message)
-
-    errors = getattr(core_result, "errors", None) or []
-    if errors:
-        return "; ".join(str(error) for error in errors)
-
-    return "Processing failed"
+    metadata = formatting_metadata_from_core(raw_meta)
+    metadata.deleted_feature_df = deleted_features_to_dataframe(raw_meta)
+    return metadata
 
 
 def _run_processor(
@@ -139,7 +98,7 @@ def _run_processor(
         output_path=output_path,
         data=core_result.data,
         metadata=_build_metadata(raw_meta),
-        error=None if core_result.success else _normalize_error(core_result),
+        error=None if core_result.success else normalize_core_error(core_result),
         statistics=dict(getattr(core_result, "statistics", {}) or {}),
     )
 
@@ -173,7 +132,7 @@ def run(
             error=f"Input file not found: {input_path}",
         )
 
-    df = _read_input(input_path)
+    df = read_input_frame(input_path)
     return _run_processor(
         df,
         background_threshold=background_threshold,

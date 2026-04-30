@@ -11,10 +11,12 @@ import logging
 from collections.abc import Callable
 from pathlib import Path
 from time import time_ns
+from typing import Any
 
 import pandas as pd
 
 from ms_preprocessing.utils.parquet_compat import write_parquet_with_normalized_fallback
+from ms_preprocessing.utils.results import ProcessingMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -98,4 +100,90 @@ def _capture_output_path(
         return save_output(df)
     except Exception as exc:
         logger.warning("Adapter handoff for %s raised unexpectedly: %s", step_name, exc)
+        return None
+
+
+def read_input_frame(input_path: str) -> pd.DataFrame:
+    """Read an adapter input file into a DataFrame."""
+    suffix = input_path.lower()
+    if suffix.endswith(".parquet"):
+        return pd.read_parquet(input_path)
+    if suffix.endswith(".csv"):
+        return pd.read_csv(input_path)
+    if suffix.endswith((".tsv", ".txt")):
+        return pd.read_csv(input_path, sep="\t")
+    return pd.read_excel(input_path)
+
+
+def capture_adapter_output(
+    df: pd.DataFrame,
+    *,
+    step_name: str,
+    preferred_root: Path,
+) -> str | None:
+    """Persist a successful adapter result to the standard handoff cache."""
+    return _capture_output_path(
+        lambda output_df: _persist_adapter_output(
+            output_df,
+            step_name=step_name,
+            preferred_root=preferred_root,
+        ),
+        df,
+        step_name=step_name,
+    )
+
+
+def normalize_core_error(core_result: Any) -> str:
+    """Return a stable app-layer error string from an ms-core result."""
+    if getattr(core_result, "message", None):
+        return str(core_result.message)
+
+    errors = getattr(core_result, "errors", None) or []
+    if errors:
+        return "; ".join(str(error) for error in errors)
+
+    return "Processing failed"
+
+
+def formatting_metadata_from_core(
+    raw_meta: dict[str, Any],
+    *,
+    red_aliases: tuple[str, ...] = (),
+) -> ProcessingMetadata:
+    """Convert common ms-core formatting metadata into app-layer metadata."""
+    red_source = raw_meta.get("red_font_rows", [])
+    for alias in red_aliases:
+        if raw_meta.get(alias):
+            red_source = raw_meta.get(alias)
+            break
+
+    red_font_rows = set(red_source or [])
+    protected_rows = set(raw_meta.get("protected_rows") or red_source or [])
+    return ProcessingMetadata(
+        red_font_rows=red_font_rows,
+        protected_rows=protected_rows,
+        blue_font_cells=list(raw_meta.get("blue_font_cells", [])),
+        highlight_rows=set(raw_meta.get("highlight_rows", [])),
+    )
+
+
+def deleted_features_to_dataframe(raw_meta: dict[str, Any]) -> pd.DataFrame | None:
+    """Normalize ms-core deleted feature metadata to a DataFrame."""
+    deleted_feature_df = raw_meta.get("deleted_feature_df")
+    if isinstance(deleted_feature_df, pd.DataFrame):
+        return deleted_feature_df
+
+    deleted_features = raw_meta.get("deleted_features") or []
+    if not deleted_features:
+        return None
+
+    try:
+        first = deleted_features[0]
+        if isinstance(first, pd.Series):
+            return pd.DataFrame(
+                [row.tolist() for row in deleted_features],
+                columns=list(first.index),
+            )
+        return pd.DataFrame(deleted_features)
+    except Exception:
         return None

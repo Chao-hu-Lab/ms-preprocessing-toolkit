@@ -17,9 +17,13 @@ def test_adapter_marker_selects_adapter_folder_and_api_contract() -> None:
     adapter_markers = classify_test_markers(
         Path("tests") / "adapters" / "test_adapter_feature_filter.py"
     )
+    cross_project_markers = classify_test_markers(
+        Path("tests") / "adapters" / "test_cross_project_adapter_contracts.py"
+    )
     contract_markers = classify_test_markers(Path("tests") / "test_ms_core_api_contract.py")
 
     assert adapter_markers == {"adapter"}
+    assert cross_project_markers == {"adapter"}
     assert contract_markers == {"adapter", "smoke"}
 
 
@@ -42,6 +46,12 @@ def test_integration_and_perf_markers_can_overlap() -> None:
         Path("tests") / "test_workflow_export_service.py"
     )
     combined_tsv_markers = classify_test_markers(Path("tests") / "test_combined_tsv_service.py")
+    golden_contract_markers = classify_test_markers(
+        Path("tests") / "test_golden_pipeline_contract.py"
+    )
+    parameter_resolver_markers = classify_test_markers(
+        Path("tests") / "test_parameter_resolver.py"
+    )
 
     assert markers == {"integration", "perf"}
     assert handoff_markers == {"integration"}
@@ -49,6 +59,8 @@ def test_integration_and_perf_markers_can_overlap() -> None:
     assert workflow_input_markers == {"integration"}
     assert workflow_export_markers == {"integration"}
     assert combined_tsv_markers == {"integration"}
+    assert golden_contract_markers == {"integration"}
+    assert parameter_resolver_markers == {"integration"}
 
 
 def test_root_hygiene_is_serial_without_being_gui() -> None:

@@ -13,6 +13,7 @@ from ms_preprocessing.gui.async_task_runner import AsyncTaskRunner
 from ms_preprocessing.gui.step_summary import summarize_step_result
 from ms_preprocessing.gui.validation import format_validation_warnings, has_blocking_warnings
 from ms_preprocessing.utils.file_handler import FileHandler
+from ms_preprocessing.workflow.parameter_resolver import ParameterResolver
 from ms_preprocessing.workflow.pipeline_session import PipelineSession
 from ms_preprocessing.workflow.workflow_runner import WorkflowRunResult
 
@@ -164,7 +165,7 @@ class RunAllController:
                 widget._last_metadata = {}
                 widget._processing_result = None
                 widget._result = None
-                widget.set_context(host._context)
+                self._set_widget_session_metadata(widget)
                 data = widget.run_processing(data, **params)
                 widget._result = data
 
@@ -306,8 +307,7 @@ class RunAllController:
             }
             output_data = step_result.data if step_result.data is not None else current_input
             widget._result = output_data
-            if hasattr(widget, "set_context"):
-                widget.set_context(host._context)
+            self._set_widget_session_metadata(widget)
             current_input = output_data
             last_synced_index = step_index
 
@@ -318,8 +318,7 @@ class RunAllController:
         ):
             next_widget = host.step_widgets[last_synced_index + 1]
             next_widget._data = current_input.copy(deep=False)
-            if hasattr(next_widget, "set_context"):
-                next_widget.set_context(host._context)
+            self._set_widget_session_metadata(next_widget)
 
     def _raise_if_raw_combined_tsv_input(self, data: pd.DataFrame) -> None:
         widgets = self._host.__dict__.get("step_widgets", [])
@@ -334,12 +333,7 @@ class RunAllController:
 
     @staticmethod
     def _resolved_parameters(params_by_step: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-        return {
-            "step1": dict(params_by_step[0]) if len(params_by_step) > 0 else {},
-            "step2": dict(params_by_step[1]) if len(params_by_step) > 1 else {},
-            "step3": dict(params_by_step[2]) if len(params_by_step) > 2 else {},
-            "step4": dict(params_by_step[3]) if len(params_by_step) > 3 else {},
-        }
+        return ParameterResolver.from_gui_step_params(params_by_step)
 
     @staticmethod
     def _step_name_to_index() -> dict[str, int]:
@@ -364,3 +358,13 @@ class RunAllController:
             return str(profile_var.get())
         except Exception:
             return "default"
+
+    def _set_widget_session_metadata(self, widget: Any) -> None:
+        metadata_setter = getattr(widget, "set_metadata", None)
+        if callable(metadata_setter):
+            metadata_setter(self._host._pipeline_session.metadata)
+            return
+
+        context_setter = getattr(widget, "set_context", None)
+        if callable(context_setter):
+            context_setter(self._host._pipeline_session.metadata.as_context_dict())

@@ -60,11 +60,13 @@ class _SummaryHarness(MainWindowEventHandlersMixin, ctk.CTkFrame):
             source_file=self._source_file,
         )
         self._context = self._pipeline_session.context
-        self._context.update(
-            {
-                "method_file": str(tmp_path / "method.docx"),
-                "xic_results_file": str(tmp_path / "xic_results.xlsx"),
-            }
+        self._pipeline_session.record_step_parameters(
+            0,
+            {"method_file": str(tmp_path / "method.docx")},
+        )
+        self._pipeline_session.record_step_parameters(
+            1,
+            {"xic_results_file": str(tmp_path / "xic_results.xlsx")},
         )
         self._step_output_paths = {}
         self.step_widgets = [_Step1Widget()]

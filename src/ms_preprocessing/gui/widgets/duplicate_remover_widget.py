@@ -292,9 +292,7 @@ class DuplicateRemoverWidget(BaseProcessingWidget):
 
     def run_processing(self, data: pd.DataFrame, **params) -> pd.DataFrame:
         """Run the Step 3 duplicate-removal step."""
-        protected_rows = set(
-            self._context.get("protected_rows") or self._context.get("red_font_rows") or []
-        )
+        protected_rows = set(self.metadata.protected_rows or self.metadata.red_font_rows)
 
         result = duplicate_remover_adapter.run_from_df(
             data,

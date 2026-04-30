@@ -202,6 +202,30 @@ def test_update_from_result_replaces_row_indexed_metadata_and_tracks_completed_s
     assert session.step_outputs["data_organizer"].endswith("step1.parquet")
 
 
+def test_feature_filter_result_without_deleted_features_clears_stale_deleted_sheet(tmp_path) -> None:
+    from ms_preprocessing.gui.pipeline_session import PipelineSession
+    from ms_preprocessing.utils.results import ProcessingMetadata, ProcessingResult
+
+    base = tmp_path
+    session = PipelineSession(output_dir=base, source_file=base / "input.xlsx")
+    stale_deleted = pd.DataFrame({"Mz/RT": ["200.0000/2.00"], "S1": [0.0]})
+    session.update_context_from_metadata({"deleted_feature_df": stale_deleted})
+
+    session.update_from_result(
+        ProcessingResult(
+            success=True,
+            step="feature_filter",
+            output_path=str(base / "step4.parquet"),
+            data=None,
+            metadata=ProcessingMetadata(),
+        )
+    )
+
+    assert session.metadata.deleted_feature_df is None
+    assert session.context["deleted_feature_df"] is None
+    assert session.snapshot()["metadata_refs"]["deleted_feature_ref"] is None
+
+
 def test_update_context_from_metadata_merges_legacy_formatting_across_steps(tmp_path) -> None:
     from ms_preprocessing.gui.pipeline_session import PipelineSession
 

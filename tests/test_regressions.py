@@ -6,11 +6,14 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pandas as pd
+import pytest
 from ms_core.preprocessing.duplicate_remover import DuplicateRemover
-from ms_core.utils.file_handler import FileHandler
 
 from ms_preprocessing.gui.main_window import MainWindow
 from ms_preprocessing.gui.pipeline_session import PipelineSession
+from ms_preprocessing.utils.excel_formatting_writer import ExcelFormattingWriter
+from ms_preprocessing.utils.file_handler import FileHandler
+from ms_preprocessing.utils.input_reader import InputReader
 
 
 def test_duplicate_remover_handles_cross_rt_bin_duplicates() -> None:
@@ -64,7 +67,7 @@ def test_load_data_preserves_red_font_rows_from_cache_or_excel() -> None:
     fake_meta = {"red_font_rows": [1], "blue_font_cells": [], "highlight_rows": []}
 
     with (
-        patch("ms_core.utils.file_handler.Settings.SAVE_PARQUET_CACHE", True),
+        patch("ms_preprocessing.utils.file_handler.Settings.SAVE_PARQUET_CACHE", True),
         patch.object(handler, "_resolve_parquet_cache", return_value=Path("cache.parquet")),
         patch("pathlib.Path.exists", return_value=True),
         patch("pandas.read_parquet", return_value=fake_df),
@@ -74,6 +77,64 @@ def test_load_data_preserves_red_font_rows_from_cache_or_excel() -> None:
 
     assert metadata.get("format") == "parquet"
     assert metadata.get("red_font_rows") == [1]
+
+
+def test_input_reader_closes_workbook_when_format_extraction_fails(monkeypatch) -> None:
+    """Red-font extraction failures must not leak the workbook handle."""
+
+    class _Workbook:
+        def __init__(self) -> None:
+            self.closed = False
+
+        @property
+        def worksheets(self):
+            raise RuntimeError("sheet lookup failed")
+
+        def close(self) -> None:
+            self.closed = True
+
+    workbook = _Workbook()
+
+    monkeypatch.setattr("pandas.read_excel", lambda *args, **kwargs: pd.DataFrame({"A": [1]}))
+    monkeypatch.setattr("ms_preprocessing.utils.input_reader.load_workbook", lambda *args, **kwargs: workbook)
+
+    df, red_font_rows = InputReader.load_excel(Path("input.xlsx"), sheet_name=0)
+
+    assert df.equals(pd.DataFrame({"A": [1]}))
+    assert red_font_rows == set()
+    assert workbook.closed is True
+
+
+def test_excel_formatting_writer_closes_workbook_when_formatting_fails(monkeypatch) -> None:
+    """Formatting failures must close the loaded workbook before bubbling up."""
+
+    class _Workbook:
+        def __init__(self) -> None:
+            self.closed = False
+
+        def __getitem__(self, name: str):
+            raise RuntimeError(f"missing sheet: {name}")
+
+        def close(self) -> None:
+            self.closed = True
+
+    workbook = _Workbook()
+
+    monkeypatch.setattr(pd.DataFrame, "to_excel", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "ms_preprocessing.utils.excel_formatting_writer.load_workbook",
+        lambda *args, **kwargs: workbook,
+    )
+
+    with pytest.raises(RuntimeError, match="missing sheet"):
+        ExcelFormattingWriter.save(
+            pd.DataFrame({"A": [1]}),
+            Path("output.xlsx"),
+            sheet_name="RawIntensity",
+            highlight_rows={0},
+        )
+
+    assert workbook.closed is True
 
 
 def test_intermediate_steps_autosave_as_parquet(project_temp_dir) -> None:

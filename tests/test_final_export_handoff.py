@@ -8,6 +8,7 @@ from unittest.mock import Mock
 import pandas as pd
 
 from ms_preprocessing.gui.main_window import MainWindow
+from ms_preprocessing.utils.results import ProcessingMetadata
 
 
 class _FakePipelineSession:
@@ -25,6 +26,7 @@ class _FakePipelineSession:
                 "deleted_feature_ref": None,
             },
         }
+        self.metadata = ProcessingMetadata()
 
     def set_source_file(self, source_file: Path | None) -> None:
         _ = source_file

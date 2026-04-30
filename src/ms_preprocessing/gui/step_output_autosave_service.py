@@ -37,10 +37,11 @@ class StepOutputAutosaveService:
             session = host._pipeline_session
             session.set_source_file(getattr(host, "_source_file", None))
             output_path = session.build_step_output_path(step_index)
+            metadata = session.metadata
             formatting_context = {
-                "highlight_rows": set(session.context.get("highlight_rows") or []),
-                "blue_font_cells": list(session.context.get("blue_font_cells") or []),
-                "red_font_rows": set(session.context.get("red_font_rows") or []),
+                "highlight_rows": set(metadata.highlight_rows),
+                "blue_font_cells": list(metadata.blue_font_cells),
+                "red_font_rows": set(metadata.red_font_rows),
             }
             session_token = id(session)
             data_snapshot = data.copy(deep=False)
