@@ -187,7 +187,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
 
         self.criteria_textbox = ctk.CTkTextbox(
             self._content_frame,
-            height=84,
+            height=132,
             font=FONTS["small"],
             wrap="word",
         )
@@ -232,17 +232,31 @@ class FeatureFilterWidget(BaseProcessingWidget):
             "4. 存在/缺失標記（MNAR presence/absence gate）\n"
             "   檢出率 = 組內高於訊號強度門檻的樣本數 / 組內總樣本數\n"
             "   若至少一組檢出率 ≥ 出現組檢出率下限，且至少另一組檢出率 ≤ 缺失組檢出率上限，\n"
-            "   代表此 feature 在某組中高頻率出現、在另一組中接近缺失（MNAR 特徵），予以保留並標記。\n"
-            "   輸出欄位 is_Presence_Absence_Marker = True 的特徵即屬此類。\n\n"
+            "   代表此 feature 在某組中高頻率出現、在另一組中接近缺失（MNAR 特徵），予以保留。\n"
+            "   這是保留規則；is_Presence_Absence_Marker 由下方補值分流模型統一判定。\n\n"
             "5. 檢出率倍數救援（Detection ratio rescue gate）\n"
             "   救援落在死區的特徵：未達 MNAR 出現/缺失條件，但組間檢出率倍數差異仍明顯。\n"
             "   條件：max(各組檢出率) / min(各組檢出率) ≥ 倍數救援門檻，\n"
             "         且每個組別檢出率至少 10%；這個 10% 底線獨立於 MNAR 缺失組檢出率上限。\n"
-            "   被救援的 feature 同樣標記 is_Presence_Absence_Marker = True，且不受 QC 檢出率門檻限制。\n\n"
+            "   被救援的 feature 會保留，且不受 QC 檢出率門檻強制刪除；\n"
+            "   但 is_Presence_Absence_Marker 可能為 True 或 False，取決於全組 detection profile。\n\n"
             "6. QC 檢出率門檻（QC gate）\n"
             "   QC 檢出率 = QC 中高於訊號強度門檻的樣本數 / QC 總樣本數\n"
             "   若 QC 檢出率 = 0，或低於你設定的 QC 檢出率門檻，代表這個 feature 在 QC 中表現不穩定，會被移除。\n"
-            "   存在/缺失標記與檢出率倍數救援的 feature 不會被本規則刪除。"
+            "   MNAR gate 或檢出率倍數救援保留的 feature 不會被本規則刪除；\n"
+            "   其他 marker-true feature 不會因此自動取得 QC force-delete 保護。\n\n"
+            "下游補值分流模型\n"
+            "Step 4 只輸出補值分流標記，不執行補值；下游依 is_Presence_Absence_Marker 選擇補值路徑。\n"
+            "Tier 1 model-imputable：全組 detection >= background_threshold，且沒有零檢出組；\n"
+            "   is_Presence_Absence_Marker = False，下游可走預設的 model-based 補值路徑。\n"
+            "Tier 2 low overall detection：至少一組 detection < background_threshold，但沒有零檢出組；\n"
+            "   is_Presence_Absence_Marker = True，下游走 min positive / 5。\n"
+            "Tier 3 structural absence：至少一組 detection = 0，且其他組有 evidence；\n"
+            "   is_Presence_Absence_Marker = True，下游同樣走 min positive / 5。\n"
+            "Tier 2 與 Tier 3 共用 is_Presence_Absence_Marker = True，但會用 Imputation_Tag_Reasons 區分原因。\n\n"
+            "Audit metadata\n"
+            "Feature_Filter_Keep_Reasons、Imputation_Tag_Reasons、Detection_Profile 是 metadata，不是 analysis features。\n"
+            "Detection_Profile 只列分析組 detection，QC 不會出現在 Detection_Profile。"
         )
         self.criteria_textbox.insert("1.0", content)
         inner_text = getattr(self.criteria_textbox, "_textbox", None)
@@ -258,6 +272,8 @@ class FeatureFilterWidget(BaseProcessingWidget):
                 "4. 存在/缺失標記（MNAR presence/absence gate）",
                 "5. 檢出率倍數救援（Detection ratio rescue gate）",
                 "6. QC 檢出率門檻（QC gate）",
+                "下游補值分流模型",
+                "Audit metadata",
             ]:
                 start = "1.0"
                 while True:

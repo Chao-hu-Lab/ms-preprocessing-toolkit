@@ -251,7 +251,24 @@ def test_feature_filter_widget_explains_rules_in_plainer_lab_language(widget) ->
     assert "缺失組檢出率上限" in criteria_text
     assert "每個組別檢出率至少 10%" in criteria_text
     assert "獨立於 MNAR 缺失組檢出率上限" in criteria_text
+    assert "is_Presence_Absence_Marker 可能為 True 或 False" in criteria_text
+    assert "被救援的 feature 同樣標記 is_Presence_Absence_Marker = True" not in criteria_text
     assert "fold-change = 最大組平均強度 / 最小組平均強度" in criteria_text
+    assert "其他 marker-true feature 不會因此自動取得 QC force-delete 保護" in criteria_text
+    assert "下游補值分流模型" in criteria_text
+    assert "Tier 1 model-imputable" in criteria_text
+    assert "全組 detection >= background_threshold，且沒有零檢出組" in criteria_text
+    assert "Tier 2 low overall detection" in criteria_text
+    assert "至少一組 detection < background_threshold，但沒有零檢出組" in criteria_text
+    assert "Tier 3 structural absence" in criteria_text
+    assert "至少一組 detection = 0，且其他組有 evidence" in criteria_text
+    assert "Tier 2 與 Tier 3 共用 is_Presence_Absence_Marker = True" in criteria_text
+    assert "min positive / 5" in criteria_text
+    assert "Feature_Filter_Keep_Reasons" in criteria_text
+    assert "Imputation_Tag_Reasons" in criteria_text
+    assert "Detection_Profile" in criteria_text
+    assert "metadata，不是 analysis features" in criteria_text
+    assert "QC 不會出現在 Detection_Profile" in criteria_text
 
 
 def test_progress_update_does_not_force_immediate_repaint(widget, monkeypatch) -> None:
