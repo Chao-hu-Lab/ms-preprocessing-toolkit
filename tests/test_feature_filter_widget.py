@@ -266,9 +266,10 @@ def test_feature_filter_widget_explains_rules_in_plainer_lab_language(widget) ->
     assert "min positive / 5" in criteria_text
     assert "Feature_Filter_Keep_Reasons" in criteria_text
     assert "Imputation_Tag_Reasons" in criteria_text
-    assert "Detection_Profile" in criteria_text
+    assert "*_ratio" in criteria_text
+    assert "Detection_Profile" not in criteria_text
     assert "metadata，不是 analysis features" in criteria_text
-    assert "QC 不會出現在 Detection_Profile" in criteria_text
+    assert "DNP 只負責安全傳遞" in criteria_text
 
 
 def test_progress_update_does_not_force_immediate_repaint(widget, monkeypatch) -> None:

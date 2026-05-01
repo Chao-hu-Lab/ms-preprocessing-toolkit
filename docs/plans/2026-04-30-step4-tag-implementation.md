@@ -1,8 +1,8 @@
 # Step4 Imputation Tag Implementation Plan
 
-Status: implementation plan v2 (plan only — not yet executed)
-Date: 2026-04-30 (v1) / 2026-05-01 (v2 revision)
-Contract source of truth: `docs/plans/2026-04-30-step4-tag-contract.md` (v2)
+Status: implementation plan v3 (plan executed and revised)
+Date: 2026-04-30 (v1) / 2026-05-01 (v2/v3 revisions)
+Contract source of truth: `docs/plans/2026-04-30-step4-tag-contract.md` (v3)
 
 > **For Claude (when asked to execute):** REQUIRED SUB-SKILL:
 > `superpowers:executing-plans`. Tasks must be executed in order with the
@@ -19,13 +19,13 @@ Contract source of truth: `docs/plans/2026-04-30-step4-tag-contract.md` (v2)
 - **Task 1 widened**: explicit flip-direction tests for the two verified
   flip cases (`0.42/0.35/0.20` and `0.25/0.22/0.18`), plus boundary
   patterns (`0.20/0.20/0.20`).
-- **Task 3 widened**: deleted-features path now emits `Detection_Profile`
-  plus `Feature_Filter_Delete_Reasons` per the contract.
+- **Task 3 widened**: deleted-features path now emits
+  `Feature_Filter_Delete_Reasons` per the contract while preserving
+  existing ratio columns.
 - **Review fixes applied**: structural absence now requires a non-zero
   contrast group; low-overall reason masks can co-exist with structural
-  reason masks; `Detection_Profile` is treated as display/audit metadata,
-  not a parseable precision source; background-threshold tagging remains
-  active even when the background keep gate is disabled.
+  reason masks; background-threshold tagging remains active even when the
+  background keep gate is disabled.
 - **Unfiltered mode specified**: the existing all-keep-gates-disabled
   fallback now emits an explicit `unfiltered` keep reason through a
   decision-layer mask, so every kept feature has at least one reason token.
@@ -43,6 +43,15 @@ Contract source of truth: `docs/plans/2026-04-30-step4-tag-contract.md` (v2)
   the external `Metaboanalyst_clone` consumer. This toolkit plan validates
   Step4 tag/schema compatibility, not downstream imputer internals.
 
+## Revision Notes (v3)
+
+- **Detection_Profile removed**: formal output no longer emits the rounded
+  string summary. Numeric `<analysis_group>_ratio` columns and `QC_ratio`
+  are the detection evidence source of truth.
+- **DNP boundary clarified**: DNP only performs calibration and safely
+  passes Step4 metadata through to MA. It must exclude metadata from numeric
+  calibration matrices but must not interpret imputation semantics.
+
 ## Goal
 
 Implement the Step4 imputation tag contract defined in
@@ -51,12 +60,14 @@ Implement the Step4 imputation tag contract defined in
 - Replace the hard-coded
   `is_Presence_Absence_Marker = mnar_keep OR ratio_rescue_keep` rule
   with the contract's `model_imputable` rule.
-- Emit three new feature-level metadata columns on kept features
-  (`Feature_Filter_Keep_Reasons`, `Imputation_Tag_Reasons`,
-  `Detection_Profile`) and two columns on deleted-feature diagnostic rows
-  (`Feature_Filter_Delete_Reasons`, `Detection_Profile`).
-- Update downstream metadata exclusion paths so the new columns are not
-  treated as numeric feature data.
+- Emit two new feature-level metadata columns on kept features
+  (`Feature_Filter_Keep_Reasons`, `Imputation_Tag_Reasons`) and one
+  column on deleted-feature diagnostic rows
+  (`Feature_Filter_Delete_Reasons`).
+- Preserve numeric `<analysis_group>_ratio` columns and `QC_ratio` as
+  feature-level detection evidence, not sample intensity data.
+- Update downstream metadata exclusion/pass-through paths so DNP can carry
+  the metadata to MA without using it in calibration matrices.
 
 This plan changes Step4 output **schema** (additive) and Step4 tag
 **semantics** (existing column flips for some patterns in both
@@ -67,8 +78,8 @@ ms-core tag.
 
 | Layer | Owner module | Role for this plan |
 | --- | --- | --- |
-| ms-core decisions | `feature_filter_decisions.py` | Compute `all_groups_pass_background`, `any_group_zero`, `any_group_nonzero`, `imputation_tag`, tag-reason masks, and `unfiltered_keep`; expose analysis ratio matrix and analysis group names |
-| ms-core output | `feature_filter_output.py` | Compose audit strings from decision masks; emit boolean tag + 3 audit columns on kept features; attach `Feature_Filter_Delete_Reasons` and `Detection_Profile` to deleted-feature rows |
+| ms-core decisions | `feature_filter_decisions.py` | Compute `all_groups_pass_background`, `any_group_zero`, `any_group_nonzero`, `imputation_tag`, tag-reason masks, and `unfiltered_keep` |
+| ms-core output | `feature_filter_output.py` | Compose audit strings from decision masks; emit boolean tag + 2 audit columns on kept features; attach `Feature_Filter_Delete_Reasons` to deleted-feature rows |
 | ms-core facade | `ms_quality_filter.py` | Forward new metadata; ensure no leakage into legacy paths |
 | toolkit adapter | `adapters/feature_filter.py`, `adapters/__init__.py` | Pass through new columns into adapter result and preserve deleted-feature DataFrame shape |
 | toolkit downstream | various (audited in Task 6) | Add kept/deleted metadata exclusion sets to numeric-matrix paths |
@@ -225,16 +236,7 @@ preserves the layering established by
    - `tag_reason_low_overall`
    - `unfiltered_keep`
 
-2. Also expose context needed by the output layer to compose strings:
-   - `analysis_ratio_matrix` (already computed internally; promote to
-     result) — shape `(n_features, n_analysis_groups)`, float
-   - `analysis_group_names: list[str]` — order matches the matrix
-     columns and matches the original `Sample_Type` row order
-
-   These context fields enable Task 3 to format `Detection_Profile`
-   without re-deriving group structure.
-
-3. Inside `decide()`, compute (analysis groups only, QC excluded):
+2. Inside `decide()`, compute (analysis groups only, QC excluded):
    - `all_groups_pass_background = (ratio_matrix >= thresholds.background).all(axis=1)`
    - `any_group_zero = (ratio_matrix == 0.0).any(axis=1)`
    - `any_group_nonzero = (ratio_matrix > 0.0).any(axis=1)`
@@ -251,13 +253,13 @@ preserves the layering established by
    False. The enable flag disables `stable_keep` as a keep reason only; it
    does not disable the imputation tag's model-imputable detection floor.
 
-4. Add an explicit guard:
+3. Add an explicit guard:
    - If `n_analysis_groups == 0`, raise `ValueError` early. The contract
      declares this case undefined; do not silently emit features.
 
-5. Do not add string lists, do not add token-joining helpers, do not
-   pre-format `Detection_Profile`. All string work is Task 3's
-   responsibility.
+4. Do not add string lists, do not add token-joining helpers, and do not
+   promote the ratio matrix only to produce display strings. All string
+   work is Task 3's responsibility.
 
 Run green for Task 1 tests, then run the full ms-core feature-filter
 test suite to confirm no decision-level regressions:
@@ -275,16 +277,16 @@ Pop-Location
 **Tests:** `ms-core/tests/test_feature_filter_output.py`
 
 This task owns all string composition and frame shaping for the new
-schema. It also owns the deleted-features `Detection_Profile`
-attachment.
+schema. It also owns deleted-feature delete-reason attachment.
 
 1. Add failing tests:
 
    **Kept-feature schema:**
-   - `test_output_emits_three_new_metadata_columns_in_order`
-     - After `is_Presence_Absence_Marker`, the result frame must contain
-       in order: `Feature_Filter_Keep_Reasons`, `Imputation_Tag_Reasons`,
-       `Detection_Profile`.
+   - `test_output_emits_two_new_metadata_columns_after_marker`
+      - After `is_Presence_Absence_Marker`, the result frame must contain
+        in order: `Feature_Filter_Keep_Reasons`,
+        `Imputation_Tag_Reasons`.
+      - Assert `Detection_Profile` is not emitted.
    - `test_output_tag_value_uses_decision_imputation_tag_not_legacy_or`
      - Use the contract's verified flip cases: `0.42/0.35/0.20` (legacy
        True, contract False) and `0.25/0.22/0.18` (legacy False,
@@ -303,24 +305,20 @@ attachment.
         low-overall. Assert `low_overall_detection` and
         `structural_absence|low_overall_detection` respectively. Assert
         Tier 1 features carry empty string `""`.
-   - `test_output_detection_profile_format_two_decimals_pipe_joined`
-      - Group order matches input `Sample_Type` order; values formatted
-        with two decimals.
-      - Use non-alphabetical group order, e.g. `B`, `A`, `C`, so the test
-        fails if implementation sorts groups alphabetically.
-   - `test_output_qc_column_does_not_appear_in_detection_profile`
+   - `test_output_preserves_numeric_ratio_columns_as_detection_source_of_truth`
+      - Existing `<analysis_group>_ratio` and `QC_ratio` columns remain
+        numeric metadata columns and are not collapsed into a display string.
 
    **Deleted-feature schema:**
-   - `test_deleted_features_carry_delete_reasons_and_detection_profile_only`
+   - `test_deleted_features_carry_delete_reason_and_existing_ratio_columns_only`
       - Construct an input where one feature fails all keep rules (e.g.,
         `0.18/0.18/0.18`).
       - Assert deleted feature row has `Feature_Filter_Delete_Reasons`
-        and `Detection_Profile` columns attached.
+        attached.
       - Assert `Feature_Filter_Keep_Reasons` and
         `Imputation_Tag_Reasons` are NOT attached to deleted rows.
       - Assert `Feature_Filter_Delete_Reasons == "no_keep_rule"`.
-      - Assert `Detection_Profile` value matches the original detection
-        pattern.
+      - Assert existing ratio columns remain on the diagnostic row.
    - `test_deleted_features_capture_qc_force_delete_reason`
       - Construct a row that matches a positive keep rule but is deleted
         by `qc_force_delete`.
@@ -344,18 +342,14 @@ attachment.
      - `_compose_keep_reasons(masks_for_feature) -> str` honoring the
        contract's fixed token order
      - `_compose_tag_reasons(masks_for_feature) -> str` same pattern
-     - `_compose_detection_profile(ratio_row, group_names) -> str` two
-       decimals, pipe-joined
-   - Insert the three new columns immediately after
-     `is_Presence_Absence_Marker` in the kept-feature result frame.
+   - Insert the two new columns immediately after
+      `is_Presence_Absence_Marker` in the kept-feature result frame.
    - Header row 0 stores the column name; data rows store composed
      strings sliced by `rows_to_keep[1:]`.
    - For each row appended to `deleted_features`, attach
-     `Feature_Filter_Delete_Reasons` and `Detection_Profile` (the same
-     profile string the kept-feature path would have produced) by
-     widening the Series index before appending. Do not rely on
-     `Series.name`; the adapter builds DataFrame columns from
-     `Series.index`.
+     `Feature_Filter_Delete_Reasons` by widening the Series index before
+     appending. Do not rely on `Series.name`; the adapter builds DataFrame
+     columns from `Series.index`.
    - `unfiltered` is emitted from `decision.unfiltered_keep`; do not
      infer it by string-layer fallthrough.
 
@@ -383,10 +377,10 @@ Run green for Task 3 tests and re-run Task 1 ms-core suite.
    - `0.42/0.35/0.20` (T -> F)
    - `0.25/0.22/0.18` (F -> T) — only if previously fixtured
 
-3. Add an integration assertion that the FeatureFilter facade returns
-   the three new metadata columns end-to-end (decision -> output ->
+3. Add an integration assertion that the FeatureFilter facade returns the
+   two new kept-feature metadata columns end-to-end (decision -> output ->
    facade) and that deleted-feature rows carry
-   `Feature_Filter_Delete_Reasons` plus `Detection_Profile`.
+   `Feature_Filter_Delete_Reasons` while preserving ratio columns.
 
 4. `ms_quality_filter.py` should require minimal or no change: it
    already delegates to decision + output. Confirm via test, do not
@@ -436,16 +430,16 @@ work must pin to the new tag, not to a master HEAD.
 - `src/ms_preprocessing/adapters/__init__.py`
 **Test:** `tests/adapters/test_adapter_feature_filter.py`
 
-1. Add failing test asserting the adapter result frame contains the
-   three new metadata columns in the contract-defined order, immediately
-   after `is_Presence_Absence_Marker`.
+1. Add failing test asserting the adapter result frame contains the two
+   new metadata columns in the contract-defined order, immediately after
+   `is_Presence_Absence_Marker`.
 
 2. Add tests for the contract's verified flip cases via the adapter to
    confirm the new semantics propagate end-to-end.
 
-3. Add a test asserting deleted-feature rows surfaced through the
-    adapter carry `Feature_Filter_Delete_Reasons` plus
-    `Detection_Profile`.
+3. Add a test asserting deleted-feature rows surfaced through the adapter
+   carry `Feature_Filter_Delete_Reasons` while preserving existing ratio
+   columns.
 
 4. Update the adapter only as needed to surface the columns. If the
     adapter already passes the result frame through unchanged, no code
@@ -480,21 +474,23 @@ work must pin to the new tag, not to a master HEAD.
     - statistics/data-organizer mode covered by
       `ms-core/tests/test_data_organizer_facade_contract.py`
 
-    For each hit, extend the kept-output metadata exclusion list to include
-    `Feature_Filter_Keep_Reasons`, `Imputation_Tag_Reasons`,
-    `Detection_Profile`. `Feature_Filter_Delete_Reasons` applies only to
-    deleted-feature diagnostic rows; include it only in code paths that
-    construct numeric matrices from deleted-feature sheets. Add a focused
-    test per touched module asserting the new columns are excluded from the
-    numeric matrix.
+   For each hit, extend the kept-output metadata exclusion/pass-through
+   list to include `Feature_Filter_Keep_Reasons`,
+   `Imputation_Tag_Reasons`, dynamic `<analysis_group>_ratio` columns,
+   and `QC_ratio`. `Feature_Filter_Delete_Reasons` applies only to
+   deleted-feature diagnostic rows; include it only in code paths that
+   construct numeric matrices from deleted-feature sheets. Add a focused
+   test per touched module asserting these columns are excluded from the
+   numeric matrix but preserved for handoff/export.
 
     Required acceptance tests for this audit:
-    - Calibration conversion/wrapper tests prove the four kept-output
-      metadata columns are not included as feature intensity values.
+    - Calibration conversion/wrapper tests prove kept-output metadata and
+      ratio columns are not included as feature intensity values.
     - Statistics/data-organizer mode tests prove the metadata columns are
       not treated as sample columns or numeric feature values.
-    - Final export/deleted-feature tests prove `Feature_Filter_Delete_Reasons`
-      is treated as deleted-sheet metadata, not numeric data.
+    - Final export/deleted-feature tests prove
+      `Feature_Filter_Delete_Reasons` and ratio columns are treated as
+      diagnostic metadata, not numeric sample data.
 
     Cross-repo note: `Metaboanalyst_clone` already owns the missing-value
     imputation router and group-agnostic KNN/RF behavior. This toolkit task
@@ -546,9 +542,9 @@ python -m pytest tests\ -q --tb=short
    tier description as a "downstream imputation routing" subsection
    that follows the existing keep-rule descriptions.
 
-3. Mention the three new audit columns by name and that they are
-   metadata, not analysis features. State that QC group does not
-   appear in `Detection_Profile`.
+3. Mention the two new audit columns and the existing `*_ratio` columns by
+   name and state that they are metadata, not analysis features. State
+   that DNP only safely passes these fields through to MA.
 
 4. Apply the project's Text And UI Copy Rules from CLAUDE.md:
    - UTF-8, no mojibake, no `??` placeholders.
@@ -594,11 +590,10 @@ chore: bump ms-core to vX.Y.0 for Step4 imputation tag contract
 ms-core changes:
 - Replace hardcoded mnar OR ratio_rescue tag rule with contract's
   model_imputable rule.
-- Emit Feature_Filter_Keep_Reasons, Imputation_Tag_Reasons,
-  Detection_Profile metadata columns on kept features.
+- Emit Feature_Filter_Keep_Reasons and Imputation_Tag_Reasons metadata
+  columns on kept features.
 - Emit `unfiltered` keep reason for the existing all-gates-disabled
   retain-all mode.
-- Attach Detection_Profile to deleted-feature diagnostic rows.
 - Attach Feature_Filter_Delete_Reasons to deleted-feature diagnostic rows.
 - Tag semantics flip in both directions for two pattern families
   (see contract Versioning Note).
@@ -666,10 +661,11 @@ Toolkit changes:
 
 - All ms-core tests green; ms-core minor tag pushed.
 - All toolkit tests green; submodule pointer bumped.
-- Three new metadata columns visible in Step4 kept-feature output for
+- Two new metadata columns visible in Step4 kept-feature output for
   every preset.
-- `Detection_Profile` visible on deleted-feature diagnostic rows.
 - `Feature_Filter_Delete_Reasons` visible on deleted-feature diagnostic rows.
+- Numeric `<analysis_group>_ratio` columns and `QC_ratio` remain available
+  as feature-level metadata and are excluded from numeric matrix paths.
 - `is_Presence_Absence_Marker` matches the contract's representative
   cases table for all listed patterns, including both flip cases.
 - GUI widget describes the three-tier model AND retains existing

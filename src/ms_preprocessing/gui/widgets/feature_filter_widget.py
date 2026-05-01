@@ -255,8 +255,9 @@ class FeatureFilterWidget(BaseProcessingWidget):
             "   is_Presence_Absence_Marker = True，下游同樣走 min positive / 5。\n"
             "Tier 2 與 Tier 3 共用 is_Presence_Absence_Marker = True，但會用 Imputation_Tag_Reasons 區分原因。\n\n"
             "Audit metadata\n"
-            "Feature_Filter_Keep_Reasons、Imputation_Tag_Reasons、Detection_Profile 是 metadata，不是 analysis features。\n"
-            "Detection_Profile 只列分析組 detection，QC 不會出現在 Detection_Profile。"
+            "Feature_Filter_Keep_Reasons、Imputation_Tag_Reasons 與 *_ratio 欄位是 metadata，不是 analysis features。\n"
+            "exposure_ratio、normal_ratio、control_ratio、QC_ratio 是 Step 4 判定證據；\n"
+            "DNP 只負責安全傳遞這些欄位到 MA，不在校正矩陣中使用。"
         )
         self.criteria_textbox.insert("1.0", content)
         inner_text = getattr(self.criteria_textbox, "_textbox", None)

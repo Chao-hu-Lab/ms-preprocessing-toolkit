@@ -1,9 +1,22 @@
 # Step4 Imputation Tag Contract
 
-Status: contract v2
-Date: 2026-04-30 (v1) / 2026-05-01 (v2 revision)
+Status: contract v3
+Date: 2026-04-30 (v1) / 2026-05-01 (v2/v3 revisions)
 Supersedes: `2026-04-30-step4-tag-contract.md` v1 (in-place revision)
 Sits alongside: `2026-04-30-step4-imputation-tag-discussion.md`
+
+## Revision Notes (v3)
+
+- **Detection evidence source-of-truth clarified**: `Detection_Profile` is
+  removed from the formal output contract. It duplicated existing numeric
+  `<analysis_group>_ratio` columns, rounded values to two decimals, and
+  created a second source of truth.
+- **Numeric ratio metadata retained**: Step4 must preserve
+  `<analysis_group>_ratio` columns and `QC_ratio` as feature-level metadata.
+  These columns are the audit source for detection evidence.
+- **Downstream responsibility boundary corrected**: DNP does not interpret
+  Step4 tags. DNP must exclude these metadata columns from calibration
+  matrices and pass them through to MA. MA owns imputation routing.
 
 ## Revision Notes (v2)
 
@@ -14,20 +27,18 @@ Sits alongside: `2026-04-30-step4-imputation-tag-discussion.md`
   flip (`0.25/0.22/0.18`), with both directions traceable to specific
   decision-rule clauses. The Versioning Note rationale is rewritten.
 - **Schema clarification**: deleted-feature diagnostic rows now have an
-  explicit audit policy (carry `Feature_Filter_Delete_Reasons` and
-  `Detection_Profile`).
+  explicit audit policy (carry `Feature_Filter_Delete_Reasons`; numeric
+  ratio columns remain on the original row).
 - **Ordering decisions promoted**: token order for
-  `Feature_Filter_Keep_Reasons`, `Imputation_Tag_Reasons`,
-  `Feature_Filter_Delete_Reasons`, and group order for
-  `Detection_Profile` are now part of the contract instead of open items,
-  since they are part of the public string output.
+  `Feature_Filter_Keep_Reasons`, `Imputation_Tag_Reasons`, and
+  `Feature_Filter_Delete_Reasons` is now part of the contract instead of an
+  open item, since these are public string outputs.
 - **Single-group guard**: explicit clause that `structural_absence` does not
   apply when `n_analysis_groups < 2`.
 - **Review fixes**: deleted-feature diagnostics now distinguish QC override
   deletion from no-keep-rule deletion; `structural_absence` now requires a
-  non-zero contrast group; `Detection_Profile` is display/audit metadata,
-  not a machine-precision source for threshold re-derivation; background
-  threshold semantics are explicit when `enable_background_threshold=False`.
+  non-zero contrast group; background threshold semantics are explicit when
+  `enable_background_threshold=False`.
 - **Unfiltered mode**: the existing all-keep-gates-disabled retain-all
   behavior now has an explicit `unfiltered` keep-reason token.
 
@@ -186,7 +197,7 @@ Step4 retains:
 
 - `is_Presence_Absence_Marker` (existing, boolean).
 
-Step4 adds three feature-level metadata columns, inserted in this order
+Step4 adds two feature-level metadata columns, inserted in this order
 immediately after `is_Presence_Absence_Marker`:
 
 1. **`Feature_Filter_Keep_Reasons`** (string, pipe-joined)
@@ -198,25 +209,26 @@ immediately after `is_Presence_Absence_Marker`:
    False)
    - Possible tokens listed under "Token And Group Ordering" below.
 
-3. **`Detection_Profile`** (string)
-   - QC excluded.
+`Detection_Profile` is **not** part of the formal contract. Detection
+evidence is represented by numeric ratio metadata columns already produced
+by Step4:
 
-`Detection_Min`, `Detection_Max`, and `Detection_Ratio` are **not** part
-of the contract. `Detection_Profile` is display/audit metadata only. It
-uses rounded values and must not be parsed as a machine-precision source
-for threshold re-derivation or downstream numeric decisions. Downstream
-consumers that need exact detection ratios must use the decision-layer
-data or re-run the detection-ratio calculation from source data.
+- `<analysis_group>_ratio`, for example `exposure_ratio`, `normal_ratio`,
+  `control_ratio`
+- `QC_ratio`, when QC samples are present
 
-These three columns are always emitted (not gated behind a profile flag)
+These ratio columns are feature-level metadata, not sample intensity
+columns. They are the source of truth for detection audit and must not be
+replaced by a rounded display string.
+
+These two audit columns are always emitted (not gated behind a profile flag)
 so downstream schema is stable.
 
 ### Deleted Features
 
-The diagnostic `deleted_features` list carries:
+The diagnostic `deleted_features` list carries one additional column:
 
 1. **`Feature_Filter_Delete_Reasons`** (string, pipe-joined)
-2. **`Detection_Profile`** (string)
 
 `Feature_Filter_Keep_Reasons` and `Imputation_Tag_Reasons` are
 kept-feature concepts and do not apply to deleted rows.
@@ -229,12 +241,11 @@ Rationale:
   diagnosable without overloading kept-feature reason columns.
 - `Imputation_Tag_Reasons` is a routing concept for kept features only;
   applying it to deleted features is a category error.
-- `Detection_Profile` is the most actionable per-feature diagnostic when
-  inspecting deletion logs and is cheap to compute.
+- Existing numeric ratio columns remain on deleted rows and provide the
+  per-feature detection evidence for deletion diagnostics.
 
 The deleted-feature output schema therefore extends the original feature
-row schema by exactly two columns (`Feature_Filter_Delete_Reasons`,
-`Detection_Profile`).
+row schema by exactly one column (`Feature_Filter_Delete_Reasons`).
 
 ## Token And Group Ordering
 
@@ -302,15 +313,6 @@ Examples:
 - `qc_low`
 - `qc_low|no_keep_rule`
 
-### Detection_Profile
-
-Group order follows the original analysis-group order observed during
-group detection (the order analysis groups appear in the `Sample_Type`
-row of the input file). QC excluded.
-
-Format: `<group_name>=<rate>` joined by `|`, two decimal places.
-Example: `A=0.80|B=0.42|C=0.00`.
-
 ## Representative Cases
 
 Background threshold = 0.20. Three analysis groups (A, B, C) unless
@@ -367,8 +369,8 @@ otherwise noted. QC excluded. Other thresholds at preset defaults
   `ratio_rescue`, but the tag reason is `low_overall_detection`. The tag
   describes imputation risk, not keep mechanism.
 - `0.18/0.18/0.18`: no keep rule fires. Does not reach the tag stage.
-  Appears in `deleted_features` with `Feature_Filter_Delete_Reasons` and
-  `Detection_Profile` attached per the deleted-feature schema.
+  Appears in `deleted_features` with `Feature_Filter_Delete_Reasons`; the
+  existing ratio columns remain on the diagnostic row.
 - A protected all-zero feature (`0.00/0.00/0.00`) is kept by
   `protected`, is not `structural_absence`, and is tagged True via
   `low_overall_detection`. This prevents "structural absence" from being
@@ -406,38 +408,44 @@ otherwise noted. QC excluded. Other thresholds at preset defaults
 
 ## Downstream Contract
 
-1. The external downstream imputation router, currently
-   `Metaboanalyst_clone`, continues to read
-   `is_Presence_Absence_Marker` as the sole boolean switch between
-   `min/5` and the selected model-based/default imputation method
-   (for example KNN). Toolkit modules may display or export the flag, but
-   they must not implement imputation routing.
+1. Toolkit Step4 emits feature-level metadata. DNP is a calibration
+   pipeline and must not interpret this metadata for imputation decisions.
+   DNP's responsibility is to exclude the metadata from numeric
+   calibration matrices, preserve it row-by-row, and pass it through to MA.
 
-2. Kept-feature outputs define this metadata exclusion set:
+2. The external downstream imputation router, currently
+   `Metaboanalyst_clone` / MA, reads `is_Presence_Absence_Marker` as the
+   boolean switch between `min/5` and the selected model-based/default
+   imputation method. MA may additionally use `Imputation_Tag_Reasons` and
+   ratio metadata for reporting/audit.
+
+3. Kept-feature outputs define this metadata exclusion/pass-through set:
    - `is_Presence_Absence_Marker`
    - `Feature_Filter_Keep_Reasons`
    - `Imputation_Tag_Reasons`
-   - `Detection_Profile`
+   - every `<analysis_group>_ratio` column
+   - `QC_ratio`
 
-3. Deleted-feature diagnostic outputs define this metadata exclusion set:
+4. Deleted-feature diagnostic outputs define this metadata
+   exclusion/pass-through set:
    - `Feature_Filter_Delete_Reasons`
-   - `Detection_Profile`
+   - every `<analysis_group>_ratio` column
+   - `QC_ratio`
 
-4. Calibration, statistical analysis, final export modules, and any
+5. Calibration, statistical analysis, final export modules, and any
    numeric feature-matrix builder must exclude the appropriate metadata
    set for the sheet/path they consume.
 
-5. Any code that previously assumed "exactly one trailing metadata
+6. `Detection_Profile` is legacy display-only metadata. New Step4 outputs
+   must not emit it. If an older file still contains it, consumers must
+   treat it as metadata and never as a sample intensity column.
+
+7. Any code that previously assumed "exactly one trailing metadata
    column" must be updated to either name-based exclusion or a metadata
    column set.
 
-6. Downstream imputation compatibility assumes model-based/default
-   methods remain group-agnostic. They should receive a numeric feature
-   matrix and per-feature method choices, not analysis group labels as
-   predictors, and should not train per-group models. This is already an
-   external `Metaboanalyst_clone` responsibility; if that behavior changes,
-   validate and fix it in the downstream repository rather than in this
-   toolkit contract implementation.
+8. Downstream imputation compatibility is owned by MA. Toolkit and DNP do
+   not validate KNN/RF internals in this branch.
 
 ## Non-Goals For This Contract
 

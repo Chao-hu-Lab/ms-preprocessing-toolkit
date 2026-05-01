@@ -87,11 +87,11 @@ class TestFeatureFilterAdapter:
         assert result.success is True
         assert result.data is not None
         marker_index = result.data.columns.get_loc("is_Presence_Absence_Marker")
-        assert list(result.data.columns[marker_index + 1 : marker_index + 4]) == [
+        assert list(result.data.columns[marker_index + 1 : marker_index + 3]) == [
             "Feature_Filter_Keep_Reasons",
             "Imputation_Tag_Reasons",
-            "Detection_Profile",
         ]
+        assert "Detection_Profile" not in result.data.columns
 
     @pytest.mark.parametrize(
         ("detections", "expected_tag"),
@@ -121,8 +121,11 @@ class TestFeatureFilterAdapter:
             {
                 "Mz/RT": "200.000/2.0",
                 "Tolerance": "na",
+                "exposure_ratio": 0.0,
+                "normal_ratio": 0.05,
+                "control_ratio": 0.0,
+                "QC_ratio": 1.0,
                 "Feature_Filter_Delete_Reasons": "no_keep_rule",
-                "Detection_Profile": "GroupA=0.00|GroupB=0.05|GroupC=0.00",
             }
         )
 
@@ -132,8 +135,12 @@ class TestFeatureFilterAdapter:
         assert list(deleted_df.columns) == [
             "Mz/RT",
             "Tolerance",
+            "exposure_ratio",
+            "normal_ratio",
+            "control_ratio",
+            "QC_ratio",
             "Feature_Filter_Delete_Reasons",
-            "Detection_Profile",
         ]
         assert "Feature_Filter_Keep_Reasons" not in deleted_df.columns
         assert "Imputation_Tag_Reasons" not in deleted_df.columns
+        assert "Detection_Profile" not in deleted_df.columns

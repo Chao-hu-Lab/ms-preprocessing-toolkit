@@ -130,18 +130,16 @@ is_Presence_Absence_Marker = 有證據不適合直接交給模型補值
 2. `Imputation_Tag_Reasons`
    - 記錄補值標記原因，例如 `structural_absence`、`low_overall_detection`。
 
-3. `Detection_Profile`
-   - 簡潔記錄各組 detection rate，例如 `A=0.80|B=0.42|C=0.00`。
-   - 這是 display/audit metadata，不作為 machine-precision numeric source。
+3. 保留既有 numeric ratio 欄位
+   - 例如 `exposure_ratio`、`normal_ratio`、`control_ratio`、`QC_ratio`。
+   - 這些欄位是 detection evidence 的 source of truth，不應被壓成 rounded string。
 
 Deleted-feature diagnostics 另外新增：
 
 1. `Feature_Filter_Delete_Reasons`
    - 記錄刪除原因，例如 `no_keep_rule`、`qc_zero|no_keep_rule`、`qc_low|stable`。
 
-2. `Detection_Profile`
-
-因此，除了既有 `is_Presence_Absence_Marker`，kept output 會額外看到 **3 個新 metadata 欄位**，deleted-feature diagnostic output 會額外看到 **2 個診斷欄位**。
+因此，除了既有 `is_Presence_Absence_Marker`，kept output 會額外看到 **2 個新 metadata 欄位**，deleted-feature diagnostic output 會額外看到 **1 個診斷欄位**。既有 ratio 欄位會繼續作為 feature-level metadata 傳遞。
 
 這些欄位是 feature-level metadata，不是 sample intensity columns。
 
@@ -170,7 +168,7 @@ is_Presence_Absence_Marker=False -> downstream default/model-based imputation pa
 
 它們應被視為和 `is_Presence_Absence_Marker` 同類型的 metadata 欄位。
 
-如果下游目前假設「只有一個 trailing metadata column」，就需要更新 column detector 或 metadata exclusion list。否則可能把 `Feature_Filter_Keep_Reasons`、`Imputation_Tag_Reasons`、`Detection_Profile` 這類 metadata 誤當成待分析 feature。
+如果下游目前假設「只有一個 trailing metadata column」，就需要更新 column detector 或 metadata exclusion list。否則可能把 `Feature_Filter_Keep_Reasons`、`Imputation_Tag_Reasons`、`*_ratio` 這類 metadata 誤當成待分析 feature。
 
 ### 3. Final export
 
@@ -199,7 +197,7 @@ Final export 會變寬，但解釋性更高：
 
 2. `0.45 / 0.42 / 0.00` 這種兩組中等檢出、一組完全缺失的 feature，要自動走 `min/5`，還是需要新的明確 tag reason？
 
-3. `Detection_Profile` 要保留幾位小數，才能兼顧可讀性與 audit 價值？
+3. DNP 如何保證 `*_ratio` metadata 不進入 calibration matrix，但能原樣傳到 MA？
 
 4. 新增 audit columns 是否永遠輸出，還是只在 profile / export option 開啟時輸出？
 
