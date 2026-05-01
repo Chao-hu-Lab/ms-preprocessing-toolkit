@@ -111,7 +111,7 @@ Step 1: Write failing tests in `ms-core/tests/test_feature_filter_decisions.py`.
 
 Required tests:
 
-- Wilson lower bound for small-N groups
+- observed detection ratio behavior for small-N groups
 - stable gate
 - MNAR high/low gate
 - QC zero forced-delete gate

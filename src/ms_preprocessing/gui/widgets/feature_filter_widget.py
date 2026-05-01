@@ -161,9 +161,33 @@ class FeatureFilterWidget(BaseProcessingWidget):
             self.qc_ratio_entry,
         )
 
+        self.ratio_rescue_enabled_var = tk.BooleanVar(value=True)
+        self.ratio_rescue_enabled_switch = self._create_threshold_switch(
+            row=6,
+            text="檢出率倍數救援門檻",
+            variable=self.ratio_rescue_enabled_var,
+        )
+        self.ratio_rescue_slider = self._create_threshold_slider(
+            row=6,
+            default_value=2.0,
+            on_change=self._update_ratio_rescue,
+            from_=1.0,
+            to=10.0,
+        )
+        self.ratio_rescue_entry = self._create_threshold_entry(
+            row=6,
+            default_value=2.0,
+            on_apply=self._apply_ratio_rescue,
+        )
+        self._threshold_controls["ratio_rescue"] = (
+            self.ratio_rescue_enabled_var,
+            self.ratio_rescue_slider,
+            self.ratio_rescue_entry,
+        )
+
         self.criteria_textbox = ctk.CTkTextbox(
             self._content_frame,
-            height=84,
+            height=132,
             font=FONTS["small"],
             wrap="word",
         )
@@ -193,7 +217,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
         content = (
             "篩選規則說明\n\n"
             "整體邏輯\n"
-            "穩定檢出、強度倍率、存在/缺失標記是正向保留條件，採 OR 判斷；只要符合其中一條，feature 就可以先保留下來。\n"
+            "穩定檢出、強度倍率、存在/缺失標記、檢出率倍數救援是正向保留條件，採 OR 判斷；只要符合其中一條，feature 就可以先保留下來。\n"
             "QC 檢出率是負向覆寫條件，用來排除在 QC 中完全不穩定或幾乎沒有檢出的 feature。\n\n"
             "1. 訊號強度門檻\n"
             "   先確認這個 feature 本身有沒有足夠訊號。\n"
@@ -208,11 +232,32 @@ class FeatureFilterWidget(BaseProcessingWidget):
             "4. 存在/缺失標記（MNAR presence/absence gate）\n"
             "   檢出率 = 組內高於訊號強度門檻的樣本數 / 組內總樣本數\n"
             "   若至少一組檢出率 ≥ 出現組檢出率下限，且至少另一組檢出率 ≤ 缺失組檢出率上限，\n"
-            "   代表此 feature 在某組中高頻率出現、在另一組中接近缺失（MNAR 特徵），予以保留並標記。\n"
-            "   輸出欄位 is_Presence_Absence_Marker = True 的特徵即屬此類。\n\n"
-            "5. QC 檢出率門檻（QC gate）\n"
+            "   代表此 feature 在某組中高頻率出現、在另一組中接近缺失（MNAR 特徵），予以保留。\n"
+            "   這是保留規則；is_Presence_Absence_Marker 由下方補值分流模型統一判定。\n\n"
+            "5. 檢出率倍數救援（Detection ratio rescue gate）\n"
+            "   救援落在死區的特徵：未達 MNAR 出現/缺失條件，但組間檢出率倍數差異仍明顯。\n"
+            "   條件：max(各組檢出率) / min(各組檢出率) ≥ 倍數救援門檻，\n"
+            "         且每個組別檢出率至少 10%；這個 10% 底線獨立於 MNAR 缺失組檢出率上限。\n"
+            "   被救援的 feature 會保留，且不受 QC 檢出率門檻強制刪除；\n"
+            "   但 is_Presence_Absence_Marker 可能為 True 或 False，取決於全組 detection profile。\n\n"
+            "6. QC 檢出率門檻（QC gate）\n"
             "   QC 檢出率 = QC 中高於訊號強度門檻的樣本數 / QC 總樣本數\n"
-            "   若 QC 檢出率 = 0，或低於你設定的 QC 檢出率門檻，代表這個 feature 在 QC 中表現不穩定，會被移除。"
+            "   若 QC 檢出率 = 0，或低於你設定的 QC 檢出率門檻，代表這個 feature 在 QC 中表現不穩定，會被移除。\n"
+            "   MNAR gate 或檢出率倍數救援保留的 feature 不會被本規則刪除；\n"
+            "   其他 marker-true feature 不會因此自動取得 QC force-delete 保護。\n\n"
+            "下游補值分流模型\n"
+            "Step 4 只輸出補值分流標記，不執行補值；下游依 is_Presence_Absence_Marker 選擇補值路徑。\n"
+            "Tier 1 model-imputable：全組 detection >= background_threshold，且沒有零檢出組；\n"
+            "   is_Presence_Absence_Marker = False，下游可走預設的 model-based 補值路徑。\n"
+            "Tier 2 low overall detection：至少一組 detection < background_threshold，但沒有零檢出組；\n"
+            "   is_Presence_Absence_Marker = True，下游走 min positive / 5。\n"
+            "Tier 3 structural absence：至少一組 detection = 0，且其他組有 evidence；\n"
+            "   is_Presence_Absence_Marker = True，下游同樣走 min positive / 5。\n"
+            "Tier 2 與 Tier 3 共用 is_Presence_Absence_Marker = True，但會用 Imputation_Tag_Reasons 區分原因。\n\n"
+            "Audit metadata\n"
+            "Feature_Filter_Keep_Reasons、Imputation_Tag_Reasons 與 *_ratio 欄位是 metadata，不是 analysis features。\n"
+            "exposure_ratio、normal_ratio、control_ratio、QC_ratio 是 Step 4 判定證據；\n"
+            "DNP 只負責安全傳遞這些欄位到 MA，不在校正矩陣中使用。"
         )
         self.criteria_textbox.insert("1.0", content)
         inner_text = getattr(self.criteria_textbox, "_textbox", None)
@@ -226,7 +271,10 @@ class FeatureFilterWidget(BaseProcessingWidget):
                 "2. 穩定檢出率門檻（Stable detection gate）",
                 "3. 強度倍率門檻（Intensity FC gate）",
                 "4. 存在/缺失標記（MNAR presence/absence gate）",
-                "5. QC 檢出率門檻（QC gate）",
+                "5. 檢出率倍數救援（Detection ratio rescue gate）",
+                "6. QC 檢出率門檻（QC gate）",
+                "下游補值分流模型",
+                "Audit metadata",
             ]:
                 start = "1.0"
                 while True:
@@ -354,6 +402,9 @@ class FeatureFilterWidget(BaseProcessingWidget):
     def _update_qc_ratio(self, value: float) -> None:
         self._sync_entry_from_slider(float(value), self.qc_ratio_entry)
 
+    def _update_ratio_rescue(self, value: float) -> None:
+        self._sync_entry_from_slider(float(value), self.ratio_rescue_entry)
+
     def _apply_bg(self) -> float:
         return self._commit_entry_to_slider(self.bg_entry, self.bg_slider)
 
@@ -369,6 +420,9 @@ class FeatureFilterWidget(BaseProcessingWidget):
     def _apply_qc_ratio(self) -> float:
         return self._commit_entry_to_slider(self.qc_ratio_entry, self.qc_ratio_slider)
 
+    def _apply_ratio_rescue(self) -> float:
+        return self._commit_entry_to_slider(self.ratio_rescue_entry, self.ratio_rescue_slider)
+
     def get_parameters(self) -> dict:
         """Get current parameter values."""
         return {
@@ -378,10 +432,12 @@ class FeatureFilterWidget(BaseProcessingWidget):
             "low_det_thresh": self._apply_low_det(),
             "qc_ratio_threshold": self._apply_qc_ratio(),
             "intensity_fc_threshold": self._apply_intensity_fc(),
+            "ratio_rescue_threshold": self._apply_ratio_rescue(),
             "enable_background_threshold": bool(self.bg_enabled_var.get()),
             "enable_qc_ratio_threshold": bool(self.qc_ratio_enabled_var.get()),
             "enable_intensity_fc_threshold": bool(self.intensity_fc_enabled_var.get()),
             "enable_mnar_gate": bool(self.mnar_enabled_var.get()),
+            "enable_ratio_rescue": bool(self.ratio_rescue_enabled_var.get()),
             "allow_single_group_stable": self._allow_single_group_stable,
         }
 
@@ -402,6 +458,12 @@ class FeatureFilterWidget(BaseProcessingWidget):
             params,
             "intensity_fc_threshold",
             "enable_intensity_fc_threshold",
+        )
+        self._apply_threshold_value(
+            "ratio_rescue",
+            params,
+            "ratio_rescue_threshold",
+            "enable_ratio_rescue",
         )
         if "enable_mnar_gate" in params:
             self.mnar_enabled_var.set(bool(params["enable_mnar_gate"]))
@@ -477,7 +539,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
         }
 
     def _confirm_small_group_run(self, small_groups: dict[str, int]) -> bool:
-        """Show Wilson CI warning for small biological groups.
+        """Show observed-ratio warning for small biological groups.
 
         Extracted as a separate method so tests can monkeypatch it without
         needing a real Tk dialog.
@@ -491,8 +553,7 @@ class FeatureFilterWidget(BaseProcessingWidget):
             tkinter.messagebox.askokcancel(
                 "小樣本警告",
                 f"偵測到以下組別樣本數不足（建議 N≥10）：\n{group_lines}\n\n"
-                "系統將自動套用 Wilson CI 校正，小 N 組別需更高比例才能通過門檻。\n"
-                "例：N=5 時，80% 門檻實際需要近 100% 檢出。\n\n"
+                "Step 4 會使用觀測檢出率，不做小樣本統計校正；小 N 組別的比例會更容易受單一樣本影響。\n\n"
                 "確認要繼續嗎？",
                 parent=self,
             )
@@ -537,10 +598,12 @@ class FeatureFilterWidget(BaseProcessingWidget):
             low_det_thresh=params.get("low_det_thresh"),
             qc_ratio_threshold=params.get("qc_ratio_threshold"),
             intensity_fc_threshold=params.get("intensity_fc_threshold"),
+            ratio_rescue_threshold=params.get("ratio_rescue_threshold"),
             enable_background_threshold=params.get("enable_background_threshold", True),
             enable_qc_ratio_threshold=params.get("enable_qc_ratio_threshold", True),
             enable_intensity_fc_threshold=params.get("enable_intensity_fc_threshold", False),
             enable_mnar_gate=params.get("enable_mnar_gate", True),
+            enable_ratio_rescue=params.get("enable_ratio_rescue", True),
             allow_single_group_stable=params.get("allow_single_group_stable", False),
             signal_threshold=params.get("signal_threshold", 5000),
             protected_rows=set(self.metadata.protected_rows or self.metadata.red_font_rows),

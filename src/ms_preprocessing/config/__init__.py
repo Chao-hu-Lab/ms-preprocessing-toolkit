@@ -18,6 +18,8 @@ from ms_preprocessing.config.pipeline_profiles import (
     PipelineProfileName,
     format_pipeline_profile_preview,
     get_pipeline_profile,
+    list_pipeline_profiles,
+    load_pipeline_profile_file,
 )
 from ms_preprocessing.config.settings import Settings
 
@@ -39,4 +41,6 @@ __all__ = [
     "PipelineProfileName",
     "format_pipeline_profile_preview",
     "get_pipeline_profile",
+    "list_pipeline_profiles",
+    "load_pipeline_profile_file",
 ]

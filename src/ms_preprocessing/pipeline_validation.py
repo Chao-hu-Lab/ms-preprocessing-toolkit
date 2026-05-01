@@ -106,10 +106,21 @@ def validate_step4_params(params: dict) -> list[ValidationWarning]:
             )
         )
 
+    ratio_rescue = _to_float(params.get("ratio_rescue_threshold"))
+    if ratio_rescue is not None and ratio_rescue < 1.0:
+        warnings.append(
+            ValidationWarning(
+                code="invalid_ratio_rescue_threshold",
+                message="Ratio rescue threshold must be >= 1.0.",
+                blocking=True,
+            )
+        )
+
     default_on_gates = (
         ("enable_background_threshold", "background_gate_disabled", "Background gate is disabled."),
         ("enable_qc_ratio_threshold", "qc_ratio_gate_disabled", "QC_ratio gate is disabled."),
         ("enable_mnar_gate", "mnar_gate_disabled", "MNAR gate is disabled."),
+        ("enable_ratio_rescue", "ratio_rescue_gate_disabled", "Ratio rescue gate is disabled."),
     )
     for key, code, message in default_on_gates:
         if params.get(key) is False:

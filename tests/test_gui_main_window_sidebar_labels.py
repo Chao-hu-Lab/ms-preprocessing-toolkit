@@ -9,6 +9,7 @@ from pathlib import Path
 import customtkinter as ctk
 import pandas as pd
 
+from ms_preprocessing.config import list_pipeline_profiles
 from ms_preprocessing.gui.event_handlers import MainWindowEventHandlersMixin
 from ms_preprocessing.gui.layout import MainWindowLayoutMixin
 from ms_preprocessing.gui.pipeline_session import PipelineSession
@@ -121,7 +122,7 @@ def test_main_window_sidebar_exposes_run_all_profile_selector(ctk_root) -> None:
         assert app.sidebar.cget("fg_color") == "#1E1E1E"
         assert app.pipeline_preset_label.cget("text") == "Run All Preset"
         assert app.run_all_profile_var.get() == "default"
-        assert app.run_all_profile_menu.cget("values") == ["loose", "default", "strict"]
+        assert app.run_all_profile_menu.cget("values") == list_pipeline_profiles()
         assert not hasattr(app, "run_all_profile_preview_label")
         assert app.run_all_btn.cget("text") == "Run All"
         assert app.run_all_btn.cget("fg_color") == "#2E8B57"
@@ -130,6 +131,25 @@ def test_main_window_sidebar_exposes_run_all_profile_selector(ctk_root) -> None:
         assert app.open_output_folder_btn.cget("fg_color") == "#333333"
         assert app.open_output_folder_btn.cget("border_width") == 1
         assert not hasattr(app, "export_dnp_btn")
+    finally:
+        app.destroy()
+
+
+def test_main_window_sidebar_profile_selector_uses_profile_discovery(
+    ctk_root,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "ms_preprocessing.gui.layout.list_pipeline_profiles",
+        lambda: ["default", "lab-local"],
+    )
+
+    app = _SidebarHarness(ctk_root)
+    app.pack()
+    ctk_root.update_idletasks()
+    try:
+        assert app.run_all_profile_var.get() == "default"
+        assert app.run_all_profile_menu.cget("values") == ["default", "lab-local"]
     finally:
         app.destroy()
 

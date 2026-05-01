@@ -29,12 +29,15 @@ def test_feature_filter_widget_defaults_keep_fc_gate_disabled(widget) -> None:
     assert widget.bg_enabled_switch.get() == 1
     assert widget.intensity_fc_enabled_switch.get() == 0
     assert widget.qc_ratio_enabled_switch.get() == 1
+    assert widget.ratio_rescue_enabled_switch.get() == 1
     assert params["enable_background_threshold"] is True
     assert params["enable_intensity_fc_threshold"] is False
     assert params["enable_qc_ratio_threshold"] is True
+    assert params["enable_ratio_rescue"] is True
     assert params["high_det_thresh"] == pytest.approx(0.8)
     assert params["low_det_thresh"] == pytest.approx(0.2)
     assert params["qc_ratio_threshold"] == pytest.approx(0.25)
+    assert params["ratio_rescue_threshold"] == pytest.approx(2.0)
 
 
 def test_feature_filter_widget_disables_matching_inputs_when_toggle_is_off(widget) -> None:
@@ -103,9 +106,49 @@ def test_feature_filter_widget_apply_parameters_updates_visible_controls(widget)
     assert params["low_det_thresh"] == pytest.approx(0.2)
     assert params["qc_ratio_threshold"] == pytest.approx(0.50)
     assert params["intensity_fc_threshold"] == pytest.approx(3.0, abs=0.01)
+    assert params["ratio_rescue_threshold"] == pytest.approx(3.0, abs=0.01)
     assert params["enable_background_threshold"] is True
     assert params["enable_qc_ratio_threshold"] is True
     assert params["enable_intensity_fc_threshold"] is False
+    assert params["enable_ratio_rescue"] is True
+
+
+def test_feature_filter_widget_run_processing_forwards_ratio_rescue_kwargs(
+    widget, monkeypatch
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_run_from_df(data, **kwargs):
+        captured.update(kwargs)
+        return ProcessingResult(
+            success=True,
+            step="feature_filter",
+            output_path=None,
+            data=data.copy(),
+            metadata=ProcessingMetadata(),
+            statistics={},
+        )
+
+    monkeypatch.setattr(feature_filter_adapter, "run_from_df", fake_run_from_df)
+    input_df = pd.DataFrame(
+        {
+            "Mz/RT": ["Sample_Type", "100.0/1.0"],
+            "Tolerance": ["na", "na"],
+            "Case1": ["case", 9000],
+            "Control1": ["control", 9000],
+            "QC1": ["qc", 9000],
+        }
+    )
+
+    widget.run_processing(
+        input_df,
+        signal_threshold=5000,
+        ratio_rescue_threshold=2.5,
+        enable_ratio_rescue=True,
+    )
+
+    assert captured["ratio_rescue_threshold"] == 2.5
+    assert captured["enable_ratio_rescue"] is True
 
 
 def test_feature_filter_widget_validates_mnar_threshold_order(widget) -> None:
@@ -158,6 +201,10 @@ def test_feature_filter_widget_uses_consistent_form_alignment(widget) -> None:
     assert widget.high_det_entry.cget("justify") == "center"
     assert widget.low_det_entry.cget("justify") == "center"
     assert widget.qc_ratio_entry.cget("justify") == "center"
+    assert widget.ratio_rescue_enabled_switch.grid_info()["column"] == 0
+    assert widget.ratio_rescue_slider.grid_info()["column"] == 2
+    assert widget.ratio_rescue_entry.grid_info()["column"] == 3
+    assert widget.ratio_rescue_entry.cget("justify") == "center"
     assert widget.bg_enabled_switch.winfo_manager() == "grid"
     assert widget.qc_ratio_enabled_switch.winfo_manager() == "grid"
     assert widget.qc_ratio_slider.winfo_manager() == "grid"
@@ -197,12 +244,32 @@ def test_feature_filter_widget_omits_redundant_mnar_section_heading(widget) -> N
 def test_feature_filter_widget_explains_rules_in_plainer_lab_language(widget) -> None:
     criteria_text = widget.criteria_textbox.get("1.0", "end")
 
-    assert "穩定檢出、強度倍率、存在/缺失標記是正向保留條件" in criteria_text
+    assert "穩定檢出、強度倍率、存在/缺失標記、檢出率倍數救援是正向保留條件" in criteria_text
     assert "QC 檢出率是負向覆寫條件" in criteria_text
     assert "至少 2 個實驗組的檢出率都大於等於此門檻" in criteria_text
     assert "出現組檢出率下限" in criteria_text
     assert "缺失組檢出率上限" in criteria_text
+    assert "每個組別檢出率至少 10%" in criteria_text
+    assert "獨立於 MNAR 缺失組檢出率上限" in criteria_text
+    assert "is_Presence_Absence_Marker 可能為 True 或 False" in criteria_text
+    assert "被救援的 feature 同樣標記 is_Presence_Absence_Marker = True" not in criteria_text
     assert "fold-change = 最大組平均強度 / 最小組平均強度" in criteria_text
+    assert "其他 marker-true feature 不會因此自動取得 QC force-delete 保護" in criteria_text
+    assert "下游補值分流模型" in criteria_text
+    assert "Tier 1 model-imputable" in criteria_text
+    assert "全組 detection >= background_threshold，且沒有零檢出組" in criteria_text
+    assert "Tier 2 low overall detection" in criteria_text
+    assert "至少一組 detection < background_threshold，但沒有零檢出組" in criteria_text
+    assert "Tier 3 structural absence" in criteria_text
+    assert "至少一組 detection = 0，且其他組有 evidence" in criteria_text
+    assert "Tier 2 與 Tier 3 共用 is_Presence_Absence_Marker = True" in criteria_text
+    assert "min positive / 5" in criteria_text
+    assert "Feature_Filter_Keep_Reasons" in criteria_text
+    assert "Imputation_Tag_Reasons" in criteria_text
+    assert "*_ratio" in criteria_text
+    assert "Detection_Profile" not in criteria_text
+    assert "metadata，不是 analysis features" in criteria_text
+    assert "DNP 只負責安全傳遞" in criteria_text
 
 
 def test_progress_update_does_not_force_immediate_repaint(widget, monkeypatch) -> None:

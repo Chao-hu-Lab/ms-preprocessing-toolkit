@@ -1,0 +1,35 @@
+version: 1
+name: lab-default
+description: "Local lab profile loaded by GUI/CLI"
+steps:
+  step1:
+    mode: normalization
+    auto_detect: true
+    method_file: "${local.method_file}"
+  step2:
+    xic_results_file: "${local.xic_results_file}"
+  step3:
+    mz_tolerance_ppm: 20.0
+    rt_tolerance: 0.1
+    merge_mode: per_sample_max
+    preserve_red_font: true
+    top_n: null
+    enable_degeneracy_annotation: false
+    degeneracy_ppm_tolerance: 20.0
+    degeneracy_rt_tolerance: 0.05
+    degeneracy_correlation_threshold: 0.8
+    degeneracy_min_correlation_points: 3
+    degeneracy_adduct_table_file: ""
+  step4:
+    signal_threshold: 5000.0
+    background_threshold: 0.33
+    high_det_thresh: 0.8
+    low_det_thresh: 0.2
+    qc_ratio_threshold: 0.25
+    intensity_fc_threshold: 2.0
+    ratio_rescue_threshold: 3.0
+    enable_background_threshold: true
+    enable_qc_ratio_threshold: true
+    enable_intensity_fc_threshold: false
+    enable_mnar_gate: true
+    enable_ratio_rescue: true

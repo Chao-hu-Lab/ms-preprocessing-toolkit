@@ -127,8 +127,7 @@ class WorkflowRunner:
 
             current = result.data if result.data is not None else current
             session.update_from_result(result)
-            protected_rows |= set(session.metadata.protected_rows)
-            self._restore_protected_rows(session, protected_rows)
+            protected_rows = set(session.metadata.protected_rows)
             if persist_intermediate:
                 session.save_step_output(spec.index, current, self._file_handler)
             completed_steps.append(spec.adapter_step)

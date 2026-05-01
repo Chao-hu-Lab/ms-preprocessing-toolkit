@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
+from ms_preprocessing.config import list_pipeline_profiles
 from ms_preprocessing.config.settings import Settings
 from ms_preprocessing.gui.styles import COLORS, DIMENSIONS, FONTS, PADDING
 from ms_preprocessing.gui.widgets.data_organizer_widget import DataOrganizerWidget
@@ -155,10 +156,12 @@ class MainWindowLayoutMixin:
         )
         self.pipeline_preset_label.pack(fill="x", padx=PADDING["medium"], pady=(0, 2))
 
-        self.run_all_profile_var = ctk.StringVar(value="default")
+        profile_names = list_pipeline_profiles()
+        default_profile = "default" if "default" in profile_names else profile_names[0]
+        self.run_all_profile_var = ctk.StringVar(value=default_profile)
         self.run_all_profile_menu = ctk.CTkOptionMenu(
             self.sidebar,
-            values=["loose", "default", "strict"],
+            values=profile_names,
             variable=self.run_all_profile_var,
             command=lambda value: getattr(self, "_on_pipeline_profile_selected", lambda *_args: None)(value),
             font=FONTS["small"],

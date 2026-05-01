@@ -11,6 +11,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from ms_preprocessing.config import list_pipeline_profiles
 from ms_preprocessing.workflow.parameter_resolver import (
     STEP2_XIC_REQUIRED_MESSAGE,
     ParameterResolver,
@@ -79,9 +80,16 @@ Examples:
     parser.add_argument(
         "--profile",
         type=str,
-        choices=["loose", "default", "strict"],
+        choices=list_pipeline_profiles(),
         default="default",
         help="Integrated Step 1-4 parameter profile (default: default)",
+    )
+
+    parser.add_argument(
+        "--profile-file",
+        type=str,
+        default=None,
+        help="Explicit YAML Step 1-4 profile file path (overrides --profile)",
     )
 
     parser.add_argument(
@@ -183,6 +191,19 @@ Examples:
         type=float,
         default=None,
         help="Intensity fold-change threshold for feature filtering (overrides profile value)",
+    )
+
+    parser.add_argument(
+        "--ratio-rescue-threshold",
+        type=float,
+        default=None,
+        help="Detection-rate max/min ratio rescue threshold for feature filtering (overrides profile value)",
+    )
+
+    parser.add_argument(
+        "--disable-ratio-rescue",
+        action="store_true",
+        help="Disable Step 4 detection-rate ratio rescue",
     )
 
     parser.add_argument(

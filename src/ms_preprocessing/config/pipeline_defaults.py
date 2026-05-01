@@ -16,6 +16,10 @@ import os
 from pathlib import Path
 from typing import Any
 
+import yaml
+
+from ms_preprocessing.config.path_resolver import user_config_dir
+
 METHOD_FILE_ENV = "MSPTK_METHOD_FILE"
 XIC_RESULTS_FILE_ENV = "MSPTK_XIC_RESULTS_FILE"
 LOCAL_REFERENCE_CONFIG_ENV = "MSPTK_LOCAL_REFERENCE_CONFIG"
@@ -26,21 +30,56 @@ STEP2_XIC_REQUIRED_MESSAGE = (
     "Please set xic_results_file or pass --xic-results-file."
 )
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-LOCAL_CONFIG_PATH = PROJECT_ROOT / "config" / "local_reference_paths.json"
+def _local_reference_yaml_path() -> Path:
+    return user_config_dir() / "local_reference.yml"
+
+
+def _local_reference_json_path() -> Path:
+    return user_config_dir() / "local_reference_paths.json"
+
+
+LOCAL_REFERENCE_YAML_PATH = _local_reference_yaml_path()
+LOCAL_REFERENCE_JSON_PATH = _local_reference_json_path()
+LOCAL_CONFIG_PATH = LOCAL_REFERENCE_JSON_PATH
+
+
+def _reference_config_path() -> Path | None:
+    override = os.getenv(LOCAL_REFERENCE_CONFIG_ENV)
+    if override:
+        return Path(override)
+    yaml_path = _local_reference_yaml_path()
+    json_path = _local_reference_json_path()
+    if yaml_path.exists():
+        return yaml_path
+    if json_path.exists():
+        return json_path
+    return None
+
+
+def _extract_reference_config(data: object) -> dict[str, Any]:
+    if not isinstance(data, dict):
+        return {}
+    references = data.get("references")
+    if isinstance(references, dict):
+        return references
+    return data
 
 
 def _load_local_reference_config() -> dict[str, Any]:
-    config_path = Path(os.getenv(LOCAL_REFERENCE_CONFIG_ENV, str(LOCAL_CONFIG_PATH)))
-    if not config_path.exists():
+    config_path = _reference_config_path()
+    if config_path is None or not config_path.exists():
         return {}
 
     try:
-        data = json.loads(config_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        text = config_path.read_text(encoding="utf-8")
+        if config_path.suffix.lower() in {".yml", ".yaml"}:
+            data = yaml.safe_load(text) or {}
+        else:
+            data = json.loads(text)
+    except (OSError, json.JSONDecodeError, yaml.YAMLError):
         return {}
 
-    return data if isinstance(data, dict) else {}
+    return _extract_reference_config(data)
 
 
 def _resolve_path(env_var: str, local_value: str | None) -> Path | None:
@@ -54,6 +93,19 @@ def _resolve_path(env_var: str, local_value: str | None) -> Path | None:
 
 def _stringify_path(path_value: Path | None) -> str:
     return "" if path_value is None else str(path_value)
+
+
+def resolve_reference_value(key: str) -> str:
+    """Resolve a local reference value with env overrides where applicable."""
+    config = _load_local_reference_config()
+    if key == "method_file":
+        return _stringify_path(_resolve_path(METHOD_FILE_ENV, config.get("method_file")))
+    if key == "xic_results_file":
+        return _stringify_path(
+            _resolve_path(XIC_RESULTS_FILE_ENV, config.get("xic_results_file"))
+        )
+    value = config.get(key)
+    return "" if value is None else str(value)
 
 
 def get_legacy_step2_source_details() -> list[str]:

@@ -82,6 +82,12 @@ Thumbs.db
 !tests/fixtures/*.xlsx
 config/local_reference_paths*.json
 !config/local_reference_paths.example.json
+config/local_reference.yml
+config/local_reference.yaml
+!config/local_reference.example.yml
+config/presets/*.yml
+config/presets/*.yaml
+!config/presets/*.example.yml
 output/
 logs/
 *.log

@@ -49,6 +49,13 @@ def test_parquet_cache_default_enabled() -> None:
     assert Settings.SAVE_PARQUET_CACHE is True
 
 
+def test_pyinstaller_spec_bundles_builtin_yaml_profiles() -> None:
+    spec = (ROOT / "ms-preprocessing.spec").read_text(encoding="utf-8")
+
+    assert "src/ms_preprocessing/resources/builtin_profiles" in spec
+    assert "ms_preprocessing/resources/builtin_profiles" in spec
+
+
 def test_docs_reference_unified_parquet_pipeline_and_zero_missing_behavior() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8", errors="replace")
     design = (
@@ -75,6 +82,7 @@ def test_readme_documents_dependency_override_policy() -> None:
 
     assert "MSPTK_MS_CORE_SRC" in readme
     assert "MSPTK_MS_CORE_ROOT" in readme
+    assert "MSPTK_CONFIG_DIR" in readme
     assert "development-only override" in readme
     assert "does not import, launch, or configure downstream normalization projects" in readme
 

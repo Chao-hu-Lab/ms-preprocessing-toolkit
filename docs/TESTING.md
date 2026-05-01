@@ -144,7 +144,7 @@ Pop-Location
 | GUI layout, labels, or widgets | Related widget tests plus GUI workflow label/sidebar tests | Shared layout, base widget, or event handler changed |
 | `event_handlers.py` / Run All | Related widget tests plus `tests/test_gui_event_handlers.py` | Threading, export, or session state changed |
 | Adapter code | `tests/adapters/` plus API contract smoke | `ms-core` public API changed |
-| Pipeline profiles / presets | `tests/test_pipeline_profiles.py`, `tests/test_feature_filter_presets.py` | Preset values affect Step 4 output |
+| Pipeline profiles / presets | `tests/test_profile_loader.py`, `tests/test_pipeline_profiles.py`, `tests/test_feature_filter_presets.py` | Preset values affect Step 4 output |
 | File IO, parquet, export, cache | Integration / IO-focused command | Output format or cache policy changed |
 | Root hygiene, temp fixtures, cleanup scripts | `tests/test_root_hygiene.py` | Any pytest temp root or cleanup behavior changed |
 | `ms-core/` submodule | `ms-core/tests/`, then adapter contract tests in toolkit | Submodule pointer is updated |

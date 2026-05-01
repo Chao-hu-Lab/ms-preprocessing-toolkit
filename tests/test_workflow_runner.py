@@ -193,13 +193,25 @@ def test_workflow_runner_passes_protected_rows_to_steps_three_and_four(monkeypat
     import ms_preprocessing.workflow.workflow_runner as runner_module
 
     monkeypatch.setattr(runner_module._adapter_do, "run_from_df", lambda data, **kwargs: _ok("data_organizer", data))
-    monkeypatch.setattr(runner_module._adapter_istd, "run_from_df", lambda data, **kwargs: _ok("istd_marker", data))
+    monkeypatch.setattr(
+        runner_module._adapter_istd,
+        "run_from_df",
+        lambda data, **kwargs: _ok(
+            "istd_marker",
+            data,
+            ProcessingMetadata(red_font_rows={1, 3}, protected_rows={1, 3}),
+        ),
+    )
     monkeypatch.setattr(
         runner_module._adapter_dr,
         "run_from_df",
         lambda data, **kwargs: (
             captured.setdefault("step3", kwargs["protected_rows"]),
-            _ok("duplicate_remover", data),
+            _ok(
+                "duplicate_remover",
+                data,
+                ProcessingMetadata(red_font_rows={1, 3}, protected_rows={1, 3}),
+            ),
         )[1],
     )
     monkeypatch.setattr(
@@ -218,6 +230,59 @@ def test_workflow_runner_passes_protected_rows_to_steps_three_and_four(monkeypat
         WorkflowRunner().run(_frame("input"), step="all", resolved_parameters=_params(base), session=session)
 
     assert captured == {"step3": {1, 3}, "step4": {1, 3}}
+
+
+def test_workflow_runner_uses_remapped_protected_rows_after_step_three(
+    monkeypatch,
+    project_temp_dir,
+) -> None:
+    captured: dict[str, set[int]] = {}
+
+    import ms_preprocessing.workflow.workflow_runner as runner_module
+
+    monkeypatch.setattr(runner_module._adapter_do, "run_from_df", lambda data, **kwargs: _ok("data_organizer", data))
+    monkeypatch.setattr(
+        runner_module._adapter_istd,
+        "run_from_df",
+        lambda data, **kwargs: _ok(
+            "istd_marker",
+            data,
+            ProcessingMetadata(red_font_rows={8, 44}, protected_rows={8, 44}),
+        ),
+    )
+    monkeypatch.setattr(
+        runner_module._adapter_dr,
+        "run_from_df",
+        lambda data, **kwargs: (
+            captured.setdefault("step3", kwargs["protected_rows"]),
+            _ok(
+                "duplicate_remover",
+                data,
+                ProcessingMetadata(red_font_rows={2}, protected_rows={2}),
+            ),
+        )[1],
+    )
+    monkeypatch.setattr(
+        runner_module._adapter_ff,
+        "run_from_df",
+        lambda data, **kwargs: (
+            captured.setdefault("step4", kwargs["protected_rows"]),
+            _ok(
+                "feature_filter",
+                data,
+                ProcessingMetadata(red_font_rows={1}, protected_rows={1}),
+            ),
+        )[1],
+    )
+
+    with project_temp_dir() as temp_dir:
+        base = Path(temp_dir)
+        session = PipelineSession(output_dir=base, source_file=base / "input.xlsx")
+        WorkflowRunner().run(_frame("input"), step="all", resolved_parameters=_params(base), session=session)
+
+    assert captured == {"step3": {8, 44}, "step4": {2}}
+    assert session.metadata.red_font_rows == {1}
+    assert session.metadata.protected_rows == {1}
 
 
 def test_workflow_runner_does_not_persist_progress_callback_in_step_parameters(

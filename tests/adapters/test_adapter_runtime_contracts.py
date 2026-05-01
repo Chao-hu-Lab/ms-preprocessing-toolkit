@@ -168,6 +168,7 @@ def test_feature_filter_run_from_df_applies_signal_threshold_and_flags(monkeypat
     assert calls["kwargs"] == {
         "background_threshold": 0.1,
         "intensity_fc_threshold": 0.2,
+        "ratio_rescue_threshold": None,
         "high_det_thresh": 0.8,
         "low_det_thresh": 0.2,
         "qc_ratio_threshold": 0.4,
@@ -175,6 +176,7 @@ def test_feature_filter_run_from_df_applies_signal_threshold_and_flags(monkeypat
         "enable_intensity_fc_threshold": True,
         "enable_qc_ratio_threshold": True,
         "enable_mnar_gate": True,
+        "enable_ratio_rescue": True,
         "allow_single_group_stable": False,
         "protected_rows": {9},
     }
