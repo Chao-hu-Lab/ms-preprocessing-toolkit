@@ -52,7 +52,7 @@ class PipelineSession:
         self,
         metadata: ProcessingMetadata | dict[str, Any] | None,
     ) -> None:
-        """Backward-compatible metadata merge for dict-based callers."""
+        """Merge legacy/file metadata into the typed session metadata."""
         if not metadata:
             return
 
@@ -200,19 +200,16 @@ class PipelineSession:
             "step_output_paths": {k: str(v) for k, v in self.step_output_paths.items()},
         }
 
+    def legacy_context_view(self) -> dict[str, Any]:
+        """Return the only supported context-shaped view of typed metadata."""
+        context = self.metadata.as_context_dict()
+        context["metadata_refs"] = dict(self._metadata_refs)
+        return context
+
     def _sync_context_from_metadata(self) -> None:
-        next_context = {
-            "red_font_rows": set(self.metadata.red_font_rows),
-            "protected_rows": set(self.metadata.protected_rows),
-            "blue_font_cells": list(self.metadata.blue_font_cells),
-            "highlight_rows": set(self.metadata.highlight_rows),
-            "sample_info": self.metadata.sample_info,
-            "deleted_feature_df": self.metadata.deleted_feature_df,
-            "metadata_refs": dict(self._metadata_refs),
-        }
+        next_context = self.legacy_context_view()
         self.context.clear()
         self.context.update(next_context)
-
 
     def _merge_formatting_metadata(
         self,

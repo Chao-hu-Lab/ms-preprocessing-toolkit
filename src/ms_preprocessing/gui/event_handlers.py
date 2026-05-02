@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import copy
 import os
 import platform
 import subprocess
@@ -45,7 +44,7 @@ if TYPE_CHECKING:
         _pipeline_session: PipelineSession
         _step_output_paths: dict[int, Path]
         _context: dict[str, Any]
-        _source_context_snapshot: dict[str, Any] | None
+        _source_context_snapshot: ProcessingMetadata | dict[str, Any] | None
         step_widgets: list[Any]
         step_buttons: list[Any]
         _step_status_labels: list[Any]
@@ -357,10 +356,13 @@ class MainWindowEventHandlersMixin:
         self._step_output_paths = session.step_output_paths
         self._context = session.context
 
-    def _snapshot_context(self: _MainWindowEventHost, context: dict[str, Any]) -> dict[str, Any]:
-        """Copy source metadata so reruns can rebuild a clean pipeline session."""
+    def _snapshot_context(
+        self: _MainWindowEventHost,
+        context: dict[str, Any] | None = None,
+    ) -> ProcessingMetadata:
+        """Copy source typed metadata so reruns can rebuild a clean pipeline session."""
         _ = context
-        return copy.deepcopy(self._pipeline_session.metadata.as_context_dict())
+        return self._pipeline_session.metadata.copy()
 
     def _set_widget_session_metadata(self: _MainWindowEventHost, widget: Any) -> None:
         session = self.__dict__.get("_pipeline_session")
@@ -369,12 +371,12 @@ class MainWindowEventHandlersMixin:
 
         metadata_setter = getattr(widget, "set_metadata", None)
         if callable(metadata_setter):
-            metadata_setter(session.metadata)
+            metadata_setter(session.metadata.copy())
             return
 
         context_setter = getattr(widget, "set_context", None)
         if callable(context_setter):
-            context_setter(session.metadata.as_context_dict())
+            context_setter(session.legacy_context_view())
 
     def _reset_pipeline_for_run_all(self: _MainWindowEventHost) -> None:
         """Start Run All from the originally loaded source metadata, not prior run state."""

@@ -13,6 +13,7 @@ from ms_preprocessing.gui.async_task_runner import AsyncTaskRunner
 from ms_preprocessing.gui.step_summary import summarize_step_result
 from ms_preprocessing.gui.validation import format_validation_warnings, has_blocking_warnings
 from ms_preprocessing.utils.file_handler import FileHandler
+from ms_preprocessing.utils.results import ProcessingMetadata
 from ms_preprocessing.workflow.parameter_resolver import ParameterResolver
 from ms_preprocessing.workflow.pipeline_session import PipelineSession
 from ms_preprocessing.workflow.workflow_runner import WorkflowRunResult
@@ -57,11 +58,15 @@ class RunAllController:
         host._last_run_all = False
         host._last_materialized_export_path = None
 
-        source_snapshot = copy.deepcopy(host.__dict__.get("_source_context_snapshot"))
+        source_snapshot = host.__dict__.get("_source_context_snapshot")
         if source_snapshot is None:
             if "_step_output_paths" in host.__dict__:
                 host._step_output_paths.clear()
             return
+        if isinstance(source_snapshot, ProcessingMetadata):
+            source_snapshot = source_snapshot.copy()
+        else:
+            source_snapshot = copy.deepcopy(source_snapshot)
 
         session = host._new_pipeline_session(host._source_file)
         host._attach_pipeline_session(session)
@@ -362,9 +367,9 @@ class RunAllController:
     def _set_widget_session_metadata(self, widget: Any) -> None:
         metadata_setter = getattr(widget, "set_metadata", None)
         if callable(metadata_setter):
-            metadata_setter(self._host._pipeline_session.metadata)
+            metadata_setter(self._host._pipeline_session.metadata.copy())
             return
 
         context_setter = getattr(widget, "set_context", None)
         if callable(context_setter):
-            context_setter(self._host._pipeline_session.metadata.as_context_dict())
+            context_setter(self._host._pipeline_session.legacy_context_view())

@@ -39,6 +39,25 @@ class TestProcessingMetadata:
         assert context["blue_font_cells"] == [(1, 2)]
         assert context["highlight_rows"] == {3}
 
+    def test_copy_returns_independent_typed_containers(self) -> None:
+        metadata = ProcessingMetadata(
+            red_font_rows={1},
+            protected_rows={1},
+            blue_font_cells=[(1, 2)],
+            highlight_rows={3},
+        )
+
+        copied = metadata.copy()
+        copied.red_font_rows.add(99)
+        copied.protected_rows.add(99)
+        copied.blue_font_cells.append((9, 9))
+        copied.highlight_rows.add(99)
+
+        assert metadata.red_font_rows == {1}
+        assert metadata.protected_rows == {1}
+        assert metadata.blue_font_cells == [(1, 2)]
+        assert metadata.highlight_rows == {3}
+
 
 class TestProcessingResult:
     def test_success_result(self) -> None:

@@ -255,6 +255,48 @@ def test_run_all_steps_rebuilds_clean_pipeline_session_from_loaded_source(tmp_pa
     assert window.step_widgets[0].contexts[0]["highlight_rows"] == set()
 
 
+def test_source_context_snapshot_uses_typed_metadata_not_legacy_context(tmp_path) -> None:
+    window = MainWindow.__new__(MainWindow)
+    window._pipeline_session = PipelineSession(
+        output_dir=tmp_path / "OUTPUT",
+        source_file=tmp_path / "input.xlsx",
+    )
+    window._pipeline_session.update_context_from_metadata(
+        {"red_font_rows": [1], "protected_rows": [1]}
+    )
+    stale_context = {"red_font_rows": {99}, "protected_rows": {99}}
+
+    snapshot = window._snapshot_context(stale_context)
+    snapshot.red_font_rows.add(42)
+
+    assert isinstance(snapshot, ProcessingMetadata)
+    assert snapshot.red_font_rows == {1, 42}
+    assert window._pipeline_session.metadata.red_font_rows == {1}
+    assert 99 not in snapshot.red_font_rows
+
+
+def test_widget_metadata_handoff_does_not_expose_live_session_metadata(tmp_path) -> None:
+    class _Widget:
+        def set_metadata(self, metadata: ProcessingMetadata) -> None:
+            self.metadata = metadata
+
+    window = MainWindow.__new__(MainWindow)
+    window._pipeline_session = PipelineSession(
+        output_dir=tmp_path / "OUTPUT",
+        source_file=tmp_path / "input.xlsx",
+    )
+    window._pipeline_session.update_context_from_metadata(
+        {"red_font_rows": [1], "protected_rows": [1]}
+    )
+    widget = _Widget()
+
+    window._set_widget_session_metadata(widget)
+    widget.metadata.red_font_rows.add(99)
+
+    assert widget.metadata.red_font_rows == {1, 99}
+    assert window._pipeline_session.metadata.red_font_rows == {1}
+
+
 def test_run_all_step_completion_updates_latest_result_summary(tmp_path) -> None:
     class _Label:
         def __init__(self) -> None:

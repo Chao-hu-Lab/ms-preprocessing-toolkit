@@ -59,6 +59,25 @@ class ProcessingMetadata:
             "deleted_feature_df": self.deleted_feature_df,
         }
 
+    def copy(self) -> "ProcessingMetadata":
+        """Return an independent typed metadata snapshot."""
+        return ProcessingMetadata(
+            red_font_rows=set(self.red_font_rows),
+            protected_rows=set(self.protected_rows),
+            blue_font_cells=list(self.blue_font_cells),
+            highlight_rows=set(self.highlight_rows),
+            sample_info=(
+                self.sample_info.copy(deep=True)
+                if isinstance(self.sample_info, pd.DataFrame)
+                else None
+            ),
+            deleted_feature_df=(
+                self.deleted_feature_df.copy(deep=True)
+                if isinstance(self.deleted_feature_df, pd.DataFrame)
+                else None
+            ),
+        )
+
 
 @dataclass
 class ProcessingResult:
