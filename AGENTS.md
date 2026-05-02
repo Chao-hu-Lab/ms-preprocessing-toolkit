@@ -9,6 +9,48 @@ This file defines the default working contract for coding agents in this reposit
   - `ms-core/`: git submodule containing core processing logic
 - Changes in `ms-core/` must be handled as submodule changes, not as regular in-repo edits.
 
+## Rule Scope
+
+Keep this file repo-specific. General agent behavior should live in global/user
+instructions or reusable skills unless this repository needs a stricter local
+override.
+
+Rules belong here when they change how this repository must be handled:
+
+- `ms-core` submodule ownership and pointer updates
+- Step1-4 scientific/workflow contracts
+- downstream handoff boundaries between toolkit, DNP, and MA
+- testing marker ownership and CI shard selection
+- Windows GUI, localized text, root hygiene, release, and packaging rules
+- local architecture-index policy such as `.graphifyignore` and `graphify-out/`
+
+Do not expand this file with generic rules that apply to every repository, such
+as broad prompting style, memory-bank frameworks, generic tool preferences, or
+general multi-agent orchestration. Promote repeated cross-repo rules to a global
+agent rule or a skill instead.
+
+## Instruction Priority And Local Context
+
+Use the most specific trustworthy repo instruction that applies to the files
+being changed. Current user instructions override this file, and this file
+overrides older plans unless the user explicitly says otherwise.
+
+Before editing, locate the local context for the target files:
+
+```powershell
+rg --files -g AGENTS.md -g CLAUDE.md -g README.md -g "docs/TESTING.md" -g "docs/plans/*.md"
+```
+
+- Read the closest relevant `AGENTS.md` / `CLAUDE.md` / `README.md` before
+  editing a subdirectory or package.
+- Read `docs/TESTING.md` before choosing tests, markers, CI shards, or GUI
+  smoke coverage.
+- Read the latest relevant contract under `docs/plans/` before changing
+  scientific rules, workflow semantics, exported metadata, or downstream
+  handoff behavior.
+- If two sources of truth disagree, stop and report the conflict instead of
+  silently choosing one.
+
 ## Task Intake
 
 Before starting substantial work, structure the task in this order:
@@ -19,6 +61,14 @@ Before starting substantial work, structure the task in this order:
 4. `Done When`
 
 If the user request is ambiguous, clarify the missing part instead of guessing.
+
+For behavior changes, also identify whether the task changes any public
+surface:
+
+- CLI flag, GUI parameter, config/profile key, worksheet name, exported column,
+  metadata field, file format, cache shape, or downstream handoff document.
+- If yes, treat it as an API contract change and update docs/tests with the
+  implementation.
 
 ## Working Modes
 
@@ -35,7 +85,7 @@ If the user request is ambiguous, clarify the missing part instead of guessing.
 
 Before any development work, run:
 
-```bash
+```powershell
 git status
 git branch --show-current
 ```
@@ -57,7 +107,7 @@ Do not proceed blindly if:
 
 Recommended pattern:
 
-```bash
+```powershell
 git worktree add .worktrees/<branch-name> -b <type>/<branch-name>
 ```
 
@@ -68,6 +118,65 @@ git worktree add .worktrees/<branch-name> -b <type>/<branch-name>
 - Do not change unrelated files just because they are nearby
 - When touching behavior, also touch verification
 - When a past mistake repeats, encode the fix into repo instructions instead of relying on memory
+- Prefer existing helpers, adapters, and file-local patterns before creating new
+  abstractions.
+- Avoid growing already-large orchestration modules. If a file is becoming a
+  dumping ground, add a small focused module and keep ownership boundaries clear.
+
+## Public API And Contract Rules
+
+Public contract includes more than Python function signatures in this project.
+
+- Preserve exported function signatures, argument names, CLI flags, GUI
+  parameter names, config/profile keys, worksheet names, column names, metadata
+  field names, and parquet/cache wire shapes unless the task explicitly changes
+  them.
+- When adding optional Python parameters to public or adapter-facing functions,
+  prefer keyword-only arguments with conservative defaults.
+- Before removing or renaming a public surface, search for GUI, CLI, export,
+  autosave, tests, docs, and downstream handoff usage.
+- If a change alters user-visible behavior, final export contents, or downstream
+  routing, update README / handoff docs / GUI copy as appropriate.
+- Treat generated or derived artifacts as part of the contract when the repo
+  already versions them. If a schema, snapshot, lockfile, marker map, or package
+  metadata is generated from source, update it in the same change or document why
+  it is intentionally unchanged.
+
+## Contract-First Rules
+
+Scientific and workflow rules are public contracts in this repository. Do not
+encode a new rule directly in code, GUI copy, or README prose before the contract
+is clear.
+
+Default order for any new rule, threshold behavior, metadata schema, or
+cross-repo handoff:
+
+1. Write or update the contract document under `docs/plans/`.
+2. Add or update focused tests that encode the contract.
+3. Implement the smallest code change that satisfies those tests.
+4. Update GUI copy, README, and handoff docs to match the contract.
+
+If an urgent bug fix must ship before the contract document is complete, the PR
+must state that explicitly and include a follow-up plan. Do not let the code
+become the only source of truth for scientific behavior.
+
+## Downstream Boundary Rules
+
+Treat downstream responsibility as an API contract, not as informal knowledge.
+
+- `ms-preprocessing-toolkit` owns Step 1-4 preprocessing, final export, and
+  metadata/schema emitted for downstream handoff.
+- DNP owns calibration. It must exclude toolkit metadata from numeric
+  calibration matrices and pass the metadata through to MA without interpreting
+  imputation semantics.
+- MA / `Metaboanalyst_clone` owns missing-value imputation and statistical
+  analysis behavior.
+- Any new downstream-facing column, worksheet, profile key, or metadata field
+  must have a documented owner, a pass-through/exclusion rule, and a focused
+  regression test.
+- Do not make toolkit code depend on downstream internals unless the task
+  explicitly changes a cross-repo contract and the corresponding downstream
+  handoff document is updated.
 
 ## Text And UI Copy Rules
 
@@ -99,6 +208,9 @@ python -m pytest tests/ -v --tb=short -x
 
 For smaller tasks, run the narrowest sufficient check first, then expand if risk justifies it.
 
+Verification evidence must be fresh, task-scoped, and inspected. For expensive
+suites, run focused tests first and state the remaining risk.
+
 If you touched localized or user-visible text:
 
 - Inspect the edited files as explicit UTF-8 text before finishing; terminal rendering alone is not sufficient evidence.
@@ -108,7 +220,7 @@ If you touched localized or user-visible text:
 
 Useful local checks:
 
-```bash
+```powershell
 python -c "from ms_preprocessing import __version__; print(__version__)"
 pyinstaller ms-preprocessing.spec --clean --noconfirm
 ```
@@ -131,6 +243,15 @@ When asked to review:
 
 If no issues are found, say so explicitly and mention residual risks or test gaps.
 
+When reviewing or self-reviewing, explicitly check:
+
+- public contract drift
+- missing or stale tests
+- GUI/CLI behavior divergence
+- downstream metadata leakage into numeric matrices
+- file format or worksheet compatibility
+- generated artifacts, marker maps, and lockfiles that should have changed
+
 ## Submodule Rules
 
 For `ms-core/` changes:
@@ -143,6 +264,20 @@ For `ms-core/` changes:
 6. Commit the top-level repo change
 
 Do not leave top-level commits pointing at an unpushed submodule commit.
+
+When working inside a worktree, keep operations confined to that worktree. Do
+not borrow build artifacts, generated outputs, or dirty files from another
+worktree unless the user explicitly asks for that migration.
+
+## Commit, Push, And PR Rules
+
+- Commit only files related to the current task.
+- Before staging, inspect `git status --short` and avoid staging unrelated local
+  files, generated outputs, secrets, or temporary artifacts.
+- Do not push unless the user explicitly asks to push, upload, create/update a
+  PR, or otherwise publish the branch.
+- For PR descriptions, keep the summary focused on what changed and why; include
+  testing only when it is useful for review or risk assessment.
 
 ## Release Rules
 
@@ -165,6 +300,9 @@ Relevant workflows:
 ## Skills And Reusable Workflows
 
 - If a workflow repeats, prefer encoding it as a skill under `skills/`
+- `graphify` may be used as a local architecture memory layer. Keep
+  `graphify-out/` local unless the user explicitly asks to version it; prefer
+  committing only `.graphifyignore` until the generated graph is proven useful.
 - Existing repo skills:
   - `skills/ms-quality-gate/SKILL.md`
   - `skills/release-checklist/SKILL.md`
@@ -195,6 +333,8 @@ Agents should not invent missing config. If the task depends on these, state the
 - No skipping pre-flight checks
 - No submodule pointer update without first pushing the submodule commit
 - No silent assumptions about external systems, secrets, or runtime configuration
+- No new scientific/workflow rule without a contract document or an explicit
+  follow-up plan documenting why the contract update is deferred
 
 ## Done Standard
 
