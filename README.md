@@ -9,28 +9,18 @@
 
 > 質譜（Mass Spectrometry）數據前處理的整合式 GUI / CLI 工具，提供從原始 feature table 到可進入正規化與統計分析的標準化前處理流程。
 >
-> An integrated GUI/CLI toolkit for reproducible mass spectrometry data preprocessing — data organization, ISTD marking, duplicate removal, and feature filtering with imputation.
+> An integrated GUI/CLI toolkit for reproducible mass spectrometry data preprocessing: data organization, ISTD marking, duplicate removal, feature filtering, and downstream imputation-routing tags.
 
-<p align="center">
-  <img src="docs/images/gui-step1.png" alt="MS Preprocessing Toolkit — Step 1 Data Organization" width="820"/>
-</p>
+---
 
-<p align="center">
-  <sub><b>Step 1 — 資料整理（Data Organization）</b></sub>
-</p>
+## At A Glance
 
-<details>
-<summary><b>更多截圖（More Screenshots）</b></summary>
-
-<p align="center">
-  <img src="docs/images/gui-step4.png" alt="Step 4 Feature Filtering" width="820"/>
-</p>
-
-<p align="center">
-  <sub><b>Step 4 — 特徵篩選（Feature Filtering）：訊號強度 / 穩定檢出率 / MNAR / QC / 檢出率倍數救援等門檻可即時調整</b></sub>
-</p>
-
-</details>
+| Question | Answer |
+|----------|--------|
+| What does it do? | Runs a four-step LC-MS preprocessing workflow from feature table organization to Step 4 filtering metadata. |
+| Who is it for? | Lab users who need a guided GUI and developers who need reproducible CLI/profile runs. |
+| Where does output stop? | The toolkit exports Step 4 `.xlsx` files and metadata; DNP handles calibration, and MA handles imputation/statistics. |
+| How do I run it? | Use the Windows release for the last tagged stable build, or install from source for current branch features. |
 
 ---
 
@@ -42,6 +32,7 @@
 - [Usage](#usage)
 - [Configuration](#configuration)
 - [Data Format](#data-format)
+- [Downstream Boundary](#downstream-boundary)
 - [Project Layout](#project-layout)
 - [Development](#development)
 - [Contributing](#contributing)
@@ -52,16 +43,19 @@
 
 ## Highlights
 
-- **四步驟整合流程** — 資料整理（Data Organization）→ ISTD 標記（Marking）→ 重複訊號刪除（Duplicate Removal）→ 特徵篩選與填補（Feature Filtering），全部在同一個 GUI 中串接。
+- **四步驟整合流程** — 資料整理（Data Organization）→ ISTD 標記（Marking）→ 重複訊號刪除（Duplicate Removal）→ 特徵篩選與補值分流標記（Feature Filtering），全部在同一個 GUI 中串接。
 - **GUI 與 CLI 雙模式** — 互動式介面（CustomTkinter）給臨床/實驗端使用者，CLI + YAML profile 支援批次重現。
 - **可重現的 Profile 系統** — 內建 `loose` / `default` / `strict` 三組 profile，支援自訂 `config/presets/*.yml` 與 `${local.*}` 路徑變數。
 - **Parquet 中介格式** — Step 1–3 中間結果預設以 parquet 快取，加速重跑；最終交付仍為 `.xlsx`。
 - **保護機制（Protected Rows）** — ISTD 與紅字標記列可在後續步驟中被保護，避免被 Step 3/4 規則誤刪。
 - **科學門檻可調** — Step 4 的穩定檢出率、出現/缺失組門檻、強度倍率、檢出率倍數救援皆可由 GUI 或 CLI 覆寫。
+- **下游交接明確** — Toolkit 不執行補值；Step 4 輸出 `is_Presence_Absence_Marker` 與 audit metadata，供 DNP 安全傳遞到 MA。
 
 ## Quick Start
 
 ### Option A. 一般使用者（Windows .exe）
+
+Windows release 適合使用已正式發佈的功能。As of 2026-05-02, `releases/latest` is `v1.2.1` from 2026-03-25 and intentionally lags this stabilization branch. YAML profiles, local reference YAML, and the newer Step 4 tag contract may require Option B from source until the next release tag is cut.
 
 ```text
 1. 從 Releases 下載：
@@ -72,10 +66,10 @@
 
 ### Option B. 從原始碼安裝（建議使用 [`uv`](https://docs.astral.sh/uv/)）
 
-```bash
+```powershell
 # 1. clone 專案（含 ms-core submodule）
 git clone --recurse-submodules https://github.com/Chao-hu-Lab/ms-preprocessing-toolkit.git
-cd ms-preprocessing-toolkit
+Set-Location ms-preprocessing-toolkit
 
 # 2. 建立虛擬環境並安裝
 uv venv
@@ -86,7 +80,7 @@ uv run python main.py
 ```
 
 > 若 clone 時忘記加 `--recurse-submodules`，補執行：
-> ```bash
+> ```powershell
 > git submodule update --init --recursive
 > ```
 
@@ -103,12 +97,11 @@ uv run python main.py
 <details>
 <summary><b>使用 pip 安裝（如不使用 uv）</b></summary>
 
-```bash
+```powershell
 git clone --recurse-submodules https://github.com/Chao-hu-Lab/ms-preprocessing-toolkit.git
-cd ms-preprocessing-toolkit
+Set-Location ms-preprocessing-toolkit
 python -m venv .venv
-# Windows: .venv\Scripts\activate
-# macOS/Linux: source .venv/bin/activate
+.\.venv\Scripts\Activate.ps1
 pip install -e .
 ```
 
@@ -134,7 +127,7 @@ This toolkit does not import, launch, or configure downstream normalization proj
 
 ### GUI 模式
 
-```bash
+```powershell
 uv run python main.py
 # 或安裝後
 ms-preprocessing
@@ -142,18 +135,19 @@ ms-preprocessing
 
 ### CLI 模式
 
-```bash
+```powershell
 # 完整流程
-uv run python main.py \
-  --input data.xlsx \
-  --output processed.xlsx \
+uv run python main.py `
+  --input data.xlsx `
+  --output processed.xlsx `
   --xic-results-file xic_results.xlsx
 
-# 一次性 YAML profile
-uv run python main.py \
-  --input data.xlsx \
-  --output processed.xlsx \
-  --profile-file config/presets/lab-default.yml
+# 一次性 YAML profile；all run 仍需 Step 2 XIC 來源
+uv run python main.py `
+  --input data.xlsx `
+  --output processed.xlsx `
+  --profile-file config/presets/lab-default.yml `
+  --xic-results-file xic_results.xlsx
 
 # 只跑特定步驟
 uv run python main.py --input data.xlsx --step istd --xic-results-file xic_results.xlsx
@@ -258,6 +252,18 @@ Profile 中可用 `${local.method_file}`、`${local.xic_results_file}` 引用。
 
 > 範例輸入檔尚未提供於 repo；請使用您自有的 feature table，或從合作實驗室取得。
 
+## Downstream Boundary
+
+本 toolkit 的責任止於 Step 4 前處理輸出。它會保留 feature table、ratio metadata、刪除診斷與補值分流標記，但不執行實際補值。
+
+| 系統 | 責任 |
+|------|------|
+| `ms-preprocessing-toolkit` | Step 1–4 前處理、final export、Step 4 metadata 與 `is_Presence_Absence_Marker` |
+| DNP | 校正流程；排除 metadata 進入 numeric matrix，並將 metadata 原樣傳遞到 MA |
+| MA / `Metaboanalyst_clone` | 讀取 `is_Presence_Absence_Marker` 與 audit metadata，執行實際補值與統計分析 |
+
+Step 4 會輸出補值分流所需的 metadata，例如 `is_Presence_Absence_Marker`、`Feature_Filter_Keep_Reasons`、`Imputation_Tag_Reasons`、`Feature_Filter_Delete_Reasons`、`<analysis_group>_ratio` 與 `QC_ratio`。這些欄位是 feature-level metadata，不是 sample intensity columns。
+
 ## Project Layout
 
 ```text
@@ -266,11 +272,12 @@ ms-preprocessing-toolkit/
 ├── pyproject.toml                # 專案配置
 ├── src/ms_preprocessing/
 │   ├── adapters/                 # 唯一允許 import ms_core 的層
-│   ├── core/                     # 4 個處理步驟核心邏輯
+│   ├── config/                   # profiles、settings、config resolution
 │   ├── gui/                      # CustomTkinter GUI
+│   ├── workflow/                 # CLI/GUI workflow orchestration
 │   ├── utils/                    # 檔案處理、驗證、結果型別
 │   └── resources/builtin_profiles/  # loose / default / strict
-├── ms-core/                      # git submodule (Chao-hu-Lab/ms-core)
+├── ms-core/                      # git submodule：core processing logic
 ├── config/                       # 使用者 profile 與本機路徑
 ├── docs/                         # 設計文件、TESTING.md
 └── tests/                        # pytest 測試套件
@@ -295,7 +302,7 @@ uv run pytest tests/ -v --tb=short -x
 
 ### Code Style
 
-```bash
+```powershell
 black src/         # 格式化
 ruff check src/    # Lint
 mypy src/          # 型別檢查
@@ -312,7 +319,7 @@ mypy src/          # 型別檢查
 
 建議使用 `git worktree` 隔離開發環境（`.worktrees/` 已加入 `.gitignore`）：
 
-```bash
+```powershell
 git worktree add .worktrees/<branch-name> -b <type>/<branch-name>
 ```
 
@@ -323,7 +330,7 @@ git worktree add .worktrees/<branch-name> -b <type>/<branch-name>
 1. 已從 `master` 拉出對應 `feature/*` / `fix/*` / `chore/*` branch
 2. 跑過 `uv run pytest tests/ -q --tb=short -x` 全綠
 3. Commit 訊息使用 [Conventional Commits](https://www.conventionalcommits.org/)（`feat:` / `fix:` / `refactor:` / `docs:` / `test:`）
-4. 涉及 `ms-core` 的變更，先在 `ms-core` repo 完成 PR 與 tag，再 bump toolkit 的 submodule reference
+4. 涉及 `ms-core` 的變更，先在 `ms-core` repo merge/push，再 bump toolkit 的 submodule reference；release tag 只在正式發版流程需要
 
 詳見 [`CLAUDE.md`](CLAUDE.md) 中的開發守則。
 
@@ -334,7 +341,7 @@ git worktree add .worktrees/<branch-name> -b <type>/<branch-name>
 
 - Step1-4 intermediate format = parquet
 - final export = xlsx; downstream handoff is manual
-- Step4 zero-as-missing default behavior
+- Step4 zero-as-missing default behavior and imputation-routing metadata
 
 詳見 `docs/plans/2026-03-05-unified-parquet-v2-rollout-checklist.md` 與
 `docs/plans/2026-03-04-step4-zero-impute-and-performance-design.md`。
@@ -351,6 +358,6 @@ git worktree add .worktrees/<branch-name> -b <type>/<branch-name>
 
 - **ISTD 標記邏輯** — `FindSTDs_mzRT_Jia_Simplified.bas`
 - **重複訊號刪除** — [ms-data-processor](https://github.com/bosschen0429/ms-data-processor)
-- **特徵篩選與填補** — `Feature_barrier_V3.bas`
+- **特徵篩選與補值分流標記** — `Feature_barrier_V3.bas`
 
 開發於 **Chao-hu Lab**，主要維護者 [@bosschen0429](https://github.com/bosschen0429)。
