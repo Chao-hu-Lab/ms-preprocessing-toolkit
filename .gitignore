@@ -91,6 +91,7 @@ config/presets/*.yaml
 output/
 logs/
 *.log
+graphify-out/
 
 # Local temp folders
 .pip-tmp*/
