@@ -1,265 +1,132 @@
-# Codex Skill Recommendations For This Repo
+# Codex Skill Surface For This Repo
 
-## Goal
+## Purpose
 
-This document maps `ComposioHQ/awesome-codex-skills` to the actual needs of `ms-preprocessing-toolkit`.
+This document records the current skill strategy for `ms-preprocessing-toolkit`.
+Repo-local skills should cover only workflows that are specific to this
+repository and difficult to replace with global Codex skills, GitHub tools, or
+general engineering judgment.
 
-Focus areas:
+## Current Decision
 
-- Python development workflow
-- data processing and spreadsheet-adjacent work
-- general development rules
-- commit / changelog / release support
+Keep the repo-local skill surface small:
 
-## Current Skill Inventory
+1. `skills/submodule-update`
+2. `skills/merge-quality-gate`
+3. `skills/release-checklist`
+4. `skills/root-hygiene`
+5. `skills/verification-shards`
 
-### Already available in this environment
+Do not add repo-local skills for generic commit writing, generic code review,
+generic Python style, or generic GitHub workflows. Those are already covered by
+global skills, Codex plugins, or `AGENTS.md`.
 
-Global or system-level skills already cover several categories:
+## Skill Roles
 
-- `gh-address-comments`
-- `gh-fix-ci`
-- `skill-creator`
-- `mcp-builder`
-- `webapp-testing`
-- `xlsx`
-- `internal-comms`
-- several planning / execution skills already exist outside the repo
+### `submodule-update`
 
-### Repo-local skill already present
+Use when a task edits `ms-core/` or advances the top-level submodule pointer.
 
-- `skills/ms-quality-gate`
-  - good fit for local testing, smoke checks, and code review structure
+Why it stays local:
 
-## Install First
+- `ms-core` is a separate repository.
+- The correct commit, push, pointer update, PR, and merge order is a recurring
+  repo-specific risk.
+- Generic Git skills do not know this repository's two-repo landing order.
 
-These are the best additions from `awesome-codex-skills` for this repository.
+### `merge-quality-gate`
 
-### 1. `changelog-generator`
+Use before merging or marking a PR ready.
 
-Why install:
+Why it stays local:
 
-- directly useful for release notes
-- useful for commit summary -> release summary conversion
-- fits the current tag-driven release workflow
+- It checks toolkit PR state, `ms-core` pointer consistency, CI, review threads,
+  and verification evidence together.
+- It prevents landing a top-level PR before the `ms-core` SHA it references has
+  landed.
 
-Best use cases here:
+Potential future cleanup:
 
-- summarize changes between `v1.1.2` -> `v1.1.3`
-- draft GitHub Release notes
-- produce user-facing update summaries from technical commits
+- Reduce duplicated submodule wording by pointing deeper details to
+  `submodule-update`.
 
-Install:
+### `release-checklist`
 
-```bash
-python ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py --repo ComposioHQ/awesome-codex-skills --path changelog-generator
-```
+Use only for actual versioned releases.
 
-### 2. `file-organizer`
+Why it stays local:
 
-Why install:
+- Release requires updating two version files, pushing `master`, creating an
+  annotated tag, and verifying the GitHub Actions Windows executable release.
+- The latest GitHub Release may intentionally lag active source branches until
+  the repo is stable enough to tag.
 
-- this repo produces outputs, docs, temporary artifacts, and test byproducts
-- useful for cleaning local workspace clutter and archiving old outputs
+### `root-hygiene`
 
-Best use cases here:
+Use when pytest temp folders, caches, or local artifacts appear in the repo root.
 
-- organize `OUTPUT/`, temp exports, benchmark files, and user-deliverable folders
-- clean old generated artifacts before release packaging
+Why it stays local:
 
-Install:
+- This repository has custom top-level and `ms-core` temp fixtures.
+- Root clutter was a real historical failure mode.
+- The cleanup script and fixture policy are repository-specific.
 
-```bash
-python ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py --repo ComposioHQ/awesome-codex-skills --path file-organizer
-```
+### `verification-shards`
 
-## Install If You Actually Need The Workflow
+Use when selecting or running focused verification.
 
-These are useful, but not mandatory for this repo.
+Why it stays local:
 
-### 3. `spreadsheet-formula-helper`
+- Test ownership is split between toolkit tests and `ms-core/tests/`.
+- Marker shards, GUI tests, adapter contracts, integration tests, and root
+  hygiene rules are defined in `docs/TESTING.md`.
+- The skill is intentionally thin and defers to `docs/TESTING.md` as source of
+  truth.
 
-Why optional:
+## Removed Or Replaced
 
-- strong for Excel / Google Sheets formulas
-- not a replacement for pandas / parquet / schema-validation work
-- overlaps partially with the existing `xlsx` skill
+### `commit-outline`
 
-Install if:
-
-- you often debug Excel formulas for users
-- you need help translating spreadsheet logic into reliable formulas
-
-Skip if:
-
-- most work stays in pandas, pytest, and Python pipelines
-
-Install:
-
-```bash
-python ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py --repo ComposioHQ/awesome-codex-skills --path spreadsheet-formula-helper
-```
-
-### 4. `connect` or `connect-apps`
-
-Why optional:
-
-- only useful if you plan to wire Codex to external tools
-- most valuable when paired with MCP or Composio actions
-
-Install if:
-
-- you want Codex to act on Slack, Notion, Jira, Linear, or email
-
-Skip if:
-
-- your current workflow stays inside git, pytest, and local files
-
-## Do Not Install From Awesome Because You Already Have Equivalent Or Better Coverage
-
-These would be redundant in the current environment.
-
-### Planning / workflow overlap
-
-- `create-plan`
+Removed.
 
 Reason:
 
-- your environment already includes stronger planning and execution-oriented skills
-- repo guidance is now encoded in `AGENTS.md` and `CLAUDE.md`
+- Generic commit/PR summaries are covered by global commit and GitHub skills.
+- The only remaining repo-specific note, "mention `ms-core` pointer updates",
+  belongs in `AGENTS.md`, `submodule-update`, or `merge-quality-gate`.
 
-### GitHub review / CI overlap
+### `ms-quality-gate`
 
-- `gh-fix-ci`
-- `gh-address-comments`
-
-Reason:
-
-- already available globally
-
-### Skill authoring overlap
-
-- `skill-creator`
+Replaced by `verification-shards`.
 
 Reason:
 
-- already available globally
+- The old script duplicated testing policy and drifted from `docs/TESTING.md`.
+- The new skill focuses on shard selection and delegates ownership rules to the
+  testing document.
 
-### MCP / app testing overlap
+## External Skill Policy
 
-- `mcp-builder`
-- `webapp-testing`
+External skills should be imported only when they add a concrete workflow not
+already covered locally or globally.
 
-Reason:
+Currently useful external/global additions:
 
-- already available globally
+- `implementing-secret-scanning-with-gitleaks`: useful as a security gate before
+  public release or when adding new config/secrets surfaces.
+- `changelog-generator`: useful for release-note drafting.
+- spreadsheet-related skills: useful when the task is directly about `.xlsx`
+  inspection or formula behavior.
 
-### Writing / Notion overlap
+Avoid importing large all-in-one skill packs wholesale. Prefer one narrow skill
+with a clear trigger over broad overlapping rule sets.
 
-- `internal-comms`
-- Notion-related skills from the awesome repo ecosystem
+## Future Candidates
 
-Reason:
+Only add these if they become recurring workflows:
 
-- equivalents already exist in the current environment
-
-## What Awesome-Codex-Skills Does Not Solve Well For This Repo
-
-The external repo does **not** provide a strong ready-made skill for:
-
-- Python data engineering workflow
-- pandas / parquet / dataframe validation
-- submodule-safe development flow
-- release checklist with version bump + tag + release verification
-- commit-outline generation tuned to this repository
-
-These should be repo-specific skills.
-
-## Recommended Private Skills To Build Next
-
-### 1. `python-data-workflow`
-
-Purpose:
-
-- standard Python + pandas + pytest workflow for this repo
-
-Should include:
-
-- default commands
-- preferred test scope strategy
-- parquet / xlsx / csv validation rules
-- common failure patterns in this codebase
-
-### 2. `submodule-update`
-
-Purpose:
-
-- encode the safe `ms-core` update sequence
-
-Should include:
-
-- commit in submodule first
-- push submodule first
-- update top-level pointer second
-- verify repo state before final commit
-
-### 3. `release-checklist`
-
-Purpose:
-
-- make release flow deterministic
-
-Should include:
-
-- bump version in both files
-- verify version output
-- run validation
-- push branch
-- create and push tag
-- verify GitHub Release exists
-
-### 4. `commit-outline`
-
-Purpose:
-
-- generate clean commit / PR / release summaries
-
-Should include:
-
-- conventional commit suggestions
-- summary from changed files
-- PR summary bullets
-- release-note draft handoff to `changelog-generator`
-
-### 5. `step4-regression-check`
-
-Purpose:
-
-- protect the most fragile, domain-specific part of this toolkit
-
-Should include:
-
-- Step 4 threshold checks
-- zero-as-missing checks
-- QC ratio behavior
-- GUI/processor parameter sync
-
-## Recommended Install Set
-
-If you only want the highest-value set, install exactly these:
-
-1. `changelog-generator`
-2. `file-organizer`
-3. `spreadsheet-formula-helper` only if Excel formula support matters
-
-Then build these private skills:
-
-1. `python-data-workflow`
-2. `submodule-update`
-3. `release-checklist`
-4. `commit-outline`
-5. `step4-regression-check`
-
-## Source
-
-- `https://github.com/ComposioHQ/awesome-codex-skills`
+- `ci-triage`: focused GitHub Actions failure diagnosis for this repo.
+- `step4-regression-check`: focused Step4 contract and downstream handoff
+  verification.
+- `release-hardening`: pre-tag packaging, PyInstaller, README, and release asset
+  verification.

@@ -7,7 +7,7 @@ from .bootstrap_paths import ensure_ms_core_src_on_path
 ensure_ms_core_src_on_path(Path(__file__).resolve())
 
 __version__ = "1.2.1"
-__author__ = "Your Name"
+__author__ = "bosschen0429"
 
 from ms_preprocessing.adapters import (
     data_organizer,

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Verification Shards"
+  short_description: "Select and run repo-specific pytest shards from docs/TESTING.md"
+  default_prompt: "Use $verification-shards to choose and run the focused verification shard for this change."

@@ -1,4 +1,0 @@
-interface:
-  display_name: "MS Quality Gate"
-  short_description: "Standardized test + code review workflow for this repo"
-  default_prompt: "Use $ms-quality-gate to run tests and produce a severity-ranked review report."

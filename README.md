@@ -1,143 +1,212 @@
 # MS Preprocessing Toolkit
 
-質譜數據前處理工具箱 - 整合式 GUI 工具，用於質譜數據的標準化前處理流程。
+[![PyPI - Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](#installation)
+[![CI](https://github.com/Chao-hu-Lab/ms-preprocessing-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/Chao-hu-Lab/ms-preprocessing-toolkit/actions/workflows/ci.yml)
+[![Build](https://github.com/Chao-hu-Lab/ms-preprocessing-toolkit/actions/workflows/build.yml/badge.svg)](https://github.com/Chao-hu-Lab/ms-preprocessing-toolkit/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/Chao-hu-Lab/ms-preprocessing-toolkit?include_prereleases)](https://github.com/Chao-hu-Lab/ms-preprocessing-toolkit/releases)
 
-## 功能概述
+> 質譜（Mass Spectrometry）數據前處理的整合式 GUI / CLI 工具，提供從原始 feature table 到可進入正規化與統計分析的標準化前處理流程。
+>
+> An integrated GUI/CLI toolkit for reproducible mass spectrometry data preprocessing: data organization, ISTD marking, duplicate removal, feature filtering, and downstream imputation-routing tags.
 
-本工具整合了四個主要的前處理步驟：
+---
 
-### 1. 資料整理 (Data Organization)
-- 標準化資料結構
-- 自動偵測並設定 Sample Type
-- 設置固定欄位名稱
-- 可選擇上機順序 Word 檔案 (.docx) 以依序排序樣本
+## At A Glance
 
-### 2. ISTD 標記 (ISTD Marking)
-- 依 m/z 值排序數據
-- 使用 XIC Extractor 結果 workbook 的 ISTD targets 作為唯一內標來源
-- 依 XIC target 的 `ppm tol`、RT window 或 Summary Mean RT 選出最符合的內標列
-- 將內標列寫入紅字與 protected row metadata，供 Step 3 保護使用
+| Question | Answer |
+|----------|--------|
+| What does it do? | Runs a four-step LC-MS preprocessing workflow from feature table organization to Step 4 filtering metadata. |
+| Who is it for? | Lab users who need a guided GUI and developers who need reproducible CLI/profile runs. |
+| Where does output stop? | The toolkit exports Step 4 `.xlsx` files and metadata; DNP handles calibration, and MA handles imputation/statistics. |
+| How do I run it? | Use the Windows release for the last tagged stable build, or install from source for current branch features. |
 
-### 3. 重複訊號刪除 (Duplicate Removal)
-- 自動識別 RT、m/z、Intensity 欄位
-- 基於容差智慧判別重複訊號
-- 保留最高強度訊號
-- 支援紅色字體保護機制
+---
 
-### 4. 篩選與缺失值填補 (Feature Filtering)
-- 動態識別 Sample Type
-- 計算各組訊號比例 (ratio)
-- 三重條件篩選：
-  - 穩定檢出：≥2 組檢出率 ≥ 穩定檢出率門檻
-  - 存在/缺失：一組檢出率 ≥ 出現組檢出率下限，另一組檢出率 ≤ 缺失組檢出率上限
-  - 強度差異：任兩組平均強度倍率 ≥ 強度倍率門檻
-- 使用組內最小值/2 填補缺失值
+## Table of Contents
 
-## 安裝
+- [Highlights](#highlights)
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Data Format](#data-format)
+- [Downstream Boundary](#downstream-boundary)
+- [Project Layout](#project-layout)
+- [Development](#development)
+- [Contributing](#contributing)
+- [License](#license)
+- [Acknowledgments](#acknowledgments)
 
-### 一般使用者（直接執行）
+---
 
-從 [Releases](https://github.com/bosschen0429/ms-preprocessing-toolkit/releases) 下載最新的 `ms-preprocessing.exe`，直接執行即可，無需安裝 Python 環境。
+## Highlights
 
-### 開發者（原始碼安裝）
+- **四步驟整合流程** — 資料整理（Data Organization）→ ISTD 標記（Marking）→ 重複訊號刪除（Duplicate Removal）→ 特徵篩選與補值分流標記（Feature Filtering），全部在同一個 GUI 中串接。
+- **GUI 與 CLI 雙模式** — 互動式介面（CustomTkinter）給臨床/實驗端使用者，CLI + YAML profile 支援批次重現。
+- **可重現的 Profile 系統** — 內建 `loose` / `default` / `strict` 三組 profile，支援自訂 `config/presets/*.yml` 與 `${local.*}` 路徑變數。
+- **Parquet 中介格式** — Step 1–3 中間結果預設以 parquet 快取，加速重跑；最終交付仍為 `.xlsx`。
+- **保護機制（Protected Rows）** — ISTD 與紅字標記列可在後續步驟中被保護，避免被 Step 3/4 規則誤刪。
+- **科學門檻可調** — Step 4 的穩定檢出率、出現/缺失組門檻、強度倍率、檢出率倍數救援皆可由 GUI 或 CLI 覆寫。
+- **下游交接明確** — Toolkit 不執行補值；Step 4 輸出 `is_Presence_Absence_Marker` 與 audit metadata，供 DNP 安全傳遞到 MA。
 
-> **注意：** 本專案包含 git submodule（ms-core），clone 時必須加上 `--recurse-submodules`。
+## Quick Start
 
-#### 環境需求
-- Python 3.11+
-- Windows / macOS / Linux
+### Option A. 一般使用者（Windows .exe）
 
-#### 安裝步驟
+Windows release 適合使用已正式發佈的功能。As of 2026-05-02, `releases/latest` is `v1.2.1` from 2026-03-25 and intentionally lags this stabilization branch. YAML profiles, local reference YAML, and the newer Step 4 tag contract may require Option B from source until the next release tag is cut.
 
-```bash
-# 1. 克隆專案（包含 submodule）
-git clone --recurse-submodules https://github.com/bosschen0429/ms-preprocessing-toolkit.git
-cd ms-preprocessing-toolkit
+```text
+1. 從 Releases 下載：
+   https://github.com/Chao-hu-Lab/ms-preprocessing-toolkit/releases/latest
+2. 解壓後直接執行 ms-preprocessing.exe
+3. 在 GUI 中依序操作 Step 1 → 4，或點選 Run All
+```
 
-# 2. 創建虛擬環境 (建議)
-python -m venv venv
-# Windows:
-venv\Scripts\activate
-# macOS/Linux:
-source venv/bin/activate
+### Option B. 從原始碼安裝（建議使用 [`uv`](https://docs.astral.sh/uv/)）
 
-# 3. 安裝套件
+```powershell
+# 1. clone 專案（含 ms-core submodule）
+git clone --recurse-submodules https://github.com/Chao-hu-Lab/ms-preprocessing-toolkit.git
+Set-Location ms-preprocessing-toolkit
+
+# 2. 建立虛擬環境並安裝
+uv venv
+uv pip install -e .
+
+# 3. 啟動 GUI
+uv run python main.py
+```
+
+> 若 clone 時忘記加 `--recurse-submodules`，補執行：
+> ```powershell
+> git submodule update --init --recursive
+> ```
+
+## Installation
+
+### 環境需求
+
+| 項目 | 版本 |
+|------|------|
+| Python | 3.11+ |
+| OS | Windows / macOS / Linux |
+| 套件管理 | 建議使用 `uv`（支援 `pip` fallback） |
+
+<details>
+<summary><b>使用 pip 安裝（如不使用 uv）</b></summary>
+
+```powershell
+git clone --recurse-submodules https://github.com/Chao-hu-Lab/ms-preprocessing-toolkit.git
+Set-Location ms-preprocessing-toolkit
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -e .
 ```
 
-#### 如果忘記加 `--recurse-submodules`
+</details>
 
-若已 clone 但 submodule 目錄為空，執行以下指令補救：
+<details>
+<summary><b>進階：使用外部 ms-core checkout（development override）</b></summary>
 
-```bash
-git submodule update --init --recursive
-```
+Officially supported runtime layout: this repository plus the checked-in `ms-core` submodule.
+External sibling `ms-core` checkouts are treated as a **development-only override**, not the default deployment contract.
 
-#### Advanced Dependency Overrides
+預設執行環境為「本 repo + 內建 `ms-core` submodule」。若需指向 sibling 目錄的 `ms-core`，設定下列任一環境變數：
 
-- Officially supported runtime layout: this repository plus the checked-in `ms-core` submodule.
-- External sibling `ms-core` checkouts are treated as a development-only override, not the default deployment contract.
-- If you intentionally want to use an external `ms-core` checkout, set one of:
-  - `MSPTK_MS_CORE_SRC`
-  - `MSPTK_MS_CORE_ROOT`
-- This toolkit does not import, launch, or configure downstream normalization projects. It stops at the Step 4 `.xlsx` output.
+- `MSPTK_MS_CORE_SRC`
+- `MSPTK_MS_CORE_ROOT`
 
-## 使用方式
+此 toolkit 不會匯入、啟動或設定下游正規化專案，輸出止於 Step 4 的 `.xlsx`。
+This toolkit does not import, launch, or configure downstream normalization projects — output stops at the Step 4 `.xlsx`.
+
+</details>
+
+## Usage
 
 ### GUI 模式
 
-```bash
-# 直接執行
-python main.py
-
+```powershell
+uv run python main.py
 # 或安裝後
 ms-preprocessing
 ```
 
-### 命令列模式
+### CLI 模式
 
-```bash
-# 執行全部流程
-python main.py --input data.xlsx --output processed.xlsx --xic-results-file xic_results.xlsx
+```powershell
+# 完整流程
+uv run python main.py `
+  --input data.xlsx `
+  --output processed.xlsx `
+  --xic-results-file xic_results.xlsx
 
-# 使用一次性的 YAML profile 檔案
-python main.py --input data.xlsx --output processed.xlsx --profile-file config/presets/lab-default.yml
+# 一次性 YAML profile；all run 仍需 Step 2 XIC 來源
+uv run python main.py `
+  --input data.xlsx `
+  --output processed.xlsx `
+  --profile-file config/presets/lab-default.yml `
+  --xic-results-file xic_results.xlsx
 
-# 執行特定步驟
-python main.py --input data.xlsx --step istd --xic-results-file xic_results.xlsx
-
-# 查看幫助
-python main.py --help
+# 只跑特定步驟
+uv run python main.py --input data.xlsx --step istd --xic-results-file xic_results.xlsx
 ```
 
-### 命令列參數
+### 常用 CLI 參數
 
 | 參數 | 說明 | 預設值 |
 |------|------|--------|
-| `--input, -i` | 輸入檔案路徑 | - |
-| `--output, -o` | 輸出檔案路徑 | 自動生成 |
-| `--step` | 執行步驟 (organize/istd/duplicate-removal/filter/all) | all |
-| `--profile` | 使用已安裝或 `config/presets/` 中的 named profile | default |
-| `--profile-file` | 使用指定 YAML profile 檔案；適合一次性批次執行 | - |
-| `--mz-tol` | Step 3 重複訊號刪除 m/z 容差 (ppm) | 20 |
-| `--xic-results-file` | XIC Extractor 結果 workbook (.xlsx)，Step 2 必填來源 | - |
-| `--rt-tol` | Step 3 重複訊號刪除 RT 容差 (分鐘) | profile 預設 |
-| `--bg-threshold` | 穩定檢出率門檻 | 0.33 |
-| `--high-det-thresh` | MNAR 出現組檢出率下限 | 0.80 |
-| `--low-det-thresh` | MNAR 缺失組檢出率上限 | 0.20 |
-| `--qc-ratio-threshold` | QC 檢出率門檻 | profile 預設 |
-| `--intensity-fc-threshold` | 強度倍率門檻 | profile 預設 |
-| `--ratio-rescue-threshold` | 檢出率倍數救援門檻 | profile 預設 |
-| `--disable-ratio-rescue` | 停用 Step 4 檢出率倍數救援 | false |
-| `--method-file` | 上機順序 Word 檔案 (.docx) | - |
+| `--input, -i` | 輸入檔案路徑 | — |
+| `--output, -o` | 輸出檔案路徑 | 自動產生 |
+| `--step` | `organize` / `istd` / `duplicate-removal` / `filter` / `all` | `all` |
+| `--profile` | 已安裝或 `config/presets/` 中的 named profile | `default` |
+| `--profile-file` | 一次性 YAML profile 檔案路徑 | — |
+| `--xic-results-file` | XIC Extractor 結果 workbook（Step 2 必填） | — |
+| `--method-file` | 上機順序 Word 檔（`.docx`） | — |
 
-Step 2 不再支援 `--istd-mz`、`--istd-record-file` 或 `--istd-record-date`。本機預設路徑請使用 `MSPTK_XIC_RESULTS_FILE` 或 config 目錄下 `local_reference.yml` 的 `references.xic_results_file`。`local_reference_paths.json` 仍是過渡期 fallback。
+<details>
+<summary><b>完整 CLI 參數列表</b></summary>
 
-### YAML profiles 與本機 reference
+| 參數 | 說明 | 預設值 |
+|------|------|--------|
+| `--mz-tol` | Step 3 重複訊號刪除 m/z 容差（ppm） | `20` |
+| `--rt-tol` | Step 3 重複訊號刪除 RT 容差（分鐘） | profile |
+| `--bg-threshold` | 穩定檢出率門檻 | `0.33` |
+| `--high-det-thresh` | MNAR 出現組檢出率下限 | `0.80` |
+| `--low-det-thresh` | MNAR 缺失組檢出率上限 | `0.20` |
+| `--qc-ratio-threshold` | QC 檢出率門檻 | profile |
+| `--intensity-fc-threshold` | 強度倍率門檻 | profile |
+| `--ratio-rescue-threshold` | 檢出率倍數救援門檻 | profile |
+| `--disable-ratio-rescue` | 停用 Step 4 檢出率倍數救援 | `false` |
 
-內建 Run All profiles 是程式資源，位於 `src/ms_preprocessing/resources/builtin_profiles/`，目前提供 `loose`、`default`、`strict`，不建議使用者直接修改。使用者自己的 workflow profile 放在 config 目錄的 `presets/*.yml`；GUI 會在 Run All preset 選單中列出這些檔名，CLI 可用 `--profile <name>` 呼叫。config 目錄解析順序是 `MSPTK_CONFIG_DIR`、目前工作目錄的 `config/`、打包版 exe 旁邊的 `config/`、source checkout 根目錄的 `config/`。若只想針對單次批次使用某個檔案，使用 `--profile-file <path>`。
+> Step 2 不再支援 `--istd-mz` / `--istd-record-file` / `--istd-record-date`。
+> 本機預設路徑請改用 `MSPTK_XIC_RESULTS_FILE` 環境變數，或 `config/local_reference.yml` 的 `references.xic_results_file`。
 
-本機路徑放在 config 目錄的 `local_reference.yml`：
+</details>
+
+## Configuration
+
+### Profiles
+
+內建 Run All profiles 為打包資源，位於 `src/ms_preprocessing/resources/builtin_profiles/`，目前提供：
+
+| Profile | 用途 |
+|---------|------|
+| `loose` | 寬鬆篩選，保留更多 features |
+| `default` | 平衡保留與 QC 穩定性 |
+| `strict` | 嚴格篩選，重視 QC reproducibility |
+
+使用者自訂 profile 放在 config 目錄的 `presets/*.yml`；GUI 的 Run All preset 選單會自動列出，CLI 用 `--profile <name>` 呼叫。
+
+**Config 目錄解析順序**：
+
+1. `MSPTK_CONFIG_DIR`
+2. 目前工作目錄的 `config/`
+3. 打包版 `.exe` 旁的 `config/`
+4. Source checkout 根目錄的 `config/`
+
+### 本機路徑（`local_reference.yml`）
 
 ```yaml
 version: 1
@@ -146,69 +215,19 @@ references:
   xic_results_file: "C:\\path\\to\\xic_results.xlsx"
 ```
 
-profile 可用 `${local.method_file}`、`${local.xic_results_file}` 引用上述路徑。`input`、`input_file`、`output`、`output_file` 不允許出現在 profile 中；資料輸入與輸出必須由 GUI 選檔或 CLI runtime 參數提供。
+Profile 中可用 `${local.method_file}`、`${local.xic_results_file}` 引用。`input` / `input_file` / `output` / `output_file` **不允許**出現在 profile 中，必須由 GUI 選檔或 CLI runtime 參數提供。
 
-## 專案結構
+## Data Format
 
-```
-ms-preprocessing-toolkit/
-├── main.py                          # 主程式入口
-├── pyproject.toml                   # 專案配置
-├── requirements.txt                 # 依賴清單
-├── README.md                        # 說明文件
-│
-├── src/ms_preprocessing/
-│   ├── __init__.py
-│   ├── main.py                      # CLI 入口點
-│   │
-│   ├── core/                        # 核心處理模組
-│   │   ├── __init__.py
-│   │   ├── base.py                  # 基礎類別
-│   │   ├── data_organizer.py        # Step 1: 資料整理
-│   │   ├── istd_marker.py           # Step 2: ISTD 標記
-│   │   ├── duplicate_remover.py     # Step 3: 重複刪除
-│   │   └── feature_filter.py        # Step 4: 篩選填補
-│   │
-│   ├── utils/                       # 工具模組
-│   │   ├── __init__.py
-│   │   ├── file_handler.py          # 檔案處理
-│   │   └── validators.py            # 資料驗證
-│   │
-│   ├── gui/                         # GUI 模組
-│   │   ├── __init__.py
-│   │   ├── main_window.py           # 主視窗
-│   │   ├── styles.py                # 樣式設定
-│   │   └── widgets/                 # UI 元件
-│   │       ├── __init__.py
-│   │       ├── base_widget.py
-│   │       ├── data_organizer_widget.py
-│   │       ├── istd_marker_widget.py
-│   │       ├── duplicate_remover_widget.py
-│   │       └── feature_filter_widget.py
-│   │
-│   └── config/                      # 配置模組
-│       ├── __init__.py
-│       └── settings.py              # 設定管理
-│
-└── tests/                           # 測試
-    ├── __init__.py
-    ├── conftest.py
-    ├── test_data_organizer.py
-    ├── test_duplicate_remover.py
-    └── test_feature_filter.py
-```
+### 輸入支援格式
 
-## 資料格式
+- Excel — `.xlsx`, `.xls`
+- CSV — `.csv`
+- TSV — `.tsv`, `.txt`
 
-### 輸入格式要求
+### 預期資料結構
 
-支援的檔案格式：
-- Excel (.xlsx, .xls)
-- CSV (.csv)
-- TSV (.tsv, .txt)
-
-預期的資料結構：
-```
+```text
 | FeatureID       | Sample1 | Sample2 | QC1  | ... |
 |-----------------|---------|---------|------|-----|
 | Sample_Type     | case    | case    | qc   | ... |
@@ -216,76 +235,129 @@ ms-preprocessing-toolkit/
 | 200.5678/2.50   | 6000    | 6500    | 6200 | ... |
 ```
 
-- 第一欄：FeatureID (格式: m/z/RT)
+- 第一欄為 `FeatureID`，格式為 `m/z/RT`
+- 第二列為 `Sample_Type`（樣本類型標籤）
 - 舊資料若含 Tolerance 欄仍可讀取，但 Step 2 不使用此欄
-- 第二列：Sample_Type (樣本類型標籤)
-- Step 2 的 ppm tolerance、RT window 與 Mean RT 由 XIC Extractor workbook 提供
+- Step 2 的 `ppm tol` / `RT window` / `Mean RT` 由 XIC Extractor workbook 提供
 
 ### Sample Type 標籤
 
 | 標籤 | 說明 |
 |------|------|
-| case | 實驗組 |
-| control | 對照組 |
-| qc | 品質控制樣本 |
-| blank | 空白樣本 (排除) |
-| standard | 標準品 (排除) |
+| `case` | 實驗組 |
+| `control` | 對照組 |
+| `qc` | 品質控制樣本 |
+| `blank` | 空白樣本（排除） |
+| `standard` | 標準品（排除） |
 
-## 開發
+> 範例輸入檔尚未提供於 repo；請使用您自有的 feature table，或從合作實驗室取得。
 
-### 執行測試
+## Downstream Boundary
 
-完整測試策略、責任邊界與精準測試範圍請看
-[docs/TESTING.md](docs/TESTING.md)。
+本 toolkit 的責任止於 Step 4 前處理輸出。它會保留 feature table、ratio metadata、刪除診斷與補值分流標記，但不執行實際補值。
+
+| 系統 | 責任 |
+|------|------|
+| `ms-preprocessing-toolkit` | Step 1–4 前處理、final export、Step 4 metadata 與 `is_Presence_Absence_Marker` |
+| DNP | 校正流程；排除 metadata 進入 numeric matrix，並將 metadata 原樣傳遞到 MA |
+| MA / `Metaboanalyst_clone` | 讀取 `is_Presence_Absence_Marker` 與 audit metadata，執行實際補值與統計分析 |
+
+Step 4 會輸出補值分流所需的 metadata，例如 `is_Presence_Absence_Marker`、`Feature_Filter_Keep_Reasons`、`Imputation_Tag_Reasons`、`Feature_Filter_Delete_Reasons`、`<analysis_group>_ratio` 與 `QC_ratio`。這些欄位是 feature-level metadata，不是 sample intensity columns。
+
+## Project Layout
+
+```text
+ms-preprocessing-toolkit/
+├── main.py                       # 主程式入口
+├── pyproject.toml                # 專案配置
+├── src/ms_preprocessing/
+│   ├── adapters/                 # 唯一允許 import ms_core 的層
+│   ├── config/                   # profiles、settings、config resolution
+│   ├── gui/                      # CustomTkinter GUI
+│   ├── workflow/                 # CLI/GUI workflow orchestration
+│   ├── utils/                    # 檔案處理、驗證、結果型別
+│   └── resources/builtin_profiles/  # loose / default / strict
+├── ms-core/                      # git submodule：core processing logic
+├── config/                       # 使用者 profile 與本機路徑
+├── docs/                         # 設計文件、TESTING.md
+└── tests/                        # pytest 測試套件
+```
+
+## Development
+
+完整測試策略、責任邊界與 GUI smoke check 請見 [`docs/TESTING.md`](docs/TESTING.md)。
 
 ```powershell
-# 安裝開發依賴
-python -m pip install -e ".[dev]"
+# 安裝 dev 依賴
+uv pip install -e ".[dev]"
 
 # 快速 smoke
 $env:PYTHONPATH='ms-core/src'
-python -m pytest -m smoke -v --tb=short
+uv run pytest -m smoke -v --tb=short
 
-# top-level full suite
+# 完整 top-level suite
 $env:PYTHONPATH='ms-core/src'
-python -m pytest tests/ -v --tb=short -x
+uv run pytest tests/ -v --tb=short -x
 ```
 
-### 程式碼風格
+### Code Style
 
-```bash
-# 格式化
-black src/
-
-# Lint
-ruff check src/
-
-# 類型檢查
-mypy src/
+```powershell
+black src/         # 格式化
+ruff check src/    # Lint
+mypy src/          # 型別檢查
 ```
 
-## 授權
+### Branch Strategy
 
-MIT License
+| Branch | 命名 | 用途 |
+|--------|------|------|
+| `master` | — | 僅供 PR 合併，禁止直接開發 |
+| `feature/*` | `feature/<topic>` | 新功能 |
+| `fix/*` | `fix/<topic>` | Bug 修復 |
+| `chore/*` | `chore/<topic>` | CI、依賴、文件 |
 
-## 致謝
+建議使用 `git worktree` 隔離開發環境（`.worktrees/` 已加入 `.gitignore`）：
 
-本工具整合並改寫自以下專案：
-- ISTD 標記邏輯: FindSTDs_mzRT_Jia_Simplified.bas
-- 重複訊號刪除: [ms-data-processor](https://github.com/bosschen0429/ms-data-processor)
-- 特徵篩選與填補: Feature_barrier_V3.bas
+```powershell
+git worktree add .worktrees/<branch-name> -b <type>/<branch-name>
+```
 
-## Step 4 + Performance Notes (2026-03-04)
+## Contributing
 
-- Step 4 imputation now treats both `NaN` and `0` as missing values in sample and QC columns.
-- Intermediate workflow outputs now prefer parquet for Step 1-3 auto-save paths.
-- Parquet cache is enabled by default (`SAVE_PARQUET_CACHE = True`) to speed repeated reloads.
-- Final user-facing deliverables remain `.xlsx` (including Step 4 export and final output).
-- Downstream normalization/statistics tools should consume the exported `.xlsx` manually after SampleInfo `Batch` and project-specific correction/metadata columns are reviewed.
+歡迎以 issue 或 PR 形式回饋。提 PR 前請確認：
 
-## Unified Parquet V2 (2026-03-05)
+1. 已從 `master` 拉出對應 `feature/*` / `fix/*` / `chore/*` branch
+2. 跑過 `uv run pytest tests/ -q --tb=short -x` 全綠
+3. Commit 訊息使用 [Conventional Commits](https://www.conventionalcommits.org/)（`feat:` / `fix:` / `refactor:` / `docs:` / `test:`）
+4. 涉及 `ms-core` 的變更，先在 `ms-core` repo merge/push，再 bump toolkit 的 submodule reference；release tag 只在正式發版流程需要
+
+詳見 [`CLAUDE.md`](CLAUDE.md) 中的開發守則。
+
+<details>
+<summary><b>Pipeline Contract — Unified Parquet V2</b></summary>
+
+本專案採用 **Unified Parquet V2** 作為 Step 1–4 的中介格式契約：
 
 - Step1-4 intermediate format = parquet
 - final export = xlsx; downstream handoff is manual
-- Step4 zero-as-missing default behavior
-- Unified Parquet V2 rollout checklist: `docs/plans/2026-03-05-unified-parquet-v2-rollout-checklist.md`
+- Step4 zero-as-missing default behavior and imputation-routing metadata
+
+詳見 `docs/plans/2026-03-05-unified-parquet-v2-rollout-checklist.md` 與
+`docs/plans/2026-03-04-step4-zero-impute-and-performance-design.md`。
+
+</details>
+
+## License
+
+本專案採用 [MIT License](LICENSE)。
+
+## Acknowledgments
+
+本工具整合並改寫自以下既有實作：
+
+- **ISTD 標記邏輯** — `FindSTDs_mzRT_Jia_Simplified.bas`
+- **重複訊號刪除** — [ms-data-processor](https://github.com/bosschen0429/ms-data-processor)
+- **特徵篩選與補值分流標記** — `Feature_barrier_V3.bas`
+
+開發於 **Chao-hu Lab**，主要維護者 [@bosschen0429](https://github.com/bosschen0429)。

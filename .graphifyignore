@@ -1,0 +1,37 @@
+# Local data and generated outputs
+OUTPUT/
+output/
+graphify-out/
+build/
+dist/
+downloads/
+logs/
+
+# Scientific data matrices and local references
+*.xlsx
+*.xls
+*.csv
+*.tsv
+*.parquet
+*.docx
+config/local_reference.yml
+config/local_reference.yaml
+config/local_reference_paths*.json
+
+# Visual assets that may contain local paths or project names
+docs/images/
+
+# Python and tooling artifacts
+.venv/
+venv/
+env/
+.pytest_cache/
+.pytest-tmp/
+.pytest-local-temp/
+__pycache__/
+*.pyc
+
+# Git/worktree surfaces
+.git/
+.worktrees/
+tmp*/
