@@ -304,11 +304,10 @@ Relevant workflows:
   `graphify-out/` local unless the user explicitly asks to version it; prefer
   committing only `.graphifyignore` until the generated graph is proven useful.
 - Existing repo skills:
-  - `skills/ms-quality-gate/SKILL.md`
+  - `skills/verification-shards/SKILL.md`
   - `skills/release-checklist/SKILL.md`
   - `skills/submodule-update/SKILL.md`
   - `skills/merge-quality-gate/SKILL.md`
-  - `skills/commit-outline/SKILL.md`
   - `skills/root-hygiene/SKILL.md`
 
 Candidate future skills:
