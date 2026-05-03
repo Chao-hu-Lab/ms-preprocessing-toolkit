@@ -14,6 +14,7 @@ from ms_preprocessing.gui.event_handlers import MainWindowEventHandlersMixin
 from ms_preprocessing.gui.layout import MainWindowLayoutMixin
 from ms_preprocessing.gui.pipeline_session import PipelineSession
 from ms_preprocessing.utils.file_handler import FileHandler
+from ms_preprocessing.utils.results import ProcessingMetadata
 
 
 class MainWindow(MainWindowEventHandlersMixin, MainWindowLayoutMixin, ctk.CTk):
@@ -43,7 +44,7 @@ class MainWindow(MainWindowEventHandlersMixin, MainWindowLayoutMixin, ctk.CTk):
         self._pipeline_session = PipelineSession(output_dir=self._output_dir, source_file=None)
         self._step_output_paths = self._pipeline_session.step_output_paths
         self._context = self._pipeline_session.context
-        self._source_context_snapshot: dict[str, object] | None = None
+        self._source_context_snapshot: ProcessingMetadata | None = None
         self._last_materialized_export_path: Path | None = None
         self._ui_thread_id = threading.get_ident()
         self._ui_queue = queue.SimpleQueue()

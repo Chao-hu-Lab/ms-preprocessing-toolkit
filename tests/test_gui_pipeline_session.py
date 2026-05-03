@@ -256,3 +256,27 @@ def test_update_context_from_metadata_merges_legacy_formatting_across_steps(tmp_
     assert session.context["protected_rows"] == {1, 2}
     assert session.context["blue_font_cells"] == ["B2", "C3"]
     assert session.context["highlight_rows"] == {4, 5}
+
+
+def test_legacy_context_view_is_context_shaped_copy_with_metadata_refs(tmp_path) -> None:
+    from ms_preprocessing.gui.pipeline_session import PipelineSession
+
+    base = tmp_path
+    session = PipelineSession(output_dir=base, source_file=base / "input.xlsx")
+    sample_info = pd.DataFrame({"Sample_Name": ["A"]})
+    session.update_context_from_metadata(
+        {
+            "red_font_rows": [1],
+            "protected_rows": [1],
+            "sample_info": sample_info,
+        }
+    )
+
+    legacy_view = session.legacy_context_view()
+    legacy_view["red_font_rows"].add(99)
+    legacy_view["metadata_refs"]["sample_info_ref"] = "changed"
+
+    assert session.metadata.red_font_rows == {1}
+    assert session.snapshot()["metadata_refs"]["sample_info_ref"] == "SampleInfo"
+    assert session.context["red_font_rows"] == {1}
+    assert session.context["metadata_refs"]["sample_info_ref"] == "SampleInfo"
